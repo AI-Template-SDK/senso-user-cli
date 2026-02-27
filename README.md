@@ -13,7 +13,7 @@ Built for **AI agents** (Claude Code, Gemini CLI, Codex) and **developers** who 
 Requires **Node.js 18+**. Works on **Linux**, **macOS**, and **Windows**.
 
 ```bash
-npm install -g github:AI-Template-SDK/senso-user-cli
+npm install -g @senso-ai/cli
 ```
 
 Verify it works:
@@ -25,7 +25,7 @@ senso --version
 > **One-off usage** — If you just want to try it without installing globally:
 >
 > ```bash
-> npx github:AI-Template-SDK/senso-user-cli --help
+> npx @senso-ai/cli --help
 > ```
 
 ## Quick Start
