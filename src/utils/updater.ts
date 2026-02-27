@@ -1,3 +1,4 @@
+import semver from "semver";
 import { readConfig, updateConfig } from "../lib/config.js";
 import { version } from "../lib/version.js";
 import { updateBox } from "./branding.js";
@@ -25,7 +26,7 @@ export async function checkForUpdate(quiet: boolean): Promise<void> {
 
   if (Date.now() - lastCheck < CHECK_INTERVAL_MS) {
     // Show cached result if we have one
-    if (config.latestVersion && config.latestVersion !== version) {
+    if (config.latestVersion && semver.gt(config.latestVersion, version)) {
       updateBox(version, config.latestVersion);
     }
     return;
@@ -51,7 +52,7 @@ export async function checkForUpdate(quiet: boolean): Promise<void> {
       latestVersion: latest,
     });
 
-    if (latest !== version) {
+    if (semver.gt(latest, version)) {
       updateBox(version, latest);
     }
   } catch {

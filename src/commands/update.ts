@@ -1,3 +1,4 @@
+import semver from "semver";
 import { Command } from "commander";
 import { getLatestRelease } from "../utils/updater.js";
 import { version } from "../lib/version.js";
@@ -22,7 +23,7 @@ export function registerUpdateCommand(program: Command): void {
 
       const latest = release.tag_name.replace(/^v/, "");
 
-      if (latest === version) {
+      if (!semver.gt(latest, version)) {
         log.success(`Already on the latest version (${version}).`);
         return;
       }
