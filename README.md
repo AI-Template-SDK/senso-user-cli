@@ -104,7 +104,7 @@ For non-interactive use (CI, agents), set the env var or pass the flag.
 ### Authentication
 
 ```
-senso login                          Save API key (interactive)
+senso login                          Authenticate with Senso (interactive)
 senso logout                         Remove stored credentials
 senso whoami                         Show current org and auth status
 ```
@@ -112,9 +112,9 @@ senso whoami                         Show current org and auth status
 ### Search
 
 ```
-senso search <query>                 Semantic search with AI-generated answer
-senso search context <query>         Semantic search — chunks only
-senso search content <query>         Semantic search — content IDs only
+senso search <query>                 Semantic search with AI-generated answer + source chunks
+senso search context <query>         Chunks only (no AI answer, faster)
+senso search content <query>         Content IDs only (deduplicated)
 ```
 
 Options: `--max-results <n>`
@@ -122,111 +122,101 @@ Options: `--max-results <n>`
 ### Content
 
 ```
-senso content list                   List content items
-senso content get <id>               Get content item by ID
-senso content delete <id>            Delete content (local + external)
-senso content unpublish <id>         Unpublish content
-senso content verification           List content awaiting verification
+senso content list                   List all knowledge base items
+senso content get <id>               Get full content detail by ID
+senso content delete <id>            Delete content (knowledge base + external)
+senso content unpublish <id>         Unpublish and revert to draft
+senso content verification           List items in verification workflow
 senso content reject <versionId>     Reject a content version
-senso content restore <versionId>    Restore a content version to draft
-senso content owners <id>            List content owners
-senso content set-owners <id>        Replace content owners
-senso content remove-owner <id> <userId>  Remove content owner
+senso content restore <versionId>    Restore rejected version to draft
+senso content owners <id>            List owners of a content item
+senso content set-owners <id>        Replace owners (--user-ids)
+senso content remove-owner <id> <userId>  Remove a single owner
 ```
+
+Options: `content list` supports `--limit`, `--offset`, `--search`, `--sort`. `content verification` supports `--limit`, `--offset`, `--search`, `--status`. `content reject` supports `--reason`.
 
 ### Content Generation
 
 ```
-senso generate settings              Get content generation settings
-senso generate update-settings       Update content generation settings
-senso generate sample                Generate ad hoc content sample
-senso generate run                   Trigger content engine run
+senso generate settings              Get generation settings
+senso generate update-settings       Update generation settings (--data)
+senso generate sample                Generate sample for a prompt (--prompt-id, --content-type-id)
+senso generate run                   Trigger a content engine run (--prompt-ids)
 ```
 
 ### Content Engine
 
 ```
-senso engine publish                 Publish content via content engine
-senso engine draft                   Save content as draft
+senso engine publish                 Publish content to external destinations (--data)
+senso engine draft                   Save content as draft for review (--data)
 ```
 
 ### Ingestion
 
 ```
-senso ingest upload                  Request presigned S3 upload URLs
-senso ingest reprocess <contentId>   Re-ingest existing content
-```
-
-### Categories & Topics
-
-```
-senso categories list                List categories
-senso categories list-all            List all categories with their topics
-senso categories create <name>       Create a category
-senso categories get <id>            Get category by ID
-senso categories update <id>         Update a category
-senso categories delete <id>         Delete a category
-senso categories batch-create        Batch create categories with topics
-
-senso topics list <categoryId>       List topics in a category
-senso topics create <categoryId>     Create a topic
-senso topics get <catId> <topicId>   Get a topic
-senso topics update <catId> <topicId> Update a topic
-senso topics delete <catId> <topicId> Delete a topic
-senso topics batch-create <catId>    Batch create topics
+senso ingest upload <files...>       Upload files to knowledge base (up to 10)
+senso ingest reprocess <contentId> <file>  Re-ingest content with new file
 ```
 
 ### Brand Kit & Content Types
 
 ```
-senso brand-kit get                  Get brand kit
-senso brand-kit set                  Upsert brand kit
+senso brand-kit get                  Get brand kit guidelines
+senso brand-kit set                  Create or replace brand kit (--data)
 
 senso content-types list             List content types
-senso content-types create           Create a content type
-senso content-types get <id>         Get content type
-senso content-types update <id>      Update content type
-senso content-types delete <id>      Delete content type
+senso content-types create           Create a content type (--data)
+senso content-types get <id>         Get content type by ID
+senso content-types update <id>      Update a content type (--data)
+senso content-types delete <id>      Delete a content type
 ```
+
+Options: `content-types list` supports `--limit`, `--offset`.
 
 ### Prompts
 
 ```
-senso prompts list                   List prompts
-senso prompts create                 Create a prompt
-senso prompts get <promptId>         Get prompt with full run history
+senso prompts list                   List prompts (geo questions)
+senso prompts create                 Create a prompt (--data)
+senso prompts get <promptId>         Get prompt with run history
 senso prompts delete <promptId>      Delete a prompt
 ```
+
+Options: `prompts list` supports `--limit`, `--offset`, `--search`, `--sort`.
 
 ### Organization
 
 ```
 senso org get                        Get organization details
-senso org update                     Update organization details
+senso org update                     Update organization details (--data)
 
 senso users list                     List users
-senso users add                      Add a user
-senso users get <userId>             Get a user
-senso users update <userId>          Update a user's role
+senso users add                      Add a user (--data)
+senso users get <userId>             Get user details
+senso users update <userId>          Update a user's role (--data)
 senso users remove <userId>          Remove a user
+senso users set-current <userId>     Set org as current for a user
 
 senso api-keys list                  List API keys
-senso api-keys create                Create API key
+senso api-keys create                Create API key (--data)
 senso api-keys get <keyId>           Get API key details
-senso api-keys update <keyId>        Update API key
+senso api-keys update <keyId>        Update API key (--data)
 senso api-keys delete <keyId>        Delete API key
 senso api-keys revoke <keyId>        Revoke API key
 
 senso members list                   List organization members
 ```
 
+Options: `users list` supports `--limit`, `--offset`. `api-keys list` supports `--limit`, `--offset`. `members list` supports `--limit`, `--offset`, `--search`, `--sort`.
+
 ### Run Configuration
 
 ```
 senso run-config models              Get configured AI models
-senso run-config set-models          Set AI models
-senso run-config schedule            Get run schedule
-senso run-config set-schedule        Set run schedule
+senso run-config set-models          Set AI models (--data)
+senso run-config schedule            Get run schedule (days of week)
+senso run-config set-schedule        Set run schedule (--data)
 ```
 
 ### Notifications
@@ -235,6 +225,8 @@ senso run-config set-schedule        Set run schedule
 senso notifications list             List notifications
 senso notifications read <id>        Mark notification as read
 ```
+
+Options: `notifications list` supports `--limit`, `--offset`, `--unread-only`.
 
 ### CLI Management
 
@@ -352,20 +344,18 @@ npm test
 ```
 src/
 ├── cli.ts                 # Entry point — arg parsing, command dispatch
-├── commands/              # One file per command group (18 files)
+├── commands/              # One file per command group (16 files)
 │   ├── auth.ts            # login, logout, whoami
 │   ├── search.ts          # search, search context, search content
 │   ├── content.ts         # CRUD + verification + owners
 │   ├── generate.ts        # content generation settings + triggers
 │   ├── engine.ts          # publish, draft
-│   ├── ingest.ts          # upload, reprocess
-│   ├── categories.ts      # CRUD + batch
-│   ├── topics.ts          # CRUD + batch
+│   ├── ingest.ts          # upload, reprocess (with S3 upload)
 │   ├── brand-kit.ts       # get, set
 │   ├── content-types.ts   # CRUD
 │   ├── prompts.ts         # CRUD
 │   ├── org.ts             # get, update
-│   ├── users.ts           # CRUD
+│   ├── users.ts           # CRUD + set-current
 │   ├── api-keys.ts        # CRUD + revoke
 │   ├── members.ts         # list
 │   ├── run-config.ts      # models, schedule

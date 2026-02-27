@@ -5,11 +5,11 @@ import * as log from "../utils/logger.js";
 export function registerRunConfigCommands(program: Command): void {
   const rc = program
     .command("run-config")
-    .description("Run configuration (models, schedule)");
+    .description("Configure which AI models are used for question runs and on which days they run. Models include chatgpt, gemini, etc.");
 
   rc
     .command("models")
-    .description("Get configured AI models")
+    .description("Get the AI models currently configured for question runs (e.g. chatgpt, gemini).")
     .action(async () => {
       const opts = program.opts();
       try {
@@ -23,8 +23,8 @@ export function registerRunConfigCommands(program: Command): void {
 
   rc
     .command("set-models")
-    .description("Set AI models")
-    .requiredOption("--data <json>", "JSON model configuration")
+    .description("Replace the configured AI models for question runs. At least one model name is required.")
+    .requiredOption("--data <json>", 'JSON: { "models": ["chatgpt", "gemini"] }')
     .action(async (cmdOpts: { data: string }) => {
       const opts = program.opts();
       try {
@@ -46,7 +46,7 @@ export function registerRunConfigCommands(program: Command): void {
 
   rc
     .command("schedule")
-    .description("Get run schedule")
+    .description("Get the days of the week when question runs are triggered (0=Sunday, 1=Monday, ..., 6=Saturday).")
     .action(async () => {
       const opts = program.opts();
       try {
@@ -60,8 +60,8 @@ export function registerRunConfigCommands(program: Command): void {
 
   rc
     .command("set-schedule")
-    .description("Set run schedule")
-    .requiredOption("--data <json>", "JSON schedule configuration")
+    .description("Set which days of the week question runs are triggered. Values must be 0-6 (Sunday-Saturday).")
+    .requiredOption("--data <json>", 'JSON: { "schedule": [1, 3, 5] }')
     .action(async (cmdOpts: { data: string }) => {
       const opts = program.opts();
       try {

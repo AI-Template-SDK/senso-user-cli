@@ -5,15 +5,22 @@ import * as log from "../utils/logger.js";
 export function registerApiKeyCommands(program: Command): void {
   const keys = program
     .command("api-keys")
-    .description("Manage API keys");
+    .description("Manage org-scoped API keys. Create, rotate, revoke, or list API keys used to authenticate with the Senso API.");
 
   keys
     .command("list")
-    .description("List API keys")
-    .action(async () => {
+    .description("List all API keys for the organization. Shows name, expiry, revocation status, and last usage.")
+    .option("--limit <n>", "Maximum number of keys to return")
+    .option("--offset <n>", "Number of keys to skip (for pagination)")
+    .action(async (cmdOpts: Record<string, string>) => {
       const opts = program.opts();
       try {
-        const data = await apiRequest({ path: "/org/api-keys", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        const data = await apiRequest({
+          path: "/org/api-keys",
+          params: { limit: cmdOpts.limit, offset: cmdOpts.offset },
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
         log.error(formatApiError(err));
@@ -23,8 +30,8 @@ export function registerApiKeyCommands(program: Command): void {
 
   keys
     .command("create")
-    .description("Create API key")
-    .requiredOption("--data <json>", "JSON key configuration")
+    .description("Create a new API key. The key value is returned only once — store it securely.")
+    .requiredOption("--data <json>", 'JSON: { "name": "my-key", "expires_at": "2025-12-31T00:00:00Z" }')
     .action(async (cmdOpts: { data: string }) => {
       const opts = program.opts();
       try {
@@ -46,7 +53,7 @@ export function registerApiKeyCommands(program: Command): void {
 
   keys
     .command("get <keyId>")
-    .description("Get API key details")
+    .description("Get details for a specific API key including name, expiry, and last used timestamp.")
     .action(async (keyId: string) => {
       const opts = program.opts();
       try {
@@ -60,14 +67,14 @@ export function registerApiKeyCommands(program: Command): void {
 
   keys
     .command("update <keyId>")
-    .description("Update API key")
-    .requiredOption("--data <json>", "JSON key updates")
+    .description("Update an API key's name or expiry date.")
+    .requiredOption("--data <json>", 'JSON: { "name": "new-name", "expires_at": "2026-06-01T00:00:00Z" }')
     .action(async (keyId: string, cmdOpts: { data: string }) => {
       const opts = program.opts();
       try {
         const body = JSON.parse(cmdOpts.data);
         const data = await apiRequest({
-          method: "PATCH",
+          method: "PUT",
           path: `/org/api-keys/${keyId}`,
           body,
           apiKey: opts.apiKey,
@@ -83,7 +90,7 @@ export function registerApiKeyCommands(program: Command): void {
 
   keys
     .command("delete <keyId>")
-    .description("Delete API key")
+    .description("Permanently delete an API key. This cannot be undone.")
     .action(async (keyId: string) => {
       const opts = program.opts();
       try {
@@ -97,7 +104,7 @@ export function registerApiKeyCommands(program: Command): void {
 
   keys
     .command("revoke <keyId>")
-    .description("Revoke API key")
+    .description("Revoke an API key. The key remains visible but can no longer be used for authentication.")
     .action(async (keyId: string) => {
       const opts = program.opts();
       try {

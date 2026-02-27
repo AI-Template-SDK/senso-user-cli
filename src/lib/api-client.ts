@@ -64,10 +64,11 @@ export async function apiRequest<T = unknown>(
 
     if (!res.ok) {
       let body: unknown;
+      const text = await res.text();
       try {
-        body = await res.json();
+        body = JSON.parse(text);
       } catch {
-        body = await res.text();
+        body = text;
       }
       throw new ApiError(res.status, res.statusText, body);
     }
@@ -76,7 +77,12 @@ export async function apiRequest<T = unknown>(
       return undefined as T;
     }
 
-    return (await res.json()) as T;
+    const text = await res.text();
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      throw new Error(`Invalid JSON response from ${opts.path}`);
+    }
   } finally {
     clearTimeout(timeout);
   }

@@ -211,17 +211,23 @@ async function apiRequest(opts) {
     });
     if (!res.ok) {
       let body;
+      const text3 = await res.text();
       try {
-        body = await res.json();
+        body = JSON.parse(text3);
       } catch {
-        body = await res.text();
+        body = text3;
       }
       throw new ApiError(res.status, res.statusText, body);
     }
     if (res.status === 204) {
       return void 0;
     }
-    return await res.json();
+    const text2 = await res.text();
+    try {
+      return JSON.parse(text2);
+    } catch {
+      throw new Error(`Invalid JSON response from ${opts.path}`);
+    }
   } finally {
     clearTimeout(timeout);
   }
@@ -280,7 +286,7 @@ async function verifyApiKey(apiKey, baseUrl) {
   });
 }
 function registerAuthCommands(program2) {
-  program2.command("login").description("Save API key to config (validates via GET /org/me)").action(async () => {
+  program2.command("login").description("Authenticate with Senso. Paste your API key and it will be validated against your organization, then stored locally.").action(async () => {
     const opts = program2.opts();
     banner();
     console.log(`  ${pc3.bold("Welcome to Senso CLI!")}
@@ -322,11 +328,11 @@ function registerAuthCommands(program2) {
       process.exit(1);
     }
   });
-  program2.command("logout").description("Remove stored credentials").action(() => {
+  program2.command("logout").description("Remove stored API key and organization info from local config.").action(() => {
     clearConfig();
     success("Credentials removed.");
   });
-  program2.command("whoami").description("Show current auth status and org info").action(async () => {
+  program2.command("whoami").description("Show which organization you are authenticated as, including org ID, slug, tier, and API key prefix.").action(async () => {
     const opts = program2.opts();
     const apiKey = getApiKey({ apiKey: opts.apiKey });
     if (!apiKey) {
@@ -372,8 +378,8 @@ function registerAuthCommands(program2) {
 
 // src/commands/org.ts
 function registerOrgCommands(program2) {
-  const org = program2.command("org").description("Organization management");
-  org.command("get").description("Get organization details").action(async () => {
+  const org = program2.command("org").description("View and update organization profile and settings. Includes name, slug, logo, websites, locations, and tier information.");
+  org.command("get").description("Get full organization details including name, slug, tier, websites, locations, configured AI models, publishers, and schedule.").action(async () => {
     const opts = program2.opts();
     try {
       const data = await apiRequest({ path: "/org/me", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
@@ -383,12 +389,12 @@ function registerOrgCommands(program2) {
       process.exit(1);
     }
   });
-  org.command("update").description("Update organization details").requiredOption("--data <json>", "JSON org fields to update").action(async (cmdOpts) => {
+  org.command("update").description("Update organization details. All fields are optional \u2014 only provided fields are changed. Pass an empty array for websites/locations to clear them.").requiredOption("--data <json>", 'JSON: { "name": "...", "slug": "...", "logo_url": "...", "websites": [...], "locations": [...] }').action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
       const body = JSON.parse(cmdOpts.data);
       const data = await apiRequest({
-        method: "PATCH",
+        method: "PUT",
         path: "/org/me",
         body,
         apiKey: opts.apiKey,
@@ -405,18 +411,23 @@ function registerOrgCommands(program2) {
 
 // src/commands/users.ts
 function registerUserCommands(program2) {
-  const users = program2.command("users").description("Manage users in organization");
-  users.command("list").description("List users in organization").action(async () => {
+  const users = program2.command("users").description("Manage users within the organization. Add, update roles, remove users, or set the active organization for a user.");
+  users.command("list").description("List all users in the organization. Returns user IDs, roles, and membership status.").option("--limit <n>", "Maximum number of users to return").option("--offset <n>", "Number of users to skip (for pagination)").action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
-      const data = await apiRequest({ path: "/org/users", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+      const data = await apiRequest({
+        path: "/org/users",
+        params: { limit: cmdOpts.limit, offset: cmdOpts.offset },
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
       console.log(JSON.stringify(data, null, 2));
     } catch (err) {
       error(formatApiError(err));
       process.exit(1);
     }
   });
-  users.command("add").description("Add user to organization").requiredOption("--data <json>", "JSON user data").action(async (cmdOpts) => {
+  users.command("add").description("Add an existing platform user to the organization. Requires user_id and role_id.").requiredOption("--data <json>", 'JSON: { "user_id": "uuid", "role_id": "uuid", "is_current": false }').action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
       const body = JSON.parse(cmdOpts.data);
@@ -434,7 +445,7 @@ function registerUserCommands(program2) {
       process.exit(1);
     }
   });
-  users.command("get <userId>").description("Get a user in the organization").action(async (userId) => {
+  users.command("get <userId>").description("Get a user's details including their role and membership status in the organization.").action(async (userId) => {
     const opts = program2.opts();
     try {
       const data = await apiRequest({ path: `/org/users/${userId}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
@@ -444,12 +455,12 @@ function registerUserCommands(program2) {
       process.exit(1);
     }
   });
-  users.command("update <userId>").description("Update a user's role").requiredOption("--data <json>", "JSON user update data").action(async (userId, cmdOpts) => {
+  users.command("update <userId>").description("Update a user's role in the organization. Requires role_id in the JSON body.").requiredOption("--data <json>", 'JSON: { "role_id": "uuid", "is_current": true }').action(async (userId, cmdOpts) => {
     const opts = program2.opts();
     try {
       const body = JSON.parse(cmdOpts.data);
       const data = await apiRequest({
-        method: "PATCH",
+        method: "PUT",
         path: `/org/users/${userId}`,
         body,
         apiKey: opts.apiKey,
@@ -462,7 +473,7 @@ function registerUserCommands(program2) {
       process.exit(1);
     }
   });
-  users.command("remove <userId>").description("Remove a user from the organization").action(async (userId) => {
+  users.command("remove <userId>").description("Remove a user from the organization. This does not delete the platform user account.").action(async (userId) => {
     const opts = program2.opts();
     try {
       await apiRequest({ method: "DELETE", path: `/org/users/${userId}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
@@ -472,22 +483,43 @@ function registerUserCommands(program2) {
       process.exit(1);
     }
   });
+  users.command("set-current <userId>").description("Set this organization as the current (active) organization for a user.").action(async (userId) => {
+    const opts = program2.opts();
+    try {
+      await apiRequest({
+        method: "PATCH",
+        path: `/org/users/${userId}/current`,
+        body: { is_current: true },
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      success(`Organization set as current for user ${userId}.`);
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
 }
 
 // src/commands/api-keys.ts
 function registerApiKeyCommands(program2) {
-  const keys = program2.command("api-keys").description("Manage API keys");
-  keys.command("list").description("List API keys").action(async () => {
+  const keys = program2.command("api-keys").description("Manage org-scoped API keys. Create, rotate, revoke, or list API keys used to authenticate with the Senso API.");
+  keys.command("list").description("List all API keys for the organization. Shows name, expiry, revocation status, and last usage.").option("--limit <n>", "Maximum number of keys to return").option("--offset <n>", "Number of keys to skip (for pagination)").action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
-      const data = await apiRequest({ path: "/org/api-keys", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+      const data = await apiRequest({
+        path: "/org/api-keys",
+        params: { limit: cmdOpts.limit, offset: cmdOpts.offset },
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
       console.log(JSON.stringify(data, null, 2));
     } catch (err) {
       error(formatApiError(err));
       process.exit(1);
     }
   });
-  keys.command("create").description("Create API key").requiredOption("--data <json>", "JSON key configuration").action(async (cmdOpts) => {
+  keys.command("create").description("Create a new API key. The key value is returned only once \u2014 store it securely.").requiredOption("--data <json>", 'JSON: { "name": "my-key", "expires_at": "2025-12-31T00:00:00Z" }').action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
       const body = JSON.parse(cmdOpts.data);
@@ -505,7 +537,7 @@ function registerApiKeyCommands(program2) {
       process.exit(1);
     }
   });
-  keys.command("get <keyId>").description("Get API key details").action(async (keyId) => {
+  keys.command("get <keyId>").description("Get details for a specific API key including name, expiry, and last used timestamp.").action(async (keyId) => {
     const opts = program2.opts();
     try {
       const data = await apiRequest({ path: `/org/api-keys/${keyId}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
@@ -515,12 +547,12 @@ function registerApiKeyCommands(program2) {
       process.exit(1);
     }
   });
-  keys.command("update <keyId>").description("Update API key").requiredOption("--data <json>", "JSON key updates").action(async (keyId, cmdOpts) => {
+  keys.command("update <keyId>").description("Update an API key's name or expiry date.").requiredOption("--data <json>", 'JSON: { "name": "new-name", "expires_at": "2026-06-01T00:00:00Z" }').action(async (keyId, cmdOpts) => {
     const opts = program2.opts();
     try {
       const body = JSON.parse(cmdOpts.data);
       const data = await apiRequest({
-        method: "PATCH",
+        method: "PUT",
         path: `/org/api-keys/${keyId}`,
         body,
         apiKey: opts.apiKey,
@@ -533,7 +565,7 @@ function registerApiKeyCommands(program2) {
       process.exit(1);
     }
   });
-  keys.command("delete <keyId>").description("Delete API key").action(async (keyId) => {
+  keys.command("delete <keyId>").description("Permanently delete an API key. This cannot be undone.").action(async (keyId) => {
     const opts = program2.opts();
     try {
       await apiRequest({ method: "DELETE", path: `/org/api-keys/${keyId}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
@@ -543,210 +575,13 @@ function registerApiKeyCommands(program2) {
       process.exit(1);
     }
   });
-  keys.command("revoke <keyId>").description("Revoke API key").action(async (keyId) => {
+  keys.command("revoke <keyId>").description("Revoke an API key. The key remains visible but can no longer be used for authentication.").action(async (keyId) => {
     const opts = program2.opts();
     try {
       await apiRequest({ method: "POST", path: `/org/api-keys/${keyId}/revoke`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
       success(`API key ${keyId} revoked.`);
     } catch (err) {
       error(formatApiError(err));
-      process.exit(1);
-    }
-  });
-}
-
-// src/commands/categories.ts
-function registerCategoryCommands(program2) {
-  const cat = program2.command("categories").description("Manage categories");
-  cat.command("list").description("List categories").action(async () => {
-    const opts = program2.opts();
-    try {
-      const data = await apiRequest({ path: "/org/categories", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
-      console.log(JSON.stringify(data, null, 2));
-    } catch (err) {
-      error(formatApiError(err));
-      process.exit(1);
-    }
-  });
-  cat.command("list-all").description("List all categories with their topics").action(async () => {
-    const opts = program2.opts();
-    try {
-      const data = await apiRequest({ path: "/org/categories/all", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
-      console.log(JSON.stringify(data, null, 2));
-    } catch (err) {
-      error(formatApiError(err));
-      process.exit(1);
-    }
-  });
-  cat.command("create <name>").description("Create a category").action(async (name) => {
-    const opts = program2.opts();
-    try {
-      const data = await apiRequest({
-        method: "POST",
-        path: "/org/categories",
-        body: { name },
-        apiKey: opts.apiKey,
-        baseUrl: opts.baseUrl
-      });
-      success(`Category "${name}" created.`);
-      console.log(JSON.stringify(data, null, 2));
-    } catch (err) {
-      error(formatApiError(err));
-      process.exit(1);
-    }
-  });
-  cat.command("get <id>").description("Get category by ID").action(async (id) => {
-    const opts = program2.opts();
-    try {
-      const data = await apiRequest({ path: `/org/categories/${id}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
-      console.log(JSON.stringify(data, null, 2));
-    } catch (err) {
-      error(formatApiError(err));
-      process.exit(1);
-    }
-  });
-  cat.command("update <id>").description("Update a category").requiredOption("--name <name>", "New category name").action(async (id, cmdOpts) => {
-    const opts = program2.opts();
-    try {
-      const data = await apiRequest({
-        method: "PATCH",
-        path: `/org/categories/${id}`,
-        body: { name: cmdOpts.name },
-        apiKey: opts.apiKey,
-        baseUrl: opts.baseUrl
-      });
-      success(`Category ${id} updated.`);
-      console.log(JSON.stringify(data, null, 2));
-    } catch (err) {
-      error(formatApiError(err));
-      process.exit(1);
-    }
-  });
-  cat.command("delete <id>").description("Delete a category").action(async (id) => {
-    const opts = program2.opts();
-    try {
-      await apiRequest({ method: "DELETE", path: `/org/categories/${id}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
-      success(`Category ${id} deleted.`);
-    } catch (err) {
-      error(formatApiError(err));
-      process.exit(1);
-    }
-  });
-  cat.command("batch-create").description("Batch create categories with topics").requiredOption("--data <json>", "JSON array of categories with topics").action(async (cmdOpts) => {
-    const opts = program2.opts();
-    try {
-      const body = JSON.parse(cmdOpts.data);
-      const data = await apiRequest({
-        method: "POST",
-        path: "/org/categories/batch",
-        body,
-        apiKey: opts.apiKey,
-        baseUrl: opts.baseUrl
-      });
-      success("Batch create completed.");
-      console.log(JSON.stringify(data, null, 2));
-    } catch (err) {
-      error(err instanceof SyntaxError ? "Invalid JSON in --data" : formatApiError(err));
-      process.exit(1);
-    }
-  });
-}
-
-// src/commands/topics.ts
-function registerTopicCommands(program2) {
-  const topics = program2.command("topics").description("Manage topics within categories");
-  topics.command("list <categoryId>").description("List topics for a category").action(async (categoryId) => {
-    const opts = program2.opts();
-    try {
-      const data = await apiRequest({
-        path: `/org/categories/${categoryId}/topics`,
-        apiKey: opts.apiKey,
-        baseUrl: opts.baseUrl
-      });
-      console.log(JSON.stringify(data, null, 2));
-    } catch (err) {
-      error(formatApiError(err));
-      process.exit(1);
-    }
-  });
-  topics.command("create <categoryId>").description("Create topic in category").requiredOption("--name <name>", "Topic name").action(async (categoryId, cmdOpts) => {
-    const opts = program2.opts();
-    try {
-      const data = await apiRequest({
-        method: "POST",
-        path: `/org/categories/${categoryId}/topics`,
-        body: { name: cmdOpts.name },
-        apiKey: opts.apiKey,
-        baseUrl: opts.baseUrl
-      });
-      success(`Topic "${cmdOpts.name}" created.`);
-      console.log(JSON.stringify(data, null, 2));
-    } catch (err) {
-      error(formatApiError(err));
-      process.exit(1);
-    }
-  });
-  topics.command("get <categoryId> <topicId>").description("Get topic by ID").action(async (categoryId, topicId) => {
-    const opts = program2.opts();
-    try {
-      const data = await apiRequest({
-        path: `/org/categories/${categoryId}/topics/${topicId}`,
-        apiKey: opts.apiKey,
-        baseUrl: opts.baseUrl
-      });
-      console.log(JSON.stringify(data, null, 2));
-    } catch (err) {
-      error(formatApiError(err));
-      process.exit(1);
-    }
-  });
-  topics.command("update <categoryId> <topicId>").description("Update a topic").requiredOption("--name <name>", "New topic name").action(async (categoryId, topicId, cmdOpts) => {
-    const opts = program2.opts();
-    try {
-      const data = await apiRequest({
-        method: "PATCH",
-        path: `/org/categories/${categoryId}/topics/${topicId}`,
-        body: { name: cmdOpts.name },
-        apiKey: opts.apiKey,
-        baseUrl: opts.baseUrl
-      });
-      success(`Topic ${topicId} updated.`);
-      console.log(JSON.stringify(data, null, 2));
-    } catch (err) {
-      error(formatApiError(err));
-      process.exit(1);
-    }
-  });
-  topics.command("delete <categoryId> <topicId>").description("Delete a topic").action(async (categoryId, topicId) => {
-    const opts = program2.opts();
-    try {
-      await apiRequest({
-        method: "DELETE",
-        path: `/org/categories/${categoryId}/topics/${topicId}`,
-        apiKey: opts.apiKey,
-        baseUrl: opts.baseUrl
-      });
-      success(`Topic ${topicId} deleted.`);
-    } catch (err) {
-      error(formatApiError(err));
-      process.exit(1);
-    }
-  });
-  topics.command("batch-create <categoryId>").description("Batch create topics in a category").requiredOption("--data <json>", "JSON array of topics").action(async (categoryId, cmdOpts) => {
-    const opts = program2.opts();
-    try {
-      const body = JSON.parse(cmdOpts.data);
-      const data = await apiRequest({
-        method: "POST",
-        path: `/org/categories/${categoryId}/topics/batch`,
-        body,
-        apiKey: opts.apiKey,
-        baseUrl: opts.baseUrl
-      });
-      success("Batch create completed.");
-      console.log(JSON.stringify(data, null, 2));
-    } catch (err) {
-      error(err instanceof SyntaxError ? "Invalid JSON in --data" : formatApiError(err));
       process.exit(1);
     }
   });
@@ -807,7 +642,7 @@ function output(format, data) {
 
 // src/commands/search.ts
 function registerSearchCommands(program2) {
-  const search = program2.command("search").description("Semantic search over your knowledge base");
+  const search = program2.command("search").description("Search the knowledge base with natural language queries. Returns AI-generated answers synthesised from matching content chunks, or raw chunks/content IDs.");
   search.argument("<query>", "Search query").option("--max-results <n>", "Maximum number of results", "5").action(async (query, cmdOpts) => {
     const opts = program2.opts();
     try {
@@ -847,7 +682,7 @@ function registerSearchCommands(program2) {
       process.exit(1);
     }
   });
-  search.command("context <query>").description("Semantic search \u2014 chunks only").option("--max-results <n>", "Maximum results", "5").action(async (query, cmdOpts) => {
+  search.command("context <query>").description("Search the knowledge base \u2014 returns matching content chunks only, without AI answer generation. Faster than full search.").option("--max-results <n>", "Maximum results", "5").action(async (query, cmdOpts) => {
     const opts = program2.opts();
     try {
       const data = await apiRequest({
@@ -863,7 +698,7 @@ function registerSearchCommands(program2) {
       process.exit(1);
     }
   });
-  search.command("content <query>").description("Semantic search \u2014 content IDs only").option("--max-results <n>", "Maximum results", "5").action(async (query, cmdOpts) => {
+  search.command("content <query>").description("Search the knowledge base \u2014 returns deduplicated content IDs and titles only. No chunks or AI answer.").option("--max-results <n>", "Maximum results", "5").action(async (query, cmdOpts) => {
     const opts = program2.opts();
     try {
       const data = await apiRequest({
@@ -889,34 +724,119 @@ function outputByFormat(format, data) {
 }
 
 // src/commands/ingest.ts
+import { createHash } from "crypto";
+import { readFile, stat } from "fs/promises";
+import { basename, resolve } from "path";
+var MIME_TYPES = {
+  ".pdf": "application/pdf",
+  ".txt": "text/plain",
+  ".csv": "text/csv",
+  ".doc": "application/msword",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".xls": "application/vnd.ms-excel",
+  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ".ppt": "application/vnd.ms-powerpoint",
+  ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  ".html": "text/html",
+  ".htm": "text/html",
+  ".md": "text/markdown",
+  ".json": "application/json",
+  ".xml": "application/xml"
+};
+function getMimeType(filename) {
+  const ext = filename.slice(filename.lastIndexOf(".")).toLowerCase();
+  return MIME_TYPES[ext] || "application/octet-stream";
+}
+async function getFileMetadata(filePath) {
+  const absPath = resolve(filePath);
+  const buffer = await readFile(absPath);
+  const stats = await stat(absPath);
+  const hash = createHash("md5").update(buffer).digest("hex");
+  return {
+    meta: {
+      filename: basename(absPath),
+      file_size_bytes: stats.size,
+      content_type: getMimeType(basename(absPath)),
+      content_hash_md5: hash
+    },
+    buffer
+  };
+}
+async function uploadToS3(url, buffer, contentType) {
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: { "Content-Type": contentType },
+    body: buffer
+  });
+  if (!res.ok) {
+    throw new Error(`S3 upload failed: ${res.status} ${res.statusText}`);
+  }
+}
 function registerIngestCommands(program2) {
-  const ingest = program2.command("ingest").description("Content ingestion (upload, reprocess)");
-  ingest.command("upload").description("Request presigned S3 upload URLs").requiredOption("--files <filenames...>", "File names to get upload URLs for").action(async (cmdOpts) => {
+  const ingest = program2.command("ingest").description("Ingest files into the knowledge base. Upload documents (PDF, TXT, DOCX, etc.) to be parsed, chunked, and embedded for semantic search.");
+  ingest.command("upload <files...>").description("Upload files to the knowledge base. Accepts local file paths (up to 10). Files are hashed, uploaded to S3, then parsed and embedded by a background worker.").action(async (files) => {
     const opts = program2.opts();
+    if (files.length > 10) {
+      error("Maximum 10 files per upload request.");
+      process.exit(1);
+    }
     try {
-      const data = await apiRequest({
+      const fileData = await Promise.all(files.map(getFileMetadata));
+      const results = await apiRequest({
         method: "POST",
         path: "/org/ingestion/upload",
-        body: { files: cmdOpts.files },
+        body: { files: fileData.map((f) => f.meta) },
         apiKey: opts.apiKey,
         baseUrl: opts.baseUrl
       });
-      console.log(JSON.stringify(data, null, 2));
+      const items = Array.isArray(results) ? results : [];
+      let uploaded = 0;
+      for (const item of items) {
+        if (item.status === "upload_pending" && item.upload_url) {
+          const match = fileData.find((f) => f.meta.filename === item.filename);
+          if (match) {
+            await uploadToS3(item.upload_url, match.buffer, match.meta.content_type);
+            uploaded++;
+            success(`Uploaded ${item.filename} (content_id: ${item.content_id})`);
+          }
+        } else {
+          warn(`Skipped ${item.filename}: ${item.status}${item.message ? ` \u2014 ${item.message}` : ""}`);
+        }
+      }
+      if (uploaded > 0) {
+        success(`${uploaded} file(s) uploaded. Background processing will parse, chunk, and embed them.`);
+      }
+      if (opts.output === "json") {
+        console.log(JSON.stringify(results, null, 2));
+      }
     } catch (err) {
       error(formatApiError(err));
       process.exit(1);
     }
   });
-  ingest.command("reprocess <contentId>").description("Request re-ingestion of existing content").action(async (contentId) => {
+  ingest.command("reprocess <contentId> <file>").description("Re-ingest an existing content item with a new file version. Provide the content ID and the path to the replacement file.").action(async (contentId, file) => {
     const opts = program2.opts();
     try {
-      await apiRequest({
-        method: "POST",
-        path: `/org/ingestion/${contentId}/reprocess`,
+      const { meta, buffer } = await getFileMetadata(file);
+      const results = await apiRequest({
+        method: "PUT",
+        path: `/org/ingestion/content/${contentId}`,
+        body: { file: meta },
         apiKey: opts.apiKey,
         baseUrl: opts.baseUrl
       });
-      success(`Reprocess triggered for content ${contentId}.`);
+      const items = Array.isArray(results) ? results : [];
+      for (const item of items) {
+        if (item.status === "upload_pending" && item.upload_url) {
+          await uploadToS3(item.upload_url, buffer, meta.content_type);
+          success(`Uploaded ${meta.filename} for content ${contentId}. Background re-processing started.`);
+        } else {
+          warn(`Skipped: ${item.status}${item.message ? ` \u2014 ${item.message}` : ""}`);
+        }
+      }
+      if (opts.output === "json") {
+        console.log(JSON.stringify(results, null, 2));
+      }
     } catch (err) {
       error(formatApiError(err));
       process.exit(1);
@@ -927,13 +847,13 @@ function registerIngestCommands(program2) {
 // src/commands/content.ts
 import pc6 from "picocolors";
 function registerContentCommands(program2) {
-  const content = program2.command("content").description("Manage content items");
-  content.command("list").description("List content items").option("--limit <n>", "Items per page", "10").option("--offset <n>", "Pagination offset", "0").action(async (cmdOpts) => {
+  const content = program2.command("content").description("Manage content items in the knowledge base. List, inspect, delete, unpublish, and manage the verification workflow and ownership of content.");
+  content.command("list").description("List all content items in the knowledge base. Returns title, status, and ID for each item. Use --search to filter by title, --sort to order results.").option("--limit <n>", "Items per page", "10").option("--offset <n>", "Pagination offset", "0").option("--search <query>", "Filter content by title").option("--sort <order>", "Sort order: title_asc, title_desc, created_asc, created_desc").action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
       const data = await apiRequest({
         path: "/org/content",
-        params: { limit: cmdOpts.limit, offset: cmdOpts.offset },
+        params: { limit: cmdOpts.limit, offset: cmdOpts.offset, search: cmdOpts.search, sort: cmdOpts.sort },
         apiKey: opts.apiKey,
         baseUrl: opts.baseUrl
       });
@@ -958,7 +878,7 @@ function registerContentCommands(program2) {
       process.exit(1);
     }
   });
-  content.command("get <id>").description("Get content item by ID").action(async (id) => {
+  content.command("get <id>").description("Get a content item by ID. Returns the full content detail including versions, metadata, and publish status.").action(async (id) => {
     const opts = program2.opts();
     try {
       const data = await apiRequest({ path: `/org/content/${id}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
@@ -968,7 +888,7 @@ function registerContentCommands(program2) {
       process.exit(1);
     }
   });
-  content.command("delete <id>").description("Delete content (local + external)").action(async (id) => {
+  content.command("delete <id>").description("Delete a content item from the knowledge base and any external publish destinations. This cannot be undone.").action(async (id) => {
     const opts = program2.opts();
     try {
       await apiRequest({ method: "DELETE", path: `/org/content/${id}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
@@ -978,7 +898,7 @@ function registerContentCommands(program2) {
       process.exit(1);
     }
   });
-  content.command("unpublish <id>").description("Unpublish content (external delete + set draft)").action(async (id) => {
+  content.command("unpublish <id>").description("Unpublish a content item. Removes it from external destinations and sets its status back to draft.").action(async (id) => {
     const opts = program2.opts();
     try {
       await apiRequest({ method: "POST", path: `/org/content/${id}/unpublish`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
@@ -988,27 +908,33 @@ function registerContentCommands(program2) {
       process.exit(1);
     }
   });
-  content.command("verification").description("List content awaiting verification").action(async () => {
+  content.command("verification").description("List content items in the verification workflow. Filter by editorial status (draft, review, rejected, published) to manage the review pipeline.").option("--limit <n>", "Maximum items to return").option("--offset <n>", "Number of items to skip (for pagination)").option("--search <query>", "Filter by title").option("--status <status>", "Filter by status: all, draft, review, rejected, published").action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
-      const data = await apiRequest({ path: "/org/content/verification", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+      const data = await apiRequest({
+        path: "/org/content/verification",
+        params: { limit: cmdOpts.limit, offset: cmdOpts.offset, search: cmdOpts.search, status: cmdOpts.status },
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
       console.log(JSON.stringify(data, null, 2));
     } catch (err) {
       error(formatApiError(err));
       process.exit(1);
     }
   });
-  content.command("reject <versionId>").description("Reject a content version").action(async (versionId) => {
+  content.command("reject <versionId>").description("Reject a content version in the verification workflow. Optionally provide a reason for the rejection.").option("--reason <text>", "Reason for rejection").action(async (versionId, cmdOpts) => {
     const opts = program2.opts();
     try {
-      await apiRequest({ method: "POST", path: `/org/content/versions/${versionId}/reject`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+      const body = cmdOpts.reason ? { reason: cmdOpts.reason } : void 0;
+      await apiRequest({ method: "POST", path: `/org/content/versions/${versionId}/reject`, body, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
       success(`Version ${versionId} rejected.`);
     } catch (err) {
       error(formatApiError(err));
       process.exit(1);
     }
   });
-  content.command("restore <versionId>").description("Restore a content version to draft").action(async (versionId) => {
+  content.command("restore <versionId>").description("Restore a rejected content version back to draft status for further editing.").action(async (versionId) => {
     const opts = program2.opts();
     try {
       await apiRequest({ method: "POST", path: `/org/content/versions/${versionId}/restore`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
@@ -1018,7 +944,7 @@ function registerContentCommands(program2) {
       process.exit(1);
     }
   });
-  content.command("owners <id>").description("List content owners").action(async (id) => {
+  content.command("owners <id>").description("List the owners assigned to a content item. Owners are responsible for reviewing and approving content.").action(async (id) => {
     const opts = program2.opts();
     try {
       const data = await apiRequest({ path: `/org/content/${id}/owners`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
@@ -1028,7 +954,7 @@ function registerContentCommands(program2) {
       process.exit(1);
     }
   });
-  content.command("set-owners <id>").description("Replace content owners").requiredOption("--user-ids <ids...>", "User IDs to set as owners").action(async (id, cmdOpts) => {
+  content.command("set-owners <id>").description("Replace all owners of a content item with a new set of user IDs.").requiredOption("--user-ids <ids...>", "User IDs to set as owners").action(async (id, cmdOpts) => {
     const opts = program2.opts();
     try {
       await apiRequest({
@@ -1044,7 +970,7 @@ function registerContentCommands(program2) {
       process.exit(1);
     }
   });
-  content.command("remove-owner <id> <userId>").description("Remove content owner").action(async (id, userId) => {
+  content.command("remove-owner <id> <userId>").description("Remove a single owner from a content item.").action(async (id, userId) => {
     const opts = program2.opts();
     try {
       await apiRequest({ method: "DELETE", path: `/org/content/${id}/owners/${userId}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
@@ -1058,8 +984,8 @@ function registerContentCommands(program2) {
 
 // src/commands/generate.ts
 function registerGenerateCommands(program2) {
-  const gen = program2.command("generate").description("Content generation settings and triggers");
-  gen.command("settings").description("Get content generation settings").action(async () => {
+  const gen = program2.command("generate").description("AI content generation. Configure settings, generate content samples from prompts, or trigger full content engine runs.");
+  gen.command("settings").description("Get content generation settings. Shows whether generation and auto-publish are enabled, the content schedule, and configured publishers.").action(async () => {
     const opts = program2.opts();
     try {
       const data = await apiRequest({ path: "/org/content-generation", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
@@ -1069,24 +995,32 @@ function registerGenerateCommands(program2) {
       process.exit(1);
     }
   });
-  gen.command("update-settings").description("Update content generation settings").requiredOption("--data <json>", "JSON settings to update").action(async (cmdOpts) => {
+  gen.command("update-settings").description("Update content generation settings. Control auto-publish, generation toggle, and schedule (days of week 0-6).").requiredOption("--data <json>", 'JSON settings: { "enable_content_generation": bool, "content_auto_publish": bool, "content_schedule": [0-6] }').action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
       const body = JSON.parse(cmdOpts.data);
       const data = await apiRequest({ method: "PATCH", path: "/org/content-generation", body, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+      success("Content generation settings updated.");
       console.log(JSON.stringify(data, null, 2));
     } catch (err) {
       error(err instanceof SyntaxError ? "Invalid JSON in --data" : formatApiError(err));
       process.exit(1);
     }
   });
-  gen.command("sample").description("Generate ad hoc content sample").requiredOption("--instructions <text>", "Instructions for generation").action(async (cmdOpts) => {
+  gen.command("sample").description("Generate an ad hoc content sample for a specific prompt and content type. Returns the generated markdown, SEO title, and publish results.").requiredOption("--prompt-id <id>", "Prompt (geo question) ID to generate content for").requiredOption("--content-type-id <id>", "Content type ID that defines the output format").option("--destination <dest>", "Publish destination (e.g. citeables)").action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
+      const body = {
+        geo_question_id: cmdOpts.promptId,
+        content_type_id: cmdOpts.contentTypeId
+      };
+      if (cmdOpts.destination) {
+        body.publish_destination = cmdOpts.destination;
+      }
       const data = await apiRequest({
         method: "POST",
         path: "/org/content-generation/sample",
-        body: { instructions: cmdOpts.instructions },
+        body,
         apiKey: opts.apiKey,
         baseUrl: opts.baseUrl
       });
@@ -1096,10 +1030,11 @@ function registerGenerateCommands(program2) {
       process.exit(1);
     }
   });
-  gen.command("run").description("Trigger content engine run").action(async () => {
+  gen.command("run").description("Trigger a content generation run. Processes all prompts (or a specific subset) through the content engine. Runs asynchronously.").option("--prompt-ids <ids...>", "Optional list of prompt IDs to process (omit to run all)").action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
-      const data = await apiRequest({ method: "POST", path: "/org/content-generation/run", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+      const body = cmdOpts.promptIds ? { prompt_ids: cmdOpts.promptIds } : void 0;
+      const data = await apiRequest({ method: "POST", path: "/org/content-generation/run", body, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
       success("Content generation run triggered.");
       console.log(JSON.stringify(data, null, 2));
     } catch (err) {
@@ -1111,8 +1046,8 @@ function registerGenerateCommands(program2) {
 
 // src/commands/engine.ts
 function registerEngineCommands(program2) {
-  const engine = program2.command("engine").description("Content engine operations (publish/draft)");
-  engine.command("publish").description("Publish content via content engine").requiredOption("--data <json>", "JSON payload for publish").action(async (cmdOpts) => {
+  const engine = program2.command("engine").description("Publish or draft content through the content engine. Used to push AI-generated content to external destinations or save it as a draft for review.");
+  engine.command("publish").description("Publish content to external destinations via the content engine. Requires geo_question_id, raw_markdown, and seo_title.").requiredOption("--data <json>", 'JSON: { "geo_question_id": "uuid", "raw_markdown": "...", "seo_title": "...", "summary": "..." }').action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
       const body = JSON.parse(cmdOpts.data);
@@ -1130,7 +1065,7 @@ function registerEngineCommands(program2) {
       process.exit(1);
     }
   });
-  engine.command("draft").description("Save content as draft via content engine").requiredOption("--data <json>", "JSON payload for draft").action(async (cmdOpts) => {
+  engine.command("draft").description("Save content as a draft for review before publishing. Requires geo_question_id, raw_markdown, and seo_title.").requiredOption("--data <json>", 'JSON: { "geo_question_id": "uuid", "raw_markdown": "...", "seo_title": "...", "summary": "..." }').action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
       const body = JSON.parse(cmdOpts.data);
@@ -1152,8 +1087,8 @@ function registerEngineCommands(program2) {
 
 // src/commands/brand-kit.ts
 function registerBrandKitCommands(program2) {
-  const bk = program2.command("brand-kit").description("Manage brand kit");
-  bk.command("get").description("Get brand kit").action(async () => {
+  const bk = program2.command("brand-kit").description("Manage the organization's brand kit guidelines. The brand kit is a free-form JSON object that informs AI content generation about your brand voice, tone, and style.");
+  bk.command("get").description("Get the current brand kit guidelines.").action(async () => {
     const opts = program2.opts();
     try {
       const data = await apiRequest({ path: "/org/brand-kit", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
@@ -1163,7 +1098,7 @@ function registerBrandKitCommands(program2) {
       process.exit(1);
     }
   });
-  bk.command("set").description("Upsert brand kit").requiredOption("--data <json>", "JSON brand kit data").action(async (cmdOpts) => {
+  bk.command("set").description("Create or replace the brand kit. The guidelines field is a free-form JSON object defining your brand voice.").requiredOption("--data <json>", 'JSON: { "guidelines": { "tone": "professional", "voice": "..." } }').action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
       const body = JSON.parse(cmdOpts.data);
@@ -1185,18 +1120,23 @@ function registerBrandKitCommands(program2) {
 
 // src/commands/content-types.ts
 function registerContentTypeCommands(program2) {
-  const ct = program2.command("content-types").description("Manage content types");
-  ct.command("list").description("List content types").action(async () => {
+  const ct = program2.command("content-types").description("Manage content type configurations. Content types define the output format and structure for AI-generated content (e.g. blog post, FAQ, landing page).");
+  ct.command("list").description("List all content types configured for the organization.").option("--limit <n>", "Maximum number of content types to return (default: 50)").option("--offset <n>", "Number of items to skip (for pagination)").action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
-      const data = await apiRequest({ path: "/org/content-types", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+      const data = await apiRequest({
+        path: "/org/content-types",
+        params: { limit: cmdOpts.limit, offset: cmdOpts.offset },
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
       console.log(JSON.stringify(data, null, 2));
     } catch (err) {
       error(formatApiError(err));
       process.exit(1);
     }
   });
-  ct.command("create").description("Create a content type").requiredOption("--data <json>", "JSON content type definition").action(async (cmdOpts) => {
+  ct.command("create").description("Create a new content type. Requires a name and configuration defining the output structure.").requiredOption("--data <json>", 'JSON: { "name": "Blog Post", "config": { ... } }').action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
       const body = JSON.parse(cmdOpts.data);
@@ -1214,7 +1154,7 @@ function registerContentTypeCommands(program2) {
       process.exit(1);
     }
   });
-  ct.command("get <id>").description("Get content type by ID").action(async (id) => {
+  ct.command("get <id>").description("Get a content type by ID, including its full configuration.").action(async (id) => {
     const opts = program2.opts();
     try {
       const data = await apiRequest({ path: `/org/content-types/${id}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
@@ -1224,12 +1164,12 @@ function registerContentTypeCommands(program2) {
       process.exit(1);
     }
   });
-  ct.command("update <id>").description("Update a content type").requiredOption("--data <json>", "JSON content type updates").action(async (id, cmdOpts) => {
+  ct.command("update <id>").description("Update a content type's name or configuration.").requiredOption("--data <json>", 'JSON: { "name": "Updated Name", "config": { ... } }').action(async (id, cmdOpts) => {
     const opts = program2.opts();
     try {
       const body = JSON.parse(cmdOpts.data);
       const data = await apiRequest({
-        method: "PATCH",
+        method: "PUT",
         path: `/org/content-types/${id}`,
         body,
         apiKey: opts.apiKey,
@@ -1242,7 +1182,7 @@ function registerContentTypeCommands(program2) {
       process.exit(1);
     }
   });
-  ct.command("delete <id>").description("Delete a content type").action(async (id) => {
+  ct.command("delete <id>").description("Delete a content type. This cannot be undone.").action(async (id) => {
     const opts = program2.opts();
     try {
       await apiRequest({ method: "DELETE", path: `/org/content-types/${id}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
@@ -1256,18 +1196,23 @@ function registerContentTypeCommands(program2) {
 
 // src/commands/prompts.ts
 function registerPromptCommands(program2) {
-  const prompts = program2.command("prompts").description("Manage prompts (geo questions)");
-  prompts.command("list").description("List prompts").action(async () => {
+  const prompts = program2.command("prompts").description("Manage prompts (geo questions). Prompts are the questions that drive AI content generation \u2014 each prompt is run against configured AI models to track brand mentions, claims, and competitor visibility.");
+  prompts.command("list").description("List all prompts in the organization. Use --search to filter by question text, --sort to order results.").option("--limit <n>", "Maximum prompts to return (max: 100)").option("--offset <n>", "Number of prompts to skip (for pagination)").option("--search <query>", "Filter prompts by question text").option("--sort <order>", "Sort order: created_desc, created_asc, text_asc, text_desc, type_asc, type_desc").action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
-      const data = await apiRequest({ path: "/org/prompts", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+      const data = await apiRequest({
+        path: "/org/prompts",
+        params: { limit: cmdOpts.limit, offset: cmdOpts.offset, search: cmdOpts.search, sort: cmdOpts.sort },
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
       console.log(JSON.stringify(data, null, 2));
     } catch (err) {
       error(formatApiError(err));
       process.exit(1);
     }
   });
-  prompts.command("create").description("Create a prompt").requiredOption("--data <json>", "JSON prompt definition").action(async (cmdOpts) => {
+  prompts.command("create").description("Create a new prompt. Type must be one of: decision, consideration, awareness, evaluation.").requiredOption("--data <json>", 'JSON: { "question_text": "What are the best...", "type": "decision" }').action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
       const body = JSON.parse(cmdOpts.data);
@@ -1285,7 +1230,7 @@ function registerPromptCommands(program2) {
       process.exit(1);
     }
   });
-  prompts.command("get <promptId>").description("Get prompt with full run history").action(async (promptId) => {
+  prompts.command("get <promptId>").description("Get a prompt with its full run history. Includes all question runs with mentions, claims, citations, and competitor data.").action(async (promptId) => {
     const opts = program2.opts();
     try {
       const data = await apiRequest({ path: `/org/prompts/${promptId}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
@@ -1295,7 +1240,7 @@ function registerPromptCommands(program2) {
       process.exit(1);
     }
   });
-  prompts.command("delete <promptId>").description("Delete a prompt").action(async (promptId) => {
+  prompts.command("delete <promptId>").description("Delete a prompt and all its associated run history. This cannot be undone.").action(async (promptId) => {
     const opts = program2.opts();
     try {
       await apiRequest({ method: "DELETE", path: `/org/prompts/${promptId}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
@@ -1309,8 +1254,8 @@ function registerPromptCommands(program2) {
 
 // src/commands/run-config.ts
 function registerRunConfigCommands(program2) {
-  const rc = program2.command("run-config").description("Run configuration (models, schedule)");
-  rc.command("models").description("Get configured AI models").action(async () => {
+  const rc = program2.command("run-config").description("Configure which AI models are used for question runs and on which days they run. Models include chatgpt, gemini, etc.");
+  rc.command("models").description("Get the AI models currently configured for question runs (e.g. chatgpt, gemini).").action(async () => {
     const opts = program2.opts();
     try {
       const data = await apiRequest({ path: "/org/run-models", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
@@ -1320,7 +1265,7 @@ function registerRunConfigCommands(program2) {
       process.exit(1);
     }
   });
-  rc.command("set-models").description("Set AI models").requiredOption("--data <json>", "JSON model configuration").action(async (cmdOpts) => {
+  rc.command("set-models").description("Replace the configured AI models for question runs. At least one model name is required.").requiredOption("--data <json>", 'JSON: { "models": ["chatgpt", "gemini"] }').action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
       const body = JSON.parse(cmdOpts.data);
@@ -1338,7 +1283,7 @@ function registerRunConfigCommands(program2) {
       process.exit(1);
     }
   });
-  rc.command("schedule").description("Get run schedule").action(async () => {
+  rc.command("schedule").description("Get the days of the week when question runs are triggered (0=Sunday, 1=Monday, ..., 6=Saturday).").action(async () => {
     const opts = program2.opts();
     try {
       const data = await apiRequest({ path: "/org/run-schedule", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
@@ -1348,7 +1293,7 @@ function registerRunConfigCommands(program2) {
       process.exit(1);
     }
   });
-  rc.command("set-schedule").description("Set run schedule").requiredOption("--data <json>", "JSON schedule configuration").action(async (cmdOpts) => {
+  rc.command("set-schedule").description("Set which days of the week question runs are triggered. Values must be 0-6 (Sunday-Saturday).").requiredOption("--data <json>", 'JSON: { "schedule": [1, 3, 5] }').action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
       const body = JSON.parse(cmdOpts.data);
@@ -1370,11 +1315,16 @@ function registerRunConfigCommands(program2) {
 
 // src/commands/members.ts
 function registerMemberCommands(program2) {
-  const members = program2.command("members").description("Organization members");
-  members.command("list").description("List organization members").action(async () => {
+  const members = program2.command("members").description("View the organization member directory. Lists all users who belong to the organization with their names and emails.");
+  members.command("list").description("List all organization members. Use --search to filter by name or email, --sort to order results.").option("--limit <n>", "Maximum members to return (max: 1000)").option("--offset <n>", "Number of members to skip (for pagination)").option("--search <query>", "Filter by name or email").option("--sort <order>", "Sort order: name_asc, name_desc, email_asc, email_desc, created_asc, created_desc").action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
-      const data = await apiRequest({ path: "/org/members", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+      const data = await apiRequest({
+        path: "/org/members",
+        params: { limit: cmdOpts.limit, offset: cmdOpts.offset, search: cmdOpts.search, sort: cmdOpts.sort },
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
       console.log(JSON.stringify(data, null, 2));
     } catch (err) {
       error(formatApiError(err));
@@ -1385,22 +1335,31 @@ function registerMemberCommands(program2) {
 
 // src/commands/notifications.ts
 function registerNotificationCommands(program2) {
-  const notif = program2.command("notifications").description("Manage notifications");
-  notif.command("list").description("List notifications").action(async () => {
+  const notif = program2.command("notifications").description("View and manage user notifications. Notifications are triggered by content verification, generation runs, and other system events.");
+  notif.command("list").description("List notifications for the current user. Use --unread-only to filter to unread notifications.").option("--limit <n>", "Maximum notifications to return (default: 50, max: 200)").option("--offset <n>", "Number of notifications to skip (for pagination)").option("--unread-only", "Only return unread notifications").action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
-      const data = await apiRequest({ path: "/app/v1/notifications", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+      const data = await apiRequest({
+        path: "/app/v1/notifications",
+        params: {
+          limit: cmdOpts.limit,
+          offset: cmdOpts.offset,
+          unread_only: cmdOpts.unreadOnly ? "true" : void 0
+        },
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
       console.log(JSON.stringify(data, null, 2));
     } catch (err) {
       error(formatApiError(err));
       process.exit(1);
     }
   });
-  notif.command("read <id>").description("Mark notification as read").action(async (id) => {
+  notif.command("read <id>").description("Mark a notification as read.").action(async (id) => {
     const opts = program2.opts();
     try {
       await apiRequest({
-        method: "POST",
+        method: "PATCH",
         path: `/app/v1/notifications/${id}/read`,
         apiKey: opts.apiKey,
         baseUrl: opts.baseUrl
@@ -1477,8 +1436,6 @@ registerAuthCommands(program);
 registerOrgCommands(program);
 registerUserCommands(program);
 registerApiKeyCommands(program);
-registerCategoryCommands(program);
-registerTopicCommands(program);
 registerSearchCommands(program);
 registerIngestCommands(program);
 registerContentCommands(program);

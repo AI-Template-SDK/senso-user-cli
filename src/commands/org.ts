@@ -5,11 +5,11 @@ import * as log from "../utils/logger.js";
 export function registerOrgCommands(program: Command): void {
   const org = program
     .command("org")
-    .description("Organization management");
+    .description("View and update organization profile and settings. Includes name, slug, logo, websites, locations, and tier information.");
 
   org
     .command("get")
-    .description("Get organization details")
+    .description("Get full organization details including name, slug, tier, websites, locations, configured AI models, publishers, and schedule.")
     .action(async () => {
       const opts = program.opts();
       try {
@@ -23,14 +23,14 @@ export function registerOrgCommands(program: Command): void {
 
   org
     .command("update")
-    .description("Update organization details")
-    .requiredOption("--data <json>", "JSON org fields to update")
+    .description("Update organization details. All fields are optional — only provided fields are changed. Pass an empty array for websites/locations to clear them.")
+    .requiredOption("--data <json>", 'JSON: { "name": "...", "slug": "...", "logo_url": "...", "websites": [...], "locations": [...] }')
     .action(async (cmdOpts: { data: string }) => {
       const opts = program.opts();
       try {
         const body = JSON.parse(cmdOpts.data);
         const data = await apiRequest({
-          method: "PATCH",
+          method: "PUT",
           path: "/org/me",
           body,
           apiKey: opts.apiKey,

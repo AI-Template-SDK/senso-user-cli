@@ -5,15 +5,22 @@ import * as log from "../utils/logger.js";
 export function registerContentTypeCommands(program: Command): void {
   const ct = program
     .command("content-types")
-    .description("Manage content types");
+    .description("Manage content type configurations. Content types define the output format and structure for AI-generated content (e.g. blog post, FAQ, landing page).");
 
   ct
     .command("list")
-    .description("List content types")
-    .action(async () => {
+    .description("List all content types configured for the organization.")
+    .option("--limit <n>", "Maximum number of content types to return (default: 50)")
+    .option("--offset <n>", "Number of items to skip (for pagination)")
+    .action(async (cmdOpts: Record<string, string>) => {
       const opts = program.opts();
       try {
-        const data = await apiRequest({ path: "/org/content-types", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        const data = await apiRequest({
+          path: "/org/content-types",
+          params: { limit: cmdOpts.limit, offset: cmdOpts.offset },
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
         log.error(formatApiError(err));
@@ -23,8 +30,8 @@ export function registerContentTypeCommands(program: Command): void {
 
   ct
     .command("create")
-    .description("Create a content type")
-    .requiredOption("--data <json>", "JSON content type definition")
+    .description("Create a new content type. Requires a name and configuration defining the output structure.")
+    .requiredOption("--data <json>", 'JSON: { "name": "Blog Post", "config": { ... } }')
     .action(async (cmdOpts: { data: string }) => {
       const opts = program.opts();
       try {
@@ -46,7 +53,7 @@ export function registerContentTypeCommands(program: Command): void {
 
   ct
     .command("get <id>")
-    .description("Get content type by ID")
+    .description("Get a content type by ID, including its full configuration.")
     .action(async (id: string) => {
       const opts = program.opts();
       try {
@@ -60,14 +67,14 @@ export function registerContentTypeCommands(program: Command): void {
 
   ct
     .command("update <id>")
-    .description("Update a content type")
-    .requiredOption("--data <json>", "JSON content type updates")
+    .description("Update a content type's name or configuration.")
+    .requiredOption("--data <json>", 'JSON: { "name": "Updated Name", "config": { ... } }')
     .action(async (id: string, cmdOpts: { data: string }) => {
       const opts = program.opts();
       try {
         const body = JSON.parse(cmdOpts.data);
         const data = await apiRequest({
-          method: "PATCH",
+          method: "PUT",
           path: `/org/content-types/${id}`,
           body,
           apiKey: opts.apiKey,
@@ -83,7 +90,7 @@ export function registerContentTypeCommands(program: Command): void {
 
   ct
     .command("delete <id>")
-    .description("Delete a content type")
+    .description("Delete a content type. This cannot be undone.")
     .action(async (id: string) => {
       const opts = program.opts();
       try {

@@ -34,7 +34,7 @@ async function verifyApiKey(
 export function registerAuthCommands(program: Command): void {
   program
     .command("login")
-    .description("Save API key to config (validates via GET /org/me)")
+    .description("Authenticate with Senso. Paste your API key and it will be validated against your organization, then stored locally.")
     .action(async () => {
       const opts = program.opts();
 
@@ -86,7 +86,7 @@ export function registerAuthCommands(program: Command): void {
 
   program
     .command("logout")
-    .description("Remove stored credentials")
+    .description("Remove stored API key and organization info from local config.")
     .action(() => {
       clearConfig();
       log.success("Credentials removed.");
@@ -94,7 +94,7 @@ export function registerAuthCommands(program: Command): void {
 
   program
     .command("whoami")
-    .description("Show current auth status and org info")
+    .description("Show which organization you are authenticated as, including org ID, slug, tier, and API key prefix.")
     .action(async () => {
       const opts = program.opts();
       const apiKey = getApiKey({ apiKey: opts.apiKey });

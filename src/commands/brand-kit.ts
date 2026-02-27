@@ -5,11 +5,11 @@ import * as log from "../utils/logger.js";
 export function registerBrandKitCommands(program: Command): void {
   const bk = program
     .command("brand-kit")
-    .description("Manage brand kit");
+    .description("Manage the organization's brand kit guidelines. The brand kit is a free-form JSON object that informs AI content generation about your brand voice, tone, and style.");
 
   bk
     .command("get")
-    .description("Get brand kit")
+    .description("Get the current brand kit guidelines.")
     .action(async () => {
       const opts = program.opts();
       try {
@@ -23,8 +23,8 @@ export function registerBrandKitCommands(program: Command): void {
 
   bk
     .command("set")
-    .description("Upsert brand kit")
-    .requiredOption("--data <json>", "JSON brand kit data")
+    .description("Create or replace the brand kit. The guidelines field is a free-form JSON object defining your brand voice.")
+    .requiredOption("--data <json>", 'JSON: { "guidelines": { "tone": "professional", "voice": "..." } }')
     .action(async (cmdOpts: { data: string }) => {
       const opts = program.opts();
       try {

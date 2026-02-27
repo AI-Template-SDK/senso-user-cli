@@ -7,7 +7,7 @@ import * as log from "../utils/logger.js";
 export function registerSearchCommands(program: Command): void {
   const search = program
     .command("search")
-    .description("Semantic search over your knowledge base");
+    .description("Search the knowledge base with natural language queries. Returns AI-generated answers synthesised from matching content chunks, or raw chunks/content IDs.");
 
   // Default: senso search <query> → POST /org/search (answer + results)
   search
@@ -58,7 +58,7 @@ export function registerSearchCommands(program: Command): void {
 
   search
     .command("context <query>")
-    .description("Semantic search — chunks only")
+    .description("Search the knowledge base — returns matching content chunks only, without AI answer generation. Faster than full search.")
     .option("--max-results <n>", "Maximum results", "5")
     .action(async (query: string, cmdOpts: Record<string, string>) => {
       const opts = program.opts();
@@ -79,7 +79,7 @@ export function registerSearchCommands(program: Command): void {
 
   search
     .command("content <query>")
-    .description("Semantic search — content IDs only")
+    .description("Search the knowledge base — returns deduplicated content IDs and titles only. No chunks or AI answer.")
     .option("--max-results <n>", "Maximum results", "5")
     .action(async (query: string, cmdOpts: Record<string, string>) => {
       const opts = program.opts();
