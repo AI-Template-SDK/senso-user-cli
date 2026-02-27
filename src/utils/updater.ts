@@ -3,12 +3,11 @@ import { readConfig, updateConfig } from "../lib/config.js";
 import { version } from "../lib/version.js";
 import { updateBox } from "./branding.js";
 
-const GITHUB_REPO = "AI-Template-SDK/senso-user-cli";
+const NPM_PACKAGE = "@senso-ai/cli";
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
-interface GitHubRelease {
-  tag_name: string;
-  body?: string;
+interface NpmPackageInfo {
+  "dist-tags": { latest: string };
 }
 
 export async function checkForUpdate(quiet: boolean): Promise<void> {
@@ -34,18 +33,8 @@ export async function checkForUpdate(quiet: boolean): Promise<void> {
 
   // Do the check in the background — don't block the CLI
   try {
-    const res = await fetch(
-      `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
-      {
-        headers: { Accept: "application/vnd.github.v3+json" },
-        signal: AbortSignal.timeout(5000),
-      },
-    );
-
-    if (!res.ok) return;
-
-    const release = (await res.json()) as GitHubRelease;
-    const latest = release.tag_name.replace(/^v/, "");
+    const latest = await getLatestVersion();
+    if (!latest) return;
 
     updateConfig({
       lastUpdateCheck: new Date().toISOString(),
@@ -60,17 +49,18 @@ export async function checkForUpdate(quiet: boolean): Promise<void> {
   }
 }
 
-export async function getLatestRelease(): Promise<GitHubRelease | null> {
+export async function getLatestVersion(): Promise<string | null> {
   try {
     const res = await fetch(
-      `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
+      `https://registry.npmjs.org/${NPM_PACKAGE}`,
       {
-        headers: { Accept: "application/vnd.github.v3+json" },
+        headers: { Accept: "application/json" },
         signal: AbortSignal.timeout(10_000),
       },
     );
     if (!res.ok) return null;
-    return (await res.json()) as GitHubRelease;
+    const data = (await res.json()) as NpmPackageInfo;
+    return data["dist-tags"]?.latest ?? null;
   } catch {
     return null;
   }

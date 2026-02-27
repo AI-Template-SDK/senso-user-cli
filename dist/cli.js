@@ -113,7 +113,7 @@ function getConfigPath() {
 }
 
 // src/utils/updater.ts
-var GITHUB_REPO = "AI-Template-SDK/senso-user-cli";
+var NPM_PACKAGE = "@senso-ai/cli";
 var CHECK_INTERVAL_MS = 24 * 60 * 60 * 1e3;
 async function checkForUpdate(quiet) {
   if (process.env.SENSO_NO_UPDATE_CHECK === "1" || quiet) {
@@ -128,16 +128,8 @@ async function checkForUpdate(quiet) {
     return;
   }
   try {
-    const res = await fetch(
-      `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
-      {
-        headers: { Accept: "application/vnd.github.v3+json" },
-        signal: AbortSignal.timeout(5e3)
-      }
-    );
-    if (!res.ok) return;
-    const release = await res.json();
-    const latest = release.tag_name.replace(/^v/, "");
+    const latest = await getLatestVersion();
+    if (!latest) return;
     updateConfig({
       lastUpdateCheck: (/* @__PURE__ */ new Date()).toISOString(),
       latestVersion: latest
@@ -148,17 +140,18 @@ async function checkForUpdate(quiet) {
   } catch {
   }
 }
-async function getLatestRelease() {
+async function getLatestVersion() {
   try {
     const res = await fetch(
-      `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
+      `https://registry.npmjs.org/${NPM_PACKAGE}`,
       {
-        headers: { Accept: "application/vnd.github.v3+json" },
+        headers: { Accept: "application/json" },
         signal: AbortSignal.timeout(1e4)
       }
     );
     if (!res.ok) return null;
-    return await res.json();
+    const data = await res.json();
+    return data["dist-tags"]?.latest ?? null;
   } catch {
     return null;
   }
@@ -1376,16 +1369,16 @@ function registerNotificationCommands(program2) {
 import semver2 from "semver";
 import pc7 from "picocolors";
 import { execSync } from "child_process";
+var NPM_PACKAGE2 = "@senso-ai/cli";
 function registerUpdateCommand(program2) {
   program2.command("update").description("Update CLI to the latest version").action(async () => {
     info(`Current version: ${pc7.bold(version)}`);
-    info("Checking for updates...");
-    const release = await getLatestRelease();
-    if (!release) {
+    info("Checking npm for updates...");
+    const latest = await getLatestVersion();
+    if (!latest) {
       error("Could not check for updates. Try again later.");
       process.exit(1);
     }
-    const latest = release.tag_name.replace(/^v/, "");
     if (!semver2.gt(latest, version)) {
       success(`Already on the latest version (${version}).`);
       return;
@@ -1393,33 +1386,16 @@ function registerUpdateCommand(program2) {
     info(`New version available: ${pc7.bold(latest)}`);
     info("Updating...");
     try {
-      execSync("npm install -g senso-user-cli@latest", {
+      execSync(`npm install -g ${NPM_PACKAGE2}@latest`, {
         stdio: "inherit"
       });
       success(`Updated to v${latest}.`);
-      if (release.body) {
-        console.log();
-        console.log(pc7.dim("Release notes:"));
-        console.log(pc7.dim(release.body.slice(0, 500)));
-      }
     } catch {
-      warn("Global npm install failed. Trying npx reinstall...");
-      try {
-        execSync(
-          "npx --yes github:AI-Template-SDK/senso-user-cli --version",
-          { stdio: "inherit" }
-        );
-        success("Updated via npx cache refresh.");
-      } catch {
-        error("Update failed. Please reinstall manually:");
-        console.log(
-          `  ${pc7.cyan("npm install -g senso-user-cli")}`
-        );
-        console.log(
-          `  ${pc7.dim("or")} ${pc7.cyan("npx github:AI-Template-SDK/senso-user-cli")}`
-        );
-        process.exit(1);
-      }
+      error("Update failed. Please reinstall manually:");
+      console.log(
+        `  ${pc7.cyan(`npm install -g ${NPM_PACKAGE2}`)}`
+      );
+      process.exit(1);
     }
   });
 }
