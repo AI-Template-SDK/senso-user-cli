@@ -3,7 +3,7 @@ import { readConfig, updateConfig } from "../lib/config.js";
 import { version } from "../lib/version.js";
 import { updateBox } from "./branding.js";
 
-const GITHUB_REPO = "senso-ai/senso-user-cli";
+const GITHUB_REPO = "AI-Template-SDK/senso-user-cli";
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 interface GitHubRelease {

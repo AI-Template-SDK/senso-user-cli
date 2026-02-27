@@ -14,7 +14,7 @@ Requires **Node.js 18+**. Works on **Linux**, **macOS**, and **Windows**.
 
 ```bash
 # Run directly from GitHub (no install needed)
-npx github:senso-ai/senso-user-cli
+npx github:AI-Template-SDK/senso-user-cli
 
 # Or install globally
 npm install -g senso-user-cli
@@ -326,7 +326,7 @@ To disable: `--no-update-check` or `export SENSO_NO_UPDATE_CHECK=1`.
 
 ```bash
 # Clone the repo
-git clone https://github.com/senso-ai/senso-user-cli.git
+git clone https://github.com/AI-Template-SDK/senso-user-cli.git
 cd senso-user-cli
 
 # Install dependencies
@@ -393,6 +393,25 @@ src/
 | ASCII Branding | figlet + gradient-string + boxen |
 | Config | env-paths (XDG-compatible) |
 | HTTP | Native `fetch` |
+
+### Releasing a New Version
+
+This project uses [semantic versioning](https://semver.org/). The CLI's auto-update checker compares the installed version against the latest GitHub release using semver, so pre-release tags and version ordering are handled correctly.
+
+```bash
+# 1. Bump the version in package.json, commit, and create a git tag
+npm version patch   # 0.1.0 → 0.1.1 (bug fixes)
+npm version minor   # 0.1.0 → 0.2.0 (new features, backwards-compatible)
+npm version major   # 0.1.0 → 1.0.0 (breaking changes)
+
+# 2. Push the commit and tag
+git push origin main --tags
+
+# 3. Create a GitHub release (this is what the auto-updater checks)
+gh release create v0.2.0 --title "v0.2.0" --notes "Release notes here"
+```
+
+After step 3, users running the CLI will see the update notice within 24 hours (or immediately via `senso update`).
 
 ---
 

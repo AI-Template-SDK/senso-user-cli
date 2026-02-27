@@ -46,7 +46,7 @@ export function registerUpdateCommand(program: Command): void {
         log.warn("Global npm install failed. Trying npx reinstall...");
         try {
           execSync(
-            "npx --yes github:senso-ai/senso-user-cli --version",
+            "npx --yes github:AI-Template-SDK/senso-user-cli --version",
             { stdio: "inherit" },
           );
           log.success("Updated via npx cache refresh.");
@@ -56,7 +56,7 @@ export function registerUpdateCommand(program: Command): void {
             `  ${pc.cyan("npm install -g senso-user-cli")}`,
           );
           console.log(
-            `  ${pc.dim("or")} ${pc.cyan("npx github:senso-ai/senso-user-cli")}`,
+            `  ${pc.dim("or")} ${pc.cyan("npx github:AI-Template-SDK/senso-user-cli")}`,
           );
           process.exit(1);
         }

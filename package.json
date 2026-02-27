@@ -41,7 +41,7 @@
   "license": "AGPL-3.0-or-later",
   "repository": {
     "type": "git",
-    "url": "https://github.com/senso-ai/senso-user-cli"
+    "url": "https://github.com/AI-Template-SDK/senso-user-cli"
   },
   "keywords": [
     "senso",
