@@ -1,0 +1,51 @@
+{
+  "name": "senso-user-cli",
+  "version": "0.1.0",
+  "description": "Senso CLI — Infrastructure for the Agentic Web. Interact with your Senso knowledge base from the terminal.",
+  "type": "module",
+  "bin": {
+    "senso": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "dev": "tsx src/cli.ts",
+    "build": "tsup",
+    "prepare": "npm run build",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.9.1",
+    "boxen": "^8.0.1",
+    "commander": "^13.1.0",
+    "env-paths": "^3.0.0",
+    "figlet": "^1.8.0",
+    "gradient-string": "^3.0.0",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/figlet": "^1.7.0",
+    "@types/gradient-string": "^1.1.6",
+    "@types/node": "^22.13.0",
+    "tsup": "^8.4.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/senso-ai/senso-user-cli"
+  },
+  "keywords": [
+    "senso",
+    "cli",
+    "ai",
+    "knowledge-base",
+    "agentic"
+  ]
+}
