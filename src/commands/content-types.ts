@@ -67,14 +67,37 @@ export function registerContentTypeCommands(program: Command): void {
 
   ct
     .command("update <id>")
-    .description("Update a content type's name or configuration.")
-    .requiredOption("--data <json>", 'JSON: { "name": "Updated Name", "config": { ... } }')
+    .description("Replace a content type's name and config (PUT). Both fields are required — run 'get <id>' first to preserve existing values. For single-field updates, use 'content-types patch <id>'.")
+    .requiredOption("--data <json>", 'JSON: { "name": "Updated Name", "config": { "template": "...", "cta_text": "...", "cta_destination": "...", "writing_rules": [] } }')
     .action(async (id: string, cmdOpts: { data: string }) => {
       const opts = program.opts();
       try {
         const body = JSON.parse(cmdOpts.data);
         const data = await apiRequest({
           method: "PUT",
+          path: `/org/content-types/${id}`,
+          body,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
+        log.success(`Content type ${id} updated.`);
+        console.log(JSON.stringify(data, null, 2));
+      } catch (err) {
+        log.error(err instanceof SyntaxError ? "Invalid JSON in --data" : formatApiError(err));
+        process.exit(1);
+      }
+    });
+
+  ct
+    .command("patch <id>")
+    .description("Partially update a content type (PATCH). Only the fields you provide are changed — existing fields are preserved. Preferred over 'update' for targeted changes like updating just the template.")
+    .requiredOption("--data <json>", 'JSON: { "config": { "template": "Updated template instruction" } }')
+    .action(async (id: string, cmdOpts: { data: string }) => {
+      const opts = program.opts();
+      try {
+        const body = JSON.parse(cmdOpts.data);
+        const data = await apiRequest({
+          method: "PATCH",
           path: `/org/content-types/${id}`,
           body,
           apiKey: opts.apiKey,

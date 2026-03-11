@@ -78,7 +78,7 @@ export function registerIngestCommands(program: Command): void {
 
   ingest
     .command("upload <files...>")
-    .description("Upload files to the knowledge base. Accepts local file paths (up to 10). Files are hashed, uploaded to S3, then parsed and embedded by a background worker.")
+    .description("Upload files to the knowledge base. Accepts local file paths (up to 10). Files are hashed, uploaded to S3, then parsed and embedded by a background worker. Poll 'senso content get <content-id>' until processing_status is 'complete' before searching the uploaded content.")
     .action(async (files: string[]) => {
       const opts = program.opts();
       if (files.length > 10) {

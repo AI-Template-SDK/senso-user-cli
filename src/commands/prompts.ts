@@ -5,7 +5,7 @@ import * as log from "../utils/logger.js";
 export function registerPromptCommands(program: Command): void {
   const prompts = program
     .command("prompts")
-    .description("Manage prompts (geo questions). Prompts are the questions that drive AI content generation — each prompt is run against configured AI models to track brand mentions, claims, and competitor visibility.");
+    .description("Manage prompts (GEO questions). Each prompt is a question that drives both AI content generation (use with 'generate sample --prompt-id') and brand visibility monitoring — tracking how AI models mention your brand, products, and competitors.");
 
   prompts
     .command("list")

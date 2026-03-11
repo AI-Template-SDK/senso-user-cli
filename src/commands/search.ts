@@ -13,13 +13,18 @@ export function registerSearchCommands(program: Command): void {
   search
     .argument("<query>", "Search query")
     .option("--max-results <n>", "Maximum number of results", "5")
-    .action(async (query: string, cmdOpts: Record<string, string>) => {
+    .option("--content-ids <ids...>", "Restrict search to specific content item IDs (space-separated UUIDs)")
+    .option("--require-scoped-ids", "Only return results from the specified --content-ids (omit to allow fallback to all content)")
+    .action(async (query: string, cmdOpts: Record<string, string | boolean | string[]>) => {
       const opts = program.opts();
       try {
+        const body: Record<string, unknown> = { query, max_results: parseInt(cmdOpts.maxResults as string) };
+        if (cmdOpts.contentIds) body.content_ids = cmdOpts.contentIds;
+        if (cmdOpts.requireScopedIds) body.require_scoped_ids = true;
         const data = await apiRequest({
           method: "POST",
           path: "/org/search",
-          body: { query, max_results: parseInt(cmdOpts.maxResults) },
+          body,
           apiKey: opts.apiKey,
           baseUrl: opts.baseUrl,
         });
@@ -58,15 +63,20 @@ export function registerSearchCommands(program: Command): void {
 
   search
     .command("context <query>")
-    .description("Search the knowledge base — returns matching content chunks only, without AI answer generation. Faster than full search.")
+    .description("Search the knowledge base — returns matching content chunks only, without AI answer generation. Use this to feed verified chunks into your own LLM pipeline instead of using Senso's generated answer.")
     .option("--max-results <n>", "Maximum results", "5")
-    .action(async (query: string, cmdOpts: Record<string, string>) => {
+    .option("--content-ids <ids...>", "Restrict search to specific content item IDs (space-separated UUIDs)")
+    .option("--require-scoped-ids", "Only return results from the specified --content-ids")
+    .action(async (query: string, cmdOpts: Record<string, string | boolean | string[]>) => {
       const opts = program.opts();
       try {
+        const body: Record<string, unknown> = { query, max_results: parseInt(cmdOpts.maxResults as string) };
+        if (cmdOpts.contentIds) body.content_ids = cmdOpts.contentIds;
+        if (cmdOpts.requireScopedIds) body.require_scoped_ids = true;
         const data = await apiRequest({
           method: "POST",
           path: "/org/search/context",
-          body: { query, max_results: parseInt(cmdOpts.maxResults) },
+          body,
           apiKey: opts.apiKey,
           baseUrl: opts.baseUrl,
         });
@@ -79,15 +89,20 @@ export function registerSearchCommands(program: Command): void {
 
   search
     .command("content <query>")
-    .description("Search the knowledge base — returns deduplicated content IDs and titles only. No chunks or AI answer.")
+    .description("Search the knowledge base — returns deduplicated content IDs and titles only. Use this to discover which documents are relevant before fetching full content with 'content get <id>'.")
     .option("--max-results <n>", "Maximum results", "5")
-    .action(async (query: string, cmdOpts: Record<string, string>) => {
+    .option("--content-ids <ids...>", "Restrict search to specific content item IDs (space-separated UUIDs)")
+    .option("--require-scoped-ids", "Only return results from the specified --content-ids")
+    .action(async (query: string, cmdOpts: Record<string, string | boolean | string[]>) => {
       const opts = program.opts();
       try {
+        const body: Record<string, unknown> = { query, max_results: parseInt(cmdOpts.maxResults as string) };
+        if (cmdOpts.contentIds) body.content_ids = cmdOpts.contentIds;
+        if (cmdOpts.requireScopedIds) body.require_scoped_ids = true;
         const data = await apiRequest({
           method: "POST",
           path: "/org/search/content",
-          body: { query, max_results: parseInt(cmdOpts.maxResults) },
+          body,
           apiKey: opts.apiKey,
           baseUrl: opts.baseUrl,
         });

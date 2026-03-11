@@ -19,6 +19,7 @@ import { registerPromptCommands } from "./commands/prompts.js";
 import { registerRunConfigCommands } from "./commands/run-config.js";
 import { registerMemberCommands } from "./commands/members.js";
 import { registerNotificationCommands } from "./commands/notifications.js";
+import { registerCreditsCommands } from "./commands/credits.js";
 import { registerUpdateCommand } from "./commands/update.js";
 
 const program = new Command();
@@ -55,6 +56,7 @@ registerPromptCommands(program);
 registerRunConfigCommands(program);
 registerMemberCommands(program);
 registerNotificationCommands(program);
+registerCreditsCommands(program);
 registerUpdateCommand(program);
 
 // Parse and execute

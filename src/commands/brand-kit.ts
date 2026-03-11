@@ -23,14 +23,37 @@ export function registerBrandKitCommands(program: Command): void {
 
   bk
     .command("set")
-    .description("Create or replace the brand kit. The guidelines field is a free-form JSON object defining your brand voice.")
-    .requiredOption("--data <json>", 'JSON: { "guidelines": { "tone": "professional", "voice": "..." } }')
+    .description("Replace the entire brand kit (PUT). All existing fields are overwritten — run 'brand-kit get' first to preserve fields you are not changing. For a safe partial update, use 'brand-kit patch'.")
+    .requiredOption("--data <json>", 'JSON: { "guidelines": { "brand_name": "Acme", "voice_and_tone": "...", "author_persona": "...", "global_writing_rules": [] } }')
     .action(async (cmdOpts: { data: string }) => {
       const opts = program.opts();
       try {
         const body = JSON.parse(cmdOpts.data);
         const data = await apiRequest({
           method: "PUT",
+          path: "/org/brand-kit",
+          body,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
+        log.success("Brand kit updated.");
+        console.log(JSON.stringify(data, null, 2));
+      } catch (err) {
+        log.error(err instanceof SyntaxError ? "Invalid JSON in --data" : formatApiError(err));
+        process.exit(1);
+      }
+    });
+
+  bk
+    .command("patch")
+    .description("Partially update the brand kit (PATCH). Only the fields you provide are changed — existing fields are preserved. Preferred over 'set' for targeted updates.")
+    .requiredOption("--data <json>", 'JSON: { "guidelines": { "voice_and_tone": "Warm and approachable" } }')
+    .action(async (cmdOpts: { data: string }) => {
+      const opts = program.opts();
+      try {
+        const body = JSON.parse(cmdOpts.data);
+        const data = await apiRequest({
+          method: "PATCH",
           path: "/org/brand-kit",
           body,
           apiKey: opts.apiKey,

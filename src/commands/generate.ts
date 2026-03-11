@@ -40,10 +40,10 @@ export function registerGenerateCommands(program: Command): void {
 
   gen
     .command("sample")
-    .description("Generate an ad hoc content sample for a specific prompt and content type. Returns the generated markdown, SEO title, and publish results.")
+    .description("Generate an ad hoc content sample for a specific prompt and content type. Returns the generated markdown, SEO title, and publish results. Use 'prompts list' to find a prompt ID, and 'content-types list' to find a content-type ID.")
     .requiredOption("--prompt-id <id>", "Prompt (geo question) ID to generate content for")
-    .requiredOption("--content-type-id <id>", "Content type ID that defines the output format")
-    .option("--destination <dest>", "Publish destination (e.g. citeables)")
+    .requiredOption("--content-type-id <id>", "Content type ID that defines the output format (use 'content-types list' to find)")
+    .option("--destination <dest>", "Publisher slug to publish to immediately after generation. Omit to save as draft only.")
     .action(async (cmdOpts: { promptId: string; contentTypeId: string; destination?: string }) => {
       const opts = program.opts();
       try {
@@ -70,7 +70,7 @@ export function registerGenerateCommands(program: Command): void {
 
   gen
     .command("run")
-    .description("Trigger a content generation run. Processes all prompts (or a specific subset) through the content engine. Runs asynchronously.")
+    .description("Trigger a content generation run. Processes all prompts (or a specific subset) through the content engine. Runs asynchronously — use 'content verification' to monitor generated drafts after the run completes.")
     .option("--prompt-ids <ids...>", "Optional list of prompt IDs to process (omit to run all)")
     .action(async (cmdOpts: { promptIds?: string[] }) => {
       const opts = program.opts();
