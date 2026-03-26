@@ -361,10 +361,16 @@ export function registerKBCommands(program: Command): void {
         for (const item of items) {
           if (item.status === "upload_pending" && item.upload_url) {
             const match = fileData.find((f) => f.meta.filename === item.filename);
-            if (match) {
+            if (!match) {
+              log.error(`Could not match server filename "${item.filename}" to a local file — skipping upload.`);
+              continue;
+            }
+            try {
               await uploadToS3(item.upload_url, match.buffer, match.meta.content_type);
               uploaded++;
               log.success(`Uploaded ${item.filename} (content_id: ${item.content_id})`);
+            } catch (uploadErr) {
+              log.error(`S3 upload failed for ${item.filename}: ${uploadErr instanceof Error ? uploadErr.message : String(uploadErr)}`);
             }
           } else {
             log.warn(`Skipped ${item.filename}: ${item.status}${item.message ? ` — ${item.message}` : ""}`);
