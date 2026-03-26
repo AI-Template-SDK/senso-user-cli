@@ -93,7 +93,7 @@ export function registerIngestCommands(program: Command): void {
         // 2. Request presigned upload URLs
         const results = await apiRequest<UploadResultItem[]>({
           method: "POST",
-          path: "/org/ingestion/upload",
+          path: "/org/kb/upload",
           body: { files: fileData.map((f) => f.meta) },
           apiKey: opts.apiKey,
           baseUrl: opts.baseUrl,
@@ -139,7 +139,7 @@ export function registerIngestCommands(program: Command): void {
 
         const results = await apiRequest<UploadResultItem[]>({
           method: "PUT",
-          path: `/org/ingestion/content/${contentId}`,
+          path: `/org/kb/nodes/${contentId}/file`,
           body: { file: meta },
           apiKey: opts.apiKey,
           baseUrl: opts.baseUrl,

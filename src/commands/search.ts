@@ -112,6 +112,32 @@ export function registerSearchCommands(program: Command): void {
         process.exit(1);
       }
     });
+
+  search
+    .command("full <query>")
+    .description("Alias for the default search — returns AI answer plus matching chunks. Equivalent to 'senso search <query>'.")
+    .option("--max-results <n>", "Maximum results", "5")
+    .option("--content-ids <ids...>", "Restrict search to specific content item IDs (space-separated UUIDs)")
+    .option("--require-scoped-ids", "Only return results from the specified --content-ids")
+    .action(async (query: string, cmdOpts: Record<string, string | boolean | string[]>) => {
+      const opts = program.opts();
+      try {
+        const body: Record<string, unknown> = { query, max_results: parseInt(cmdOpts.maxResults as string) };
+        if (cmdOpts.contentIds) body.content_ids = cmdOpts.contentIds;
+        if (cmdOpts.requireScopedIds) body.require_scoped_ids = true;
+        const data = await apiRequest({
+          method: "POST",
+          path: "/org/search/full",
+          body,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
+        outputByFormat(opts.output, data);
+      } catch (err) {
+        log.error(formatApiError(err));
+        process.exit(1);
+      }
+    });
 }
 
 function outputByFormat(format: string | undefined, data: unknown): void {

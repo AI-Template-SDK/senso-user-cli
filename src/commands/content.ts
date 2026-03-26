@@ -11,36 +11,35 @@ export function registerContentCommands(program: Command): void {
 
   content
     .command("list")
-    .description("List all content items in the knowledge base. Returns title, status, and ID for each item. Use --search to filter by title, --sort to order results.")
+    .description("List top-level files and folders in the knowledge base. Use 'kb my-files' for the same result with richer KB node output.")
     .option("--limit <n>", "Items per page", "10")
     .option("--offset <n>", "Pagination offset", "0")
-    .option("--search <query>", "Filter content by title")
-    .option("--sort <order>", "Sort order: title_asc, title_desc, created_asc, created_desc")
     .action(async (cmdOpts: Record<string, string>) => {
       const opts = program.opts();
       try {
         const data = await apiRequest<Record<string, unknown>[]>({
-          path: "/org/content",
-          params: { limit: cmdOpts.limit, offset: cmdOpts.offset, search: cmdOpts.search, sort: cmdOpts.sort },
+          path: "/org/kb/my-files",
+          params: { limit: cmdOpts.limit, offset: cmdOpts.offset },
           apiKey: opts.apiKey,
           baseUrl: opts.baseUrl,
         });
         const format: OutputFormat = opts.output || "plain";
-        const rows = Array.isArray(data) ? data : [];
+        const rows = Array.isArray(data) ? data : (data as Record<string, unknown[]>).nodes ?? [];
         output(format, {
           json: data,
           table: {
-            rows: rows.map((r) => ({
-              id: r.id || r.content_id,
-              title: r.title,
-              status: r.status,
+            rows: (rows as Record<string, unknown>[]).map((r) => ({
+              id: r.node_id,
+              name: r.name,
+              type: r.type,
+              status: r.processing_status,
             })),
-            columns: ["id", "title", "status"],
+            columns: ["id", "name", "type", "status"],
           },
-          plain: rows.length
-            ? rows.map(
+          plain: (rows as Record<string, unknown>[]).length
+            ? (rows as Record<string, unknown>[]).map(
                 (r) =>
-                  `  ${pc.bold(String(r.title || "Untitled"))} ${pc.dim(`(${r.id || r.content_id})`)} ${r.status ? pc.dim(`[${r.status}]`) : ""}`,
+                  `  ${pc.bold(String(r.name || "Untitled"))} ${pc.dim(`(${r.node_id})`)} ${r.type ? pc.dim(`[${r.type}]`) : ""}`,
               )
             : ["  No content found."],
         });

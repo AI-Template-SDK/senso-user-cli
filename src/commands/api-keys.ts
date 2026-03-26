@@ -115,4 +115,49 @@ export function registerApiKeyCommands(program: Command): void {
         process.exit(1);
       }
     });
+
+  keys
+    .command("kb-permissions-get <keyId>")
+    .description("Get the knowledge base node permission grants configured for an API key.")
+    .action(async (keyId: string) => {
+      const opts = program.opts();
+      try {
+        const data = await apiRequest({ path: `/org/api-keys/${keyId}/kb-permissions`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        console.log(JSON.stringify(data, null, 2));
+      } catch (err) {
+        log.error(formatApiError(err));
+        process.exit(1);
+      }
+    });
+
+  keys
+    .command("kb-permissions-set <keyId>")
+    .description("Set KB node permission grants for an API key. Replaces any existing grants. Each grant requires a node_id (UUID) and role (viewer|editor|owner|admin).")
+    .requiredOption("--data <json>", 'JSON: { "grants": [{ "node_id": "<uuid>", "role": "viewer" }] }')
+    .action(async (keyId: string, cmdOpts: { data: string }) => {
+      const opts = program.opts();
+      try {
+        const body = JSON.parse(cmdOpts.data);
+        const data = await apiRequest({ method: "PUT", path: `/org/api-keys/${keyId}/kb-permissions`, body, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        log.success(`KB permissions updated for key ${keyId}.`);
+        console.log(JSON.stringify(data, null, 2));
+      } catch (err) {
+        log.error(err instanceof SyntaxError ? "Invalid JSON in --data" : formatApiError(err));
+        process.exit(1);
+      }
+    });
+
+  keys
+    .command("kb-permissions-delete <keyId>")
+    .description("Remove all KB node permission grants from an API key, restoring full org-level access.")
+    .action(async (keyId: string) => {
+      const opts = program.opts();
+      try {
+        await apiRequest({ method: "DELETE", path: `/org/api-keys/${keyId}/kb-permissions`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        log.success(`KB permissions removed from key ${keyId}.`);
+      } catch (err) {
+        log.error(formatApiError(err));
+        process.exit(1);
+      }
+    });
 }

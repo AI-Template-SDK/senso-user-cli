@@ -18,8 +18,10 @@ import { registerContentTypeCommands } from "./commands/content-types.js";
 import { registerPromptCommands } from "./commands/prompts.js";
 import { registerRunConfigCommands } from "./commands/run-config.js";
 import { registerMemberCommands } from "./commands/members.js";
-import { registerNotificationCommands } from "./commands/notifications.js";
 import { registerCreditsCommands } from "./commands/credits.js";
+import { registerQuestionsCommands } from "./commands/questions.js";
+import { registerKBCommands } from "./commands/kb.js";
+import { registerPermissionsCommands } from "./commands/permissions.js";
 import { registerUpdateCommand } from "./commands/update.js";
 
 const program = new Command();
@@ -55,8 +57,10 @@ registerContentTypeCommands(program);
 registerPromptCommands(program);
 registerRunConfigCommands(program);
 registerMemberCommands(program);
-registerNotificationCommands(program);
 registerCreditsCommands(program);
+registerQuestionsCommands(program);
+registerKBCommands(program);
+registerPermissionsCommands(program);
 registerUpdateCommand(program);
 
 // Parse and execute

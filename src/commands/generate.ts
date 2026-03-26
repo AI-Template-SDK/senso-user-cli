@@ -70,7 +70,7 @@ export function registerGenerateCommands(program: Command): void {
 
   gen
     .command("run")
-    .description("Trigger a content generation run. Processes all prompts (or a specific subset) through the content engine. Runs asynchronously — use 'content verification' to monitor generated drafts after the run completes.")
+    .description("Trigger a content generation run. Processes all prompts (or a specific subset) through the content engine. Runs asynchronously — use 'generate runs-list' to monitor progress.")
     .option("--prompt-ids <ids...>", "Optional list of prompt IDs to process (omit to run all)")
     .action(async (cmdOpts: { promptIds?: string[] }) => {
       const opts = program.opts();
@@ -78,6 +78,108 @@ export function registerGenerateCommands(program: Command): void {
         const body = cmdOpts.promptIds ? { prompt_ids: cmdOpts.promptIds } : undefined;
         const data = await apiRequest({ method: "POST", path: "/org/content-generation/run", body, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
         log.success("Content generation run triggered.");
+        console.log(JSON.stringify(data, null, 2));
+      } catch (err) {
+        log.error(formatApiError(err));
+        process.exit(1);
+      }
+    });
+
+  gen
+    .command("job-context")
+    .description("Get the full content generation job context — all prompts with queue status (create vs update), content state, and a summary of queue counts.")
+    .action(async () => {
+      const opts = program.opts();
+      try {
+        const data = await apiRequest({ path: "/org/content-generation/job-context", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        console.log(JSON.stringify(data, null, 2));
+      } catch (err) {
+        log.error(formatApiError(err));
+        process.exit(1);
+      }
+    });
+
+  gen
+    .command("runs-list")
+    .description("List content generation runs for the org. Use --status to filter by run status, --active-only to show only in-progress runs.")
+    .option("--limit <n>", "Items per page", "20")
+    .option("--offset <n>", "Pagination offset", "0")
+    .option("--status <status>", "Filter by run status")
+    .option("--active-only", "Only return active (in-progress) runs")
+    .option("--start-date <date>", "Filter runs on or after this date (YYYY-MM-DD)")
+    .option("--end-date <date>", "Filter runs on or before this date (YYYY-MM-DD)")
+    .action(async (cmdOpts: Record<string, string | boolean>) => {
+      const opts = program.opts();
+      try {
+        const data = await apiRequest({
+          path: "/org/content-generation/runs",
+          params: {
+            limit: cmdOpts.limit as string,
+            offset: cmdOpts.offset as string,
+            status: cmdOpts.status as string | undefined,
+            active_only: cmdOpts.activeOnly ? "true" : undefined,
+            start_date: cmdOpts.startDate as string | undefined,
+            end_date: cmdOpts.endDate as string | undefined,
+          },
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
+        console.log(JSON.stringify(data, null, 2));
+      } catch (err) {
+        log.error(formatApiError(err));
+        process.exit(1);
+      }
+    });
+
+  gen
+    .command("runs-get <runId>")
+    .description("Get details for a specific content generation run.")
+    .action(async (runId: string) => {
+      const opts = program.opts();
+      try {
+        const data = await apiRequest({ path: `/org/content-generation/runs/${runId}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        console.log(JSON.stringify(data, null, 2));
+      } catch (err) {
+        log.error(formatApiError(err));
+        process.exit(1);
+      }
+    });
+
+  gen
+    .command("runs-items <runId>")
+    .description("List individual prompt items within a content generation run and their per-item status.")
+    .option("--limit <n>", "Items per page", "100")
+    .option("--offset <n>", "Pagination offset", "0")
+    .action(async (runId: string, cmdOpts: Record<string, string>) => {
+      const opts = program.opts();
+      try {
+        const data = await apiRequest({
+          path: `/org/content-generation/runs/${runId}/items`,
+          params: { limit: cmdOpts.limit, offset: cmdOpts.offset },
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
+        console.log(JSON.stringify(data, null, 2));
+      } catch (err) {
+        log.error(formatApiError(err));
+        process.exit(1);
+      }
+    });
+
+  gen
+    .command("runs-logs <runId>")
+    .description("List log entries for a content generation run.")
+    .option("--limit <n>", "Items per page", "100")
+    .option("--offset <n>", "Pagination offset", "0")
+    .action(async (runId: string, cmdOpts: Record<string, string>) => {
+      const opts = program.opts();
+      try {
+        const data = await apiRequest({
+          path: `/org/content-generation/runs/${runId}/logs`,
+          params: { limit: cmdOpts.limit, offset: cmdOpts.offset },
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
         log.error(formatApiError(err));
