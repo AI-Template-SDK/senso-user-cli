@@ -18,7 +18,14 @@ interface UploadResultItem {
   filename: string;
   status: "upload_pending" | "conflict" | "duplicate" | "invalid";
   upload_url?: string;
-  message?: string;
+  expires_in?: number;
+  error?: string;
+  existing_content_id?: string;
+}
+
+interface UploadResponse {
+  summary: { total: number; success: number; skipped: number };
+  results: UploadResultItem[];
 }
 
 const MIME_TYPES: Record<string, string> = {
@@ -91,7 +98,7 @@ export function registerIngestCommands(program: Command): void {
         const fileData = await Promise.all(files.map(getFileMetadata));
 
         // 2. Request presigned upload URLs
-        const results = await apiRequest<UploadResultItem[]>({
+        const response = await apiRequest<UploadResponse>({
           method: "POST",
           path: "/org/kb/upload",
           body: { files: fileData.map((f) => f.meta) },
@@ -99,7 +106,7 @@ export function registerIngestCommands(program: Command): void {
           baseUrl: opts.baseUrl,
         });
 
-        const items = Array.isArray(results) ? results : [];
+        const items = response.results ?? [];
 
         // 3. Upload accepted files to S3
         let uploaded = 0;
@@ -118,7 +125,7 @@ export function registerIngestCommands(program: Command): void {
               log.error(`S3 upload failed for ${item.filename}: ${uploadErr instanceof Error ? uploadErr.message : String(uploadErr)}`);
             }
           } else {
-            log.warn(`Skipped ${item.filename}: ${item.status}${item.message ? ` — ${item.message}` : ""}`);
+            log.warn(`Skipped ${item.filename}: ${item.status}${item.error ? ` — ${item.error}` : ""}`);
           }
         }
 
@@ -127,7 +134,7 @@ export function registerIngestCommands(program: Command): void {
         }
 
         if (opts.output === "json") {
-          console.log(JSON.stringify(results, null, 2));
+          console.log(JSON.stringify(response, null, 2));
         }
       } catch (err) {
         log.error(formatApiError(err));
@@ -136,33 +143,30 @@ export function registerIngestCommands(program: Command): void {
     });
 
   ingest
-    .command("reprocess <contentId> <file>")
-    .description("Re-ingest an existing content item with a new file version. Provide the content ID and the path to the replacement file.")
-    .action(async (contentId: string, file: string) => {
+    .command("reprocess <nodeId> <file>")
+    .description("Re-ingest an existing document with a new file version. Provide the KB node ID (kb_node_id) and the path to the replacement file.")
+    .action(async (nodeId: string, file: string) => {
       const opts = program.opts();
       try {
         const { meta, buffer } = await getFileMetadata(file);
 
-        const results = await apiRequest<UploadResultItem[]>({
+        const item = await apiRequest<UploadResultItem>({
           method: "PUT",
-          path: `/org/kb/nodes/${contentId}/file`,
+          path: `/org/kb/nodes/${nodeId}/file`,
           body: { file: meta },
           apiKey: opts.apiKey,
           baseUrl: opts.baseUrl,
         });
 
-        const items = Array.isArray(results) ? results : [];
-        for (const item of items) {
-          if (item.status === "upload_pending" && item.upload_url) {
-            await uploadToS3(item.upload_url, buffer, meta.content_type);
-            log.success(`Uploaded ${meta.filename} for content ${contentId}. Background re-processing started.`);
-          } else {
-            log.warn(`Skipped: ${item.status}${item.message ? ` — ${item.message}` : ""}`);
-          }
+        if (item.status === "upload_pending" && item.upload_url) {
+          await uploadToS3(item.upload_url, buffer, meta.content_type);
+          log.success(`Uploaded ${meta.filename} for node ${nodeId}. Background re-processing started.`);
+        } else {
+          log.warn(`Skipped: ${item.status}${item.error ? ` — ${item.error}` : ""}`);
         }
 
         if (opts.output === "json") {
-          console.log(JSON.stringify(results, null, 2));
+          console.log(JSON.stringify(item, null, 2));
         }
       } catch (err) {
         log.error(formatApiError(err));

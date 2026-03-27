@@ -24,7 +24,7 @@ export function registerGenerateCommands(program: Command): void {
   gen
     .command("update-settings")
     .description("Update content generation settings. Control auto-publish, generation toggle, and schedule (days of week 0-6).")
-    .requiredOption("--data <json>", 'JSON settings: { "enable_content_generation": bool, "content_auto_publish": bool, "content_schedule": [0-6] }')
+    .requiredOption("--data <json>", 'JSON settings: { "enable_content_generation": bool, "content_auto_publish": bool, "content_schedule": [0-6], "selected_content_type_id": "<uuid>" }')
     .action(async (cmdOpts: { data: string }) => {
       const opts = program.opts();
       try {
@@ -72,11 +72,16 @@ export function registerGenerateCommands(program: Command): void {
     .command("run")
     .description("Trigger a content generation run. Processes all prompts (or a specific subset) through the content engine. Runs asynchronously — use 'generate runs-list' to monitor progress.")
     .option("--prompt-ids <ids...>", "Optional list of prompt IDs to process (omit to run all)")
-    .action(async (cmdOpts: { promptIds?: string[] }) => {
+    .option("--content-type-id <id>", "Override the org's default content type for this run")
+    .option("--publisher-ids <ids...>", "Restrict publishing to specific publisher IDs")
+    .action(async (cmdOpts: { promptIds?: string[]; contentTypeId?: string; publisherIds?: string[] }) => {
       const opts = program.opts();
       try {
-        const body = cmdOpts.promptIds ? { prompt_ids: cmdOpts.promptIds } : undefined;
-        const data = await apiRequest({ method: "POST", path: "/org/content-generation/run", body, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        const body: Record<string, unknown> = {};
+        if (cmdOpts.promptIds) body.prompt_ids = cmdOpts.promptIds;
+        if (cmdOpts.contentTypeId) body.content_type_id = cmdOpts.contentTypeId;
+        if (cmdOpts.publisherIds) body.publisher_ids = cmdOpts.publisherIds;
+        const data = await apiRequest({ method: "POST", path: "/org/content-generation/run", body: Object.keys(body).length > 0 ? body : {}, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
         log.success("Content generation run triggered.");
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {

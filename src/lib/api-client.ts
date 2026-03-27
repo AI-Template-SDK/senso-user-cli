@@ -8,8 +8,12 @@ export class ApiError extends Error {
     public body: unknown,
   ) {
     const msg =
-      typeof body === "object" && body && "error" in body
-        ? (body as { error: string }).error
+      typeof body === "object" && body
+        ? "error" in body
+          ? (body as { error: string }).error
+          : "message" in body
+            ? (body as { message: string }).message
+            : statusText
         : statusText;
     super(msg);
     this.name = "ApiError";
@@ -93,8 +97,10 @@ export function formatApiError(err: unknown): string {
     switch (err.status) {
       case 401:
         return "Authentication failed. Run `senso login` to update your API key.";
+      case 402:
+        return "Insufficient credits or spending limit reached. Check your plan at https://app.senso.ai.";
       case 403:
-        return "Permission denied. Check your API key permissions.";
+        return `Permission denied: ${err.message}`;
       case 404:
         return "Resource not found.";
       case 409:

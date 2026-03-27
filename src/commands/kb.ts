@@ -226,7 +226,7 @@ export function registerKBCommands(program: Command): void {
       const opts = program.opts();
       try {
         const body: Record<string, unknown> = { name: cmdOpts.name };
-        if (cmdOpts.parentId) body.parent_node_id = cmdOpts.parentId;
+        if (cmdOpts.parentId) body.parent_id = cmdOpts.parentId;
         const data = await apiRequest({ method: "POST", path: "/org/kb/folders", body, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
         log.success(`Folder "${cmdOpts.name}" created.`);
         console.log(JSON.stringify(data, null, 2));
@@ -259,7 +259,7 @@ export function registerKBCommands(program: Command): void {
     .action(async (id: string, cmdOpts: { parentId: string }) => {
       const opts = program.opts();
       try {
-        const data = await apiRequest({ method: "PATCH", path: `/org/kb/nodes/${id}/move`, body: { parent_node_id: cmdOpts.parentId }, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        const data = await apiRequest({ method: "PATCH", path: `/org/kb/nodes/${id}/move`, body: { new_parent_id: cmdOpts.parentId }, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
         log.success(`Node ${id} moved.`);
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
@@ -285,7 +285,7 @@ export function registerKBCommands(program: Command): void {
   kb
     .command("create-raw")
     .description("Create a raw (text/markdown) content item in the knowledge base.")
-    .requiredOption("--data <json>", 'JSON: { "name": "My doc", "text": "# Hello", "kb_folder_node_id": "<uuid>" }')
+    .requiredOption("--data <json>", 'JSON: { "title": "My doc", "text": "# Hello", "kb_folder_node_id": "<uuid>", "tag_ids": ["<uuid>"] }')
     .action(async (cmdOpts: { data: string }) => {
       const opts = program.opts();
       try {
@@ -302,7 +302,7 @@ export function registerKBCommands(program: Command): void {
   kb
     .command("update-raw <id>")
     .description("Fully replace the text content of a raw KB node (creates a new version).")
-    .requiredOption("--data <json>", 'JSON: { "text": "# Updated content" }')
+    .requiredOption("--data <json>", 'JSON: { "title": "Title", "text": "# Updated content", "tag_ids": ["<uuid>"] }')
     .action(async (id: string, cmdOpts: { data: string }) => {
       const opts = program.opts();
       try {
@@ -319,7 +319,7 @@ export function registerKBCommands(program: Command): void {
   kb
     .command("patch-raw <id>")
     .description("Partially update the text content of a raw KB node.")
-    .requiredOption("--data <json>", 'JSON: { "text": "Updated text", "name": "New name" }')
+    .requiredOption("--data <json>", 'JSON: { "title": "New title", "text": "Updated text", "summary": "...", "tag_ids": ["<uuid>"] }')
     .action(async (id: string, cmdOpts: { data: string }) => {
       const opts = program.opts();
       try {
@@ -348,7 +348,7 @@ export function registerKBCommands(program: Command): void {
         const body: Record<string, unknown> = { files: fileData.map((f) => f.meta) };
         if (cmdOpts.folderId) body.kb_folder_node_id = cmdOpts.folderId;
 
-        const results = await apiRequest<Array<{ status: string; upload_url?: string; filename: string; content_id?: string; message?: string }>>({
+        const response = await apiRequest<{ summary: { total: number; success: number; skipped: number }; results: Array<{ status: string; upload_url?: string; filename: string; content_id?: string; error?: string; expires_in?: number; existing_content_id?: string }> }>({
           method: "POST",
           path: "/org/kb/upload",
           body,
@@ -356,7 +356,7 @@ export function registerKBCommands(program: Command): void {
           baseUrl: opts.baseUrl,
         });
 
-        const items = Array.isArray(results) ? results : [];
+        const items = response.results ?? [];
         let uploaded = 0;
         for (const item of items) {
           if (item.status === "upload_pending" && item.upload_url) {
@@ -373,13 +373,13 @@ export function registerKBCommands(program: Command): void {
               log.error(`S3 upload failed for ${item.filename}: ${uploadErr instanceof Error ? uploadErr.message : String(uploadErr)}`);
             }
           } else {
-            log.warn(`Skipped ${item.filename}: ${item.status}${item.message ? ` — ${item.message}` : ""}`);
+            log.warn(`Skipped ${item.filename}: ${item.status}${item.error ? ` — ${item.error}` : ""}`);
           }
         }
         if (uploaded > 0) {
           log.success(`${uploaded} file(s) uploaded. Background processing will parse, chunk, and embed them.`);
         }
-        if (opts.output === "json") console.log(JSON.stringify(results, null, 2));
+        if (opts.output === "json") console.log(JSON.stringify(response, null, 2));
       } catch (err) {
         log.error(formatApiError(err));
         process.exit(1);
@@ -393,23 +393,20 @@ export function registerKBCommands(program: Command): void {
       const opts = program.opts();
       try {
         const { meta, buffer } = await getFileMetadata(file);
-        const results = await apiRequest<Array<{ status: string; upload_url?: string; message?: string }>>({
+        const item = await apiRequest<{ status: string; upload_url?: string; error?: string; content_id?: string; ingestion_run_id?: string }>({
           method: "PUT",
           path: `/org/kb/nodes/${id}/file`,
           body: { file: meta },
           apiKey: opts.apiKey,
           baseUrl: opts.baseUrl,
         });
-        const items = Array.isArray(results) ? results : [];
-        for (const item of items) {
-          if (item.status === "upload_pending" && item.upload_url) {
-            await uploadToS3(item.upload_url, buffer, meta.content_type);
-            log.success(`Uploaded ${meta.filename} for node ${id}. Background re-processing started.`);
-          } else {
-            log.warn(`Skipped: ${item.status}${item.message ? ` — ${item.message}` : ""}`);
-          }
+        if (item.status === "upload_pending" && item.upload_url) {
+          await uploadToS3(item.upload_url, buffer, meta.content_type);
+          log.success(`Uploaded ${meta.filename} for node ${id}. Background re-processing started.`);
+        } else {
+          log.warn(`Skipped: ${item.status}${item.error ? ` — ${item.error}` : ""}`);
         }
-        if (opts.output === "json") console.log(JSON.stringify(results, null, 2));
+        if (opts.output === "json") console.log(JSON.stringify(item, null, 2));
       } catch (err) {
         log.error(formatApiError(err));
         process.exit(1);

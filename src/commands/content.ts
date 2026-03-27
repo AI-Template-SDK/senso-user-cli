@@ -29,7 +29,7 @@ export function registerContentCommands(program: Command): void {
           json: data,
           table: {
             rows: (rows as Record<string, unknown>[]).map((r) => ({
-              id: r.node_id,
+              id: r.kb_node_id,
               name: r.name,
               type: r.type,
               status: r.processing_status,
@@ -39,7 +39,7 @@ export function registerContentCommands(program: Command): void {
           plain: (rows as Record<string, unknown>[]).length
             ? (rows as Record<string, unknown>[]).map(
                 (r) =>
-                  `  ${pc.bold(String(r.name || "Untitled"))} ${pc.dim(`(${r.node_id})`)} ${r.type ? pc.dim(`[${r.type}]`) : ""}`,
+                  `  ${pc.bold(String(r.name || "Untitled"))} ${pc.dim(`(${r.kb_node_id})`)} ${r.type ? pc.dim(`[${r.type}]`) : ""}`,
               )
             : ["  No content found."],
         });
