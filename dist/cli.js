@@ -1488,6 +1488,151 @@ function registerRunConfigCommands(program2) {
   });
 }
 
+// src/commands/skills.ts
+import { execFile } from "child_process";
+import { promisify } from "util";
+var execFileAsync = promisify(execFile);
+var SENSO_SKILLS = [
+  "@senso/senso-search",
+  "@senso/senso-ingest",
+  "@senso/senso-content-gen",
+  "@senso/senso-brand-setup",
+  "@senso/senso-kb-organize",
+  "@senso/senso-review-publish"
+];
+var AGENT_FLAGS = {
+  claude: "--claude",
+  cursor: "--cursor",
+  codex: "--codex",
+  copilot: "--copilot",
+  gemini: "--gemini",
+  cline: "--cline"
+};
+async function resolveShipables() {
+  try {
+    await execFileAsync("shipables", ["--version"]);
+    return "shipables";
+  } catch {
+    return "npx";
+  }
+}
+async function runShipables(args) {
+  const bin = await resolveShipables();
+  if (bin === "npx") {
+    return execFileAsync("npx", ["--yes", "@senso-ai/shipables", ...args], { timeout: 12e4 });
+  }
+  return execFileAsync(bin, args, { timeout: 12e4 });
+}
+function buildAgentFlags(agent) {
+  if (!agent) return ["--all"];
+  const flag = AGENT_FLAGS[agent.toLowerCase()];
+  if (!flag) {
+    const valid = Object.keys(AGENT_FLAGS).join(", ");
+    throw new Error(`Unknown agent "${agent}". Valid agents: ${valid}`);
+  }
+  return [flag];
+}
+function registerSkillsCommands(program2) {
+  const skills = program2.command("skills").description("Install and manage Senso agent skills. Skills teach AI coding agents (Claude Code, Cursor, Codex, etc.) how to use Senso automatically.");
+  skills.command("install [names...]").description("Install Senso agent skills. Use --all for all six official skills, or pass individual short names (search, ingest, content-gen, brand-setup, kb-organize, review-publish).").option("--all", "Install all six official Senso skills").option("--agent <name>", "Target a specific agent: claude, cursor, codex, copilot, gemini, cline").option("--global", "Install globally instead of project-level").action(async (names, cmdOpts) => {
+    const opts = program2.opts();
+    let skillPackages;
+    if (cmdOpts.all || names.length === 0) {
+      skillPackages = [...SENSO_SKILLS];
+    } else {
+      skillPackages = names.map((n) => {
+        if (n.startsWith("@")) return n;
+        return `@senso/senso-${n}`;
+      });
+    }
+    let agentFlags;
+    try {
+      agentFlags = buildAgentFlags(cmdOpts.agent);
+    } catch (err) {
+      error(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    }
+    const envFlags = [];
+    const apiKey = getApiKey({ apiKey: opts.apiKey });
+    if (apiKey) {
+      envFlags.push("--env", `SENSO_API_KEY=${apiKey}`);
+    }
+    const globalFlag = cmdOpts.global ? ["--global"] : [];
+    info(`Installing ${skillPackages.length} skill(s)...`);
+    for (const pkg of skillPackages) {
+      try {
+        const args = ["install", pkg, ...agentFlags, ...globalFlag, ...envFlags, "--yes"];
+        const { stdout, stderr } = await runShipables(args);
+        if (!opts.quiet) {
+          if (stdout.trim()) console.log(stdout.trim());
+          if (stderr.trim()) console.error(stderr.trim());
+        }
+        const shortName = pkg.replace("@senso/senso-", "");
+        success(`Installed ${shortName}`);
+      } catch (err) {
+        const shortName = pkg.replace("@senso/senso-", "");
+        const msg = err instanceof Error ? err.message : String(err);
+        error(`Failed to install ${shortName}: ${msg}`);
+      }
+    }
+    success("Done. Your agent can now use Senso \u2014 just talk to it naturally.");
+  });
+  skills.command("list").description("List installed Senso skills.").option("--global", "List globally installed skills").action(async (cmdOpts) => {
+    const opts = program2.opts();
+    try {
+      const globalFlag = cmdOpts.global ? ["--global"] : [];
+      const { stdout } = await runShipables(["list", ...globalFlag, "--json"]);
+      const data = JSON.parse(stdout);
+      if (opts.output === "json") {
+        console.log(JSON.stringify(data, null, 2));
+      } else {
+        if (!data || Array.isArray(data) && data.length === 0) {
+          info("No skills installed. Run `senso skills install --all` to get started.");
+        } else {
+          console.log(JSON.stringify(data, null, 2));
+        }
+      }
+    } catch (err) {
+      error(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    }
+  });
+  skills.command("list-available").description("Show all six official Senso skills available for install.").action(async () => {
+    const opts = program2.opts();
+    const available = SENSO_SKILLS.map((pkg) => ({
+      package: pkg,
+      shortName: pkg.replace("@senso/senso-", "")
+    }));
+    if (opts.output === "json") {
+      console.log(JSON.stringify(available, null, 2));
+    } else {
+      console.log();
+      for (const s of available) {
+        console.log(`  ${s.shortName.padEnd(18)} ${s.package}`);
+      }
+      console.log();
+      info("Install all: senso skills install --all");
+    }
+  });
+  skills.command("remove <name>").description("Remove an installed Senso skill. Use the short name (e.g., search, ingest, content-gen).").option("--global", "Remove from global install").action(async (name, cmdOpts) => {
+    const opts = program2.opts();
+    const pkg = name.startsWith("@") ? name : `@senso/senso-${name}`;
+    const globalFlag = cmdOpts.global ? ["--global"] : [];
+    try {
+      const { stdout, stderr } = await runShipables(["uninstall", pkg, ...globalFlag, "--yes"]);
+      if (!opts.quiet) {
+        if (stdout.trim()) console.log(stdout.trim());
+        if (stderr.trim()) console.error(stderr.trim());
+      }
+      const shortName = pkg.replace("@senso/senso-", "");
+      success(`Removed ${shortName}`);
+    } catch (err) {
+      error(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    }
+  });
+}
+
 // src/commands/members.ts
 function registerMemberCommands(program2) {
   const members = program2.command("members").description("View the organization member directory. Lists all users who belong to the organization with their names and emails.");
@@ -1964,6 +2109,7 @@ registerBrandKitCommands(program);
 registerContentTypeCommands(program);
 registerPromptCommands(program);
 registerRunConfigCommands(program);
+registerSkillsCommands(program);
 registerMemberCommands(program);
 registerCreditsCommands(program);
 registerQuestionsCommands(program);
