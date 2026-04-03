@@ -7,12 +7,12 @@ import { getApiKey } from "../lib/config.js";
 const execFileAsync = promisify(execFile);
 
 const SENSO_SKILLS = [
-  "@senso/senso-search",
-  "@senso/senso-ingest",
-  "@senso/senso-content-gen",
-  "@senso/senso-brand-setup",
-  "@senso/senso-kb-organize",
-  "@senso/senso-review-publish",
+  "senso-ai/senso-search",
+  "senso-ai/senso-ingest",
+  "senso-ai/senso-content-gen",
+  "senso-ai/senso-brand-setup",
+  "senso-ai/senso-kb-organize",
+  "senso-ai/senso-review-publish",
 ];
 
 const AGENT_FLAGS: Record<string, string> = {
@@ -73,9 +73,9 @@ export function registerSkillsCommands(program: Command): void {
         skillPackages = [...SENSO_SKILLS];
       } else {
         skillPackages = names.map((n) => {
-          // Allow short names like "search" -> "@senso/senso-search"
+          // Allow short names like "search" -> "senso-ai/senso-search"
           if (n.startsWith("@")) return n;
-          return `@senso/senso-${n}`;
+          return `senso-ai/senso-${n}`;
         });
       }
 
@@ -109,10 +109,10 @@ export function registerSkillsCommands(program: Command): void {
             if (stderr.trim()) console.error(stderr.trim());
           }
 
-          const shortName = pkg.replace("@senso/senso-", "");
+          const shortName = pkg.replace("senso-ai/senso-", "");
           log.success(`Installed ${shortName}`);
         } catch (err) {
-          const shortName = pkg.replace("@senso/senso-", "");
+          const shortName = pkg.replace("senso-ai/senso-", "");
           const msg = err instanceof Error ? err.message : String(err);
           log.error(`Failed to install ${shortName}: ${msg}`);
         }
@@ -153,7 +153,7 @@ export function registerSkillsCommands(program: Command): void {
       const opts = program.opts();
       const available = SENSO_SKILLS.map((pkg) => ({
         package: pkg,
-        shortName: pkg.replace("@senso/senso-", ""),
+        shortName: pkg.replace("senso-ai/senso-", ""),
       }));
 
       if (opts.output === "json") {
@@ -174,7 +174,7 @@ export function registerSkillsCommands(program: Command): void {
     .option("--global", "Remove from global install")
     .action(async (name: string, cmdOpts: { global?: boolean }) => {
       const opts = program.opts();
-      const pkg = name.startsWith("@") ? name : `@senso/senso-${name}`;
+      const pkg = name.startsWith("@") ? name : `senso-ai/senso-${name}`;
       const globalFlag = cmdOpts.global ? ["--global"] : [];
 
       try {
@@ -185,7 +185,7 @@ export function registerSkillsCommands(program: Command): void {
           if (stderr.trim()) console.error(stderr.trim());
         }
 
-        const shortName = pkg.replace("@senso/senso-", "");
+        const shortName = pkg.replace("senso-ai/senso-", "");
         log.success(`Removed ${shortName}`);
       } catch (err) {
         log.error(err instanceof Error ? err.message : String(err));
