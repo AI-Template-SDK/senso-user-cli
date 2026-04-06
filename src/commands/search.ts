@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import pc from "picocolors";
-import { apiRequest, formatApiError } from "../lib/api-client.js";
+import { apiRequest, apiStreamRequest, formatApiError } from "../lib/api-client.js";
 import { output, type OutputFormat } from "../lib/output.js";
 import * as log from "../utils/logger.js";
 
@@ -139,6 +139,103 @@ export function registerSearchCommands(program: Command): void {
           baseUrl: opts.baseUrl,
         });
         outputByFormat(opts.output, data);
+      } catch (err) {
+        log.error(formatApiError(err));
+        process.exit(1);
+      }
+    });
+  search
+    .command("stream <query>")
+    .description("Streaming search — returns AI answer tokens in real-time via SSE, followed by source chunks. Use this for a responsive, live search experience.")
+    .option("--max-results <n>", "Maximum results (max: 20)", "5")
+    .option("--content-ids <ids...>", "Restrict search to specific content item IDs (space-separated UUIDs)")
+    .option("--require-scoped-ids", "Only return results from the specified --content-ids")
+    .action(async (query: string, cmdOpts: Record<string, string | boolean | string[]>) => {
+      const opts = program.opts();
+      const body: Record<string, unknown> = { query, max_results: parseMaxResults(cmdOpts.maxResults as string) };
+      if (cmdOpts.contentIds) body.content_ids = cmdOpts.contentIds;
+      if (cmdOpts.requireScopedIds) body.require_scoped_ids = true;
+
+      try {
+        const res = await apiStreamRequest({
+          method: "POST",
+          path: "/org/search/stream",
+          body,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
+
+        if (!res.body) {
+          log.error("No response body received.");
+          process.exit(1);
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let eventType: string | null = null;
+        let answerStarted = false;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (line.startsWith("event: ")) {
+              eventType = line.slice(7).trim();
+            } else if (line.startsWith("data: ") && eventType) {
+              const data = JSON.parse(line.slice(6));
+
+              switch (eventType) {
+                case "token":
+                  if (!answerStarted) {
+                    answerStarted = true;
+                    process.stdout.write(`\n  ${pc.bold("Answer:")} `);
+                  }
+                  process.stdout.write(data.token);
+                  break;
+
+                case "sources": {
+                  if (answerStarted) process.stdout.write("\n");
+                  console.log();
+
+                  const results = data.results || [];
+                  if (results.length > 0) {
+                    console.log(`  ${pc.bold("Sources:")} (${results.length})`);
+                    for (let i = 0; i < results.length; i++) {
+                      const r = results[i];
+                      console.log();
+                      console.log(`  ${pc.dim(`${i + 1}.`)} ${pc.bold(r.title || "Untitled")} ${pc.dim(`(${r.content_id})`)}`);
+                      if (r.chunk_text) {
+                        console.log(`     ${pc.dim("Snippet:")} ${r.chunk_text}`);
+                      }
+                    }
+                  } else {
+                    console.log(`  ${pc.dim("No sources found.")}`);
+                  }
+                  console.log();
+
+                  if (opts.output === "json") {
+                    console.log(JSON.stringify(data, null, 2));
+                  }
+                  break;
+                }
+
+                case "error":
+                  log.error(`Stream error: ${data.error}`);
+                  break;
+
+                case "done":
+                  break;
+              }
+              eventType = null;
+            }
+          }
+        }
       } catch (err) {
         log.error(formatApiError(err));
         process.exit(1);
