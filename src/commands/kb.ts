@@ -2,7 +2,14 @@ import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import { Command } from "commander";
-import { apiRequest, formatApiError } from "../lib/api-client.js";
+import {
+  apiRequest,
+  formatApiError,
+  handleUploadError,
+  printUploadSummary,
+  uploadStatusToReason,
+  type UploadResponse,
+} from "../lib/api-client.js";
 import * as log from "../utils/logger.js";
 
 const MIME_TYPES: Record<string, string> = {
@@ -76,12 +83,13 @@ export function registerKBCommands(program: Command): void {
     .description("List top-level files and folders in the knowledge base.")
     .option("--limit <n>", "Items per page", "50")
     .option("--offset <n>", "Pagination offset", "0")
+    .option("--type <type>", "Filter by node type (folder or content)")
     .action(async (cmdOpts: Record<string, string>) => {
       const opts = program.opts();
       try {
         const data = await apiRequest({
           path: "/org/kb/my-files",
-          params: { limit: cmdOpts.limit, offset: cmdOpts.offset },
+          params: { limit: cmdOpts.limit, offset: cmdOpts.offset, type: cmdOpts.type },
           apiKey: opts.apiKey,
           baseUrl: opts.baseUrl,
         });
@@ -98,12 +106,13 @@ export function registerKBCommands(program: Command): void {
     .requiredOption("--query <q>", "Name search query")
     .option("--limit <n>", "Items per page", "20")
     .option("--offset <n>", "Pagination offset", "0")
+    .option("--type <type>", "Filter by node type (folder or content)")
     .action(async (cmdOpts: Record<string, string>) => {
       const opts = program.opts();
       try {
         const data = await apiRequest({
           path: "/org/kb/find",
-          params: { q: cmdOpts.query, limit: cmdOpts.limit, offset: cmdOpts.offset },
+          params: { q: cmdOpts.query, limit: cmdOpts.limit, offset: cmdOpts.offset, type: cmdOpts.type },
           apiKey: opts.apiKey,
           baseUrl: opts.baseUrl,
         });
@@ -147,12 +156,13 @@ export function registerKBCommands(program: Command): void {
     .description("List children of a KB folder node.")
     .option("--limit <n>", "Items per page", "50")
     .option("--offset <n>", "Pagination offset", "0")
+    .option("--type <type>", "Filter by node type (folder or content)")
     .action(async (id: string, cmdOpts: Record<string, string>) => {
       const opts = program.opts();
       try {
         const data = await apiRequest({
           path: `/org/kb/nodes/${id}/children`,
-          params: { limit: cmdOpts.limit, offset: cmdOpts.offset },
+          params: { limit: cmdOpts.limit, offset: cmdOpts.offset, type: cmdOpts.type },
           apiKey: opts.apiKey,
           baseUrl: opts.baseUrl,
         });
@@ -348,7 +358,7 @@ export function registerKBCommands(program: Command): void {
         const body: Record<string, unknown> = { files: fileData.map((f) => f.meta) };
         if (cmdOpts.folderId) body.kb_folder_node_id = cmdOpts.folderId;
 
-        const response = await apiRequest<{ summary: { total: number; success: number; skipped: number }; results: Array<{ status: string; upload_url?: string; filename: string; content_id?: string; error?: string; expires_in?: number; existing_content_id?: string }> }>({
+        const response = await apiRequest<UploadResponse>({
           method: "POST",
           path: "/org/kb/upload",
           body,
@@ -358,30 +368,36 @@ export function registerKBCommands(program: Command): void {
 
         const items = response.results ?? [];
         let uploaded = 0;
+        const failed: Array<{ filename: string; reason: string }> = [];
+
         for (const item of items) {
           if (item.status === "upload_pending" && item.upload_url) {
             const match = fileData.find((f) => f.meta.filename === item.filename);
             if (!match) {
-              log.error(`Could not match server filename "${item.filename}" to a local file — skipping upload.`);
+              failed.push({ filename: item.filename, reason: "Could not match to a local file." });
               continue;
             }
             try {
               await uploadToS3(item.upload_url, match.buffer, match.meta.content_type);
               uploaded++;
-              log.success(`Uploaded ${item.filename} (content_id: ${item.content_id})`);
             } catch (uploadErr) {
-              log.error(`S3 upload failed for ${item.filename}: ${uploadErr instanceof Error ? uploadErr.message : String(uploadErr)}`);
+              failed.push({
+                filename: item.filename,
+                reason: `Upload failed: ${uploadErr instanceof Error ? uploadErr.message : String(uploadErr)}`,
+              });
             }
           } else {
-            log.warn(`Skipped ${item.filename}: ${item.status}${item.error ? ` — ${item.error}` : ""}`);
+            failed.push({
+              filename: item.filename,
+              reason: uploadStatusToReason(item.status, item.error),
+            });
           }
         }
-        if (uploaded > 0) {
-          log.success(`${uploaded} file(s) uploaded. Background processing will parse, chunk, and embed them.`);
-        }
+
+        printUploadSummary(uploaded, failed, items);
         if (opts.output === "json") console.log(JSON.stringify(response, null, 2));
       } catch (err) {
-        log.error(formatApiError(err));
+        handleUploadError(err);
         process.exit(1);
       }
     });

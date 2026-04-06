@@ -159,12 +159,30 @@ async function getLatestVersion() {
 
 // src/commands/auth.ts
 import * as p from "@clack/prompts";
+import pc4 from "picocolors";
+
+// src/lib/api-client.ts
 import pc3 from "picocolors";
+
+// src/utils/logger.ts
+import pc2 from "picocolors";
+function success(msg) {
+  console.log(`  ${pc2.green("\u2713")} ${msg}`);
+}
+function error(msg) {
+  console.error(`  ${pc2.red("\u2717")} ${msg}`);
+}
+function warn(msg) {
+  console.error(`  ${pc2.yellow("!")} ${msg}`);
+}
+function info(msg) {
+  console.log(`  ${pc2.cyan("\u2139")} ${msg}`);
+}
 
 // src/lib/api-client.ts
 var ApiError = class extends Error {
   constructor(status, statusText, body) {
-    const msg = typeof body === "object" && body ? "error" in body ? body.error : "message" in body ? body.message : statusText : statusText;
+    const msg = extractErrorMessage(body, statusText);
     super(msg);
     this.status = status;
     this.statusText = statusText;
@@ -172,6 +190,19 @@ var ApiError = class extends Error {
     this.name = "ApiError";
   }
 };
+function extractErrorMessage(body, fallback) {
+  if (typeof body !== "object" || !body) return fallback;
+  const b = body;
+  if (typeof b.error === "string") return b.error;
+  if (typeof b.message === "string") return b.message;
+  if (typeof b.detail === "string") return b.detail;
+  if (Array.isArray(b.errors) && b.errors.length > 0) {
+    return b.errors.map(
+      (e) => e.field ? `${e.field}: ${e.message}` : String(e.message || e)
+    ).join("; ");
+  }
+  return fallback;
+}
 async function apiRequest(opts) {
   const apiKey = getApiKey({ apiKey: opts.apiKey });
   if (!apiKey) {
@@ -204,25 +235,106 @@ async function apiRequest(opts) {
     });
     if (!res.ok) {
       let body;
-      const text3 = await res.text();
+      const text5 = await res.text();
       try {
-        body = JSON.parse(text3);
+        body = JSON.parse(text5);
       } catch {
-        body = text3;
+        body = text5;
       }
       throw new ApiError(res.status, res.statusText, body);
     }
     if (res.status === 204) {
       return void 0;
     }
-    const text2 = await res.text();
+    const text4 = await res.text();
     try {
-      return JSON.parse(text2);
+      return JSON.parse(text4);
     } catch {
       throw new Error(`Invalid JSON response from ${opts.path}`);
     }
   } finally {
     clearTimeout(timeout);
+  }
+}
+async function apiStreamRequest(opts) {
+  const apiKey = getApiKey({ apiKey: opts.apiKey });
+  if (!apiKey) {
+    throw new Error(
+      "No API key found. Run `senso login` or set SENSO_API_KEY."
+    );
+  }
+  const baseUrl = getBaseUrl({ baseUrl: opts.baseUrl });
+  const url = new URL(`${baseUrl}${opts.path}`);
+  const res = await fetch(url.toString(), {
+    method: opts.method || "POST",
+    headers: {
+      "X-API-Key": apiKey,
+      Accept: "text/event-stream",
+      ...opts.body ? { "Content-Type": "application/json" } : {},
+      "User-Agent": `senso-cli/${version}`
+    },
+    body: opts.body ? JSON.stringify(opts.body) : void 0
+  });
+  if (!res.ok) {
+    let body;
+    const text4 = await res.text();
+    try {
+      body = JSON.parse(text4);
+    } catch {
+      body = text4;
+    }
+    throw new ApiError(res.status, res.statusText, body);
+  }
+  return res;
+}
+function uploadStatusToReason(status, error2) {
+  switch (status) {
+    case "conflict":
+      return "A file with the same content already exists in your knowledge base.";
+    case "duplicate":
+      return "This file has already been uploaded.";
+    case "invalid":
+      return error2 || "This file type is not supported.";
+    default:
+      return error2 || `Unexpected status: ${status}`;
+  }
+}
+function printUploadSummary(uploaded, failed, items) {
+  const total = items.length;
+  console.log();
+  console.log(`  ${pc3.bold("Upload Summary")} \u2014 ${uploaded}/${total} file(s) uploaded`);
+  console.log();
+  if (uploaded > 0) {
+    for (const item of items) {
+      if (item.status === "upload_pending" && !failed.find((f) => f.filename === item.filename)) {
+        success(`${item.filename}`);
+      }
+    }
+  }
+  if (failed.length > 0) {
+    for (const f of failed) {
+      error(`${f.filename} \u2014 ${f.reason}`);
+    }
+  }
+  if (uploaded > 0) {
+    console.log();
+    info("Background processing will parse, chunk, and embed the uploaded files.");
+  }
+  if (uploaded === 0 && total > 0) {
+    console.log();
+    error("No files were uploaded. Please review the issues above and try again.");
+  }
+}
+function handleUploadError(err) {
+  if (err instanceof ApiError && err.body && typeof err.body === "object" && "results" in err.body) {
+    const errorResponse = err.body;
+    for (const item of errorResponse.results ?? []) {
+      const reason = uploadStatusToReason(item.status, item.error);
+      error(`${item.filename} \u2014 ${reason}`);
+    }
+    error("No files were uploaded. Please review the issues above and try again.");
+  } else {
+    error(formatApiError(err));
   }
 }
 function formatApiError(err) {
@@ -257,21 +369,6 @@ function formatApiError(err) {
   return String(err);
 }
 
-// src/utils/logger.ts
-import pc2 from "picocolors";
-function success(msg) {
-  console.log(`  ${pc2.green("\u2713")} ${msg}`);
-}
-function error(msg) {
-  console.error(`  ${pc2.red("\u2717")} ${msg}`);
-}
-function warn(msg) {
-  console.error(`  ${pc2.yellow("!")} ${msg}`);
-}
-function info(msg) {
-  console.log(`  ${pc2.cyan("\u2139")} ${msg}`);
-}
-
 // src/commands/auth.ts
 async function verifyApiKey(apiKey, baseUrl) {
   return apiRequest({
@@ -284,10 +381,10 @@ function registerAuthCommands(program2) {
   program2.command("login").description("Authenticate with Senso. Paste your API key and it will be validated against your organization, then stored locally.").action(async () => {
     const opts = program2.opts();
     banner();
-    console.log(`  ${pc3.bold("Welcome to Senso CLI!")}
+    console.log(`  ${pc4.bold("Welcome to Senso CLI!")}
 `);
-    console.log(`  ${pc3.dim("1.")} Go to ${pc3.cyan("https://docs.senso.ai")} to create an account`);
-    console.log(`  ${pc3.dim("2.")} Generate an API key from your dashboard
+    console.log(`  ${pc4.dim("1.")} Go to ${pc4.cyan("https://docs.senso.ai")} to create an account`);
+    console.log(`  ${pc4.dim("2.")} Generate an API key from your dashboard
 `);
     const result = await p.text({
       message: "Paste your API key:",
@@ -314,8 +411,8 @@ function registerAuthCommands(program2) {
         orgSlug: org.slug,
         isFreeTier: org.is_free_tier
       });
-      success(`Authenticated as ${pc3.bold(`"${org.name}"`)} (${pc3.dim(org.org_id)})`);
-      success(`Config saved to ${pc3.dim(getConfigPath())}`);
+      success(`Authenticated as ${pc4.bold(`"${org.name}"`)} (${pc4.dim(org.org_id)})`);
+      success(`Config saved to ${pc4.dim(getConfigPath())}`);
       console.log();
     } catch (err) {
       spin.stop("Verification failed");
@@ -350,19 +447,19 @@ function registerAuthCommands(program2) {
         );
       } else {
         console.log();
-        console.log(`  ${pc3.bold("Organization:")}  ${org.name}`);
-        console.log(`  ${pc3.bold("Org ID:")}        ${org.org_id}`);
-        console.log(`  ${pc3.bold("Slug:")}          ${org.slug}`);
-        console.log(`  ${pc3.bold("Tier:")}          ${org.is_free_tier ? "Free" : "Paid"}`);
-        console.log(`  ${pc3.bold("API Key:")}       ${apiKey.slice(0, 8)}...`);
-        console.log(`  ${pc3.bold("Config:")}        ${getConfigPath()}`);
+        console.log(`  ${pc4.bold("Organization:")}  ${org.name}`);
+        console.log(`  ${pc4.bold("Org ID:")}        ${org.org_id}`);
+        console.log(`  ${pc4.bold("Slug:")}          ${org.slug}`);
+        console.log(`  ${pc4.bold("Tier:")}          ${org.is_free_tier ? "Free" : "Paid"}`);
+        console.log(`  ${pc4.bold("API Key:")}       ${apiKey.slice(0, 8)}...`);
+        console.log(`  ${pc4.bold("Config:")}        ${getConfigPath()}`);
         console.log();
       }
     } catch (err) {
       if (config.orgName) {
         warn(`Could not reach API: ${formatApiError(err)}`);
-        console.log(`  ${pc3.bold("Organization:")}  ${config.orgName} ${pc3.dim("(cached)")}`);
-        console.log(`  ${pc3.bold("Org ID:")}        ${config.orgId}`);
+        console.log(`  ${pc4.bold("Organization:")}  ${config.orgName} ${pc4.dim("(cached)")}`);
+        console.log(`  ${pc4.bold("Org ID:")}        ${config.orgId}`);
       } else {
         error(formatApiError(err));
         process.exit(1);
@@ -615,16 +712,16 @@ function registerApiKeyCommands(program2) {
 }
 
 // src/commands/search.ts
-import pc5 from "picocolors";
+import pc6 from "picocolors";
 
 // src/lib/output.ts
-import pc4 from "picocolors";
+import pc5 from "picocolors";
 function outputJson(data) {
   console.log(JSON.stringify(data, null, 2));
 }
 function outputTable(rows, columns) {
   if (rows.length === 0) {
-    console.log(pc4.dim("  No results."));
+    console.log(pc5.dim("  No results."));
     return;
   }
   const cols = columns || Object.keys(rows[0]);
@@ -635,7 +732,7 @@ function outputTable(rows, columns) {
     );
     return Math.max(col.length, maxVal);
   });
-  const header = cols.map((col, i) => pc4.bold(col.padEnd(widths[i]))).join("  ");
+  const header = cols.map((col, i) => pc5.bold(col.padEnd(widths[i]))).join("  ");
   console.log(`  ${header}`);
   console.log(`  ${widths.map((w) => "\u2500".repeat(w)).join("  ")}`);
   for (const row of rows) {
@@ -702,12 +799,12 @@ function registerSearchCommands(program2) {
         } : void 0,
         plain: [
           "",
-          res.answer ? `  ${pc5.bold("Answer:")} ${res.answer}` : "",
+          res.answer ? `  ${pc6.bold("Answer:")} ${res.answer}` : "",
           "",
           ...(res.results || []).map(
-            (r, i) => `  ${pc5.dim(`${i + 1}.`)} ${pc5.bold(String(r.title || "Untitled"))}
+            (r, i) => `  ${pc6.dim(`${i + 1}.`)} ${pc6.bold(String(r.title || "Untitled"))}
      ${String(r.chunk_text || "").slice(0, 120)}
-     ${pc5.dim(`ID: ${r.content_id}`)}`
+     ${pc6.dim(`ID: ${r.content_id}`)}`
           ),
           ""
         ].filter(Boolean)
@@ -774,6 +871,86 @@ function registerSearchCommands(program2) {
       process.exit(1);
     }
   });
+  search.command("stream <query>").description("Streaming search \u2014 returns AI answer tokens in real-time via SSE, followed by source chunks. Use this for a responsive, live search experience.").option("--max-results <n>", "Maximum results (max: 20)", "5").option("--content-ids <ids...>", "Restrict search to specific content item IDs (space-separated UUIDs)").option("--require-scoped-ids", "Only return results from the specified --content-ids").action(async (query, cmdOpts) => {
+    const opts = program2.opts();
+    const body = { query, max_results: parseMaxResults(cmdOpts.maxResults) };
+    if (cmdOpts.contentIds) body.content_ids = cmdOpts.contentIds;
+    if (cmdOpts.requireScopedIds) body.require_scoped_ids = true;
+    try {
+      const res = await apiStreamRequest({
+        method: "POST",
+        path: "/org/search/stream",
+        body,
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      if (!res.body) {
+        error("No response body received.");
+        process.exit(1);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let eventType = null;
+      let answerStarted = false;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (line.startsWith("event: ")) {
+            eventType = line.slice(7).trim();
+          } else if (line.startsWith("data: ") && eventType) {
+            const data = JSON.parse(line.slice(6));
+            switch (eventType) {
+              case "token":
+                if (!answerStarted) {
+                  answerStarted = true;
+                  process.stdout.write(`
+  ${pc6.bold("Answer:")} `);
+                }
+                process.stdout.write(data.token);
+                break;
+              case "sources": {
+                if (answerStarted) process.stdout.write("\n");
+                console.log();
+                const results = data.results || [];
+                if (results.length > 0) {
+                  console.log(`  ${pc6.bold("Sources:")} (${results.length})`);
+                  for (let i = 0; i < results.length; i++) {
+                    const r = results[i];
+                    console.log();
+                    console.log(`  ${pc6.dim(`${i + 1}.`)} ${pc6.bold(r.title || "Untitled")} ${pc6.dim(`(${r.content_id})`)}`);
+                    if (r.chunk_text) {
+                      console.log(`     ${pc6.dim("Snippet:")} ${r.chunk_text}`);
+                    }
+                  }
+                } else {
+                  console.log(`  ${pc6.dim("No sources found.")}`);
+                }
+                console.log();
+                if (opts.output === "json") {
+                  console.log(JSON.stringify(data, null, 2));
+                }
+                break;
+              }
+              case "error":
+                error(`Stream error: ${data.error}`);
+                break;
+              case "done":
+                break;
+            }
+            eventType = null;
+          }
+        }
+      }
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
 }
 function outputByFormat(format, data) {
   if (format === "json") {
@@ -785,8 +962,168 @@ function outputByFormat(format, data) {
 
 // src/commands/ingest.ts
 import { createHash } from "crypto";
-import { readFile, stat } from "fs/promises";
+import { access, readFile, stat } from "fs/promises";
 import { basename, resolve } from "path";
+import * as p3 from "@clack/prompts";
+import pc8 from "picocolors";
+
+// src/lib/folder-picker.ts
+import * as p2 from "@clack/prompts";
+import pc7 from "picocolors";
+var PAGE_SIZE = 50;
+async function fetchFolders(parentId, offset, opts) {
+  if (parentId) {
+    return apiRequest({
+      path: `/org/kb/nodes/${parentId}/children`,
+      params: { type: "folder", limit: PAGE_SIZE, offset },
+      apiKey: opts.apiKey,
+      baseUrl: opts.baseUrl
+    });
+  }
+  return apiRequest({
+    path: "/org/kb/my-files",
+    params: { type: "folder", limit: PAGE_SIZE, offset },
+    apiKey: opts.apiKey,
+    baseUrl: opts.baseUrl
+  });
+}
+async function createFolder(name, parentId, opts) {
+  const body = { name };
+  if (parentId) body.parent_id = parentId;
+  try {
+    const data = await apiRequest({
+      method: "POST",
+      path: "/org/kb/folders",
+      body,
+      apiKey: opts.apiKey,
+      baseUrl: opts.baseUrl
+    });
+    success(`Folder "${name}" created.`);
+    return { folderId: data.kb_node_id, folderName: name };
+  } catch (err) {
+    if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      error(
+        "Verify with the org admin that you have the proper scope to create under the org's root folder."
+      );
+      process.exit(1);
+    }
+    throw err;
+  }
+}
+async function promptCreateFolder(parentId, opts) {
+  const name = await p2.text({
+    message: "Enter a name for your new folder:",
+    validate: (val) => {
+      if (!val || val.trim().length === 0) return "Folder name is required";
+    }
+  });
+  if (p2.isCancel(name)) {
+    p2.cancel("Upload cancelled.");
+    process.exit(0);
+  }
+  return createFolder(name.trim(), parentId, opts);
+}
+async function pickFolder(opts) {
+  const navigationStack = [];
+  let currentParentId = null;
+  let currentOffset = 0;
+  let loadedFolders = [];
+  let totalCount = 0;
+  let needsFetch = true;
+  while (true) {
+    if (needsFetch) {
+      const spin = p2.spinner();
+      spin.start("Loading folders...");
+      try {
+        const response = await fetchFolders(currentParentId, currentOffset, opts);
+        if (currentOffset === 0) {
+          loadedFolders = response.nodes;
+        } else {
+          loadedFolders = [...loadedFolders, ...response.nodes];
+        }
+        totalCount = response.total;
+        spin.stop(
+          `${loadedFolders.length} folder(s) loaded${loadedFolders.length < totalCount ? ` of ${totalCount}` : ""}`
+        );
+        needsFetch = false;
+        if (loadedFolders.length === 0 && currentParentId === null) {
+          info("No folders found. Let's create one.");
+          return promptCreateFolder(null, opts);
+        }
+      } catch (err) {
+        spin.stop("Failed to load folders");
+        error(formatApiError(err));
+        process.exit(1);
+      }
+    }
+    const breadcrumb = navigationStack.length === 0 ? "My Files" : "My Files > " + navigationStack.map((s) => s.name).join(" > ");
+    const currentFolderName = navigationStack.length > 0 ? navigationStack[navigationStack.length - 1].name : null;
+    console.log();
+    console.log(`  ${pc7.bold("Location:")} ${breadcrumb}`);
+    console.log();
+    if (currentFolderName) {
+      console.log(`  ${pc7.dim("Use arrow keys to navigate, Enter to select.")}`);
+      console.log(`  ${pc7.dim("Pick a folder to open it, or choose an action below the list.")}`);
+    } else {
+      console.log(`  ${pc7.dim("Use arrow keys to navigate, Enter to select a folder to open it.")}`);
+    }
+    console.log();
+    const options = [];
+    for (const folder2 of loadedFolders) {
+      options.push({ value: folder2.kb_node_id, label: `\u{1F4C1} ${folder2.name}` });
+    }
+    if (loadedFolders.length < totalCount) {
+      options.push({ value: "__LOAD_MORE__", label: pc7.dim("Load more...") });
+    }
+    if (currentFolderName) {
+      options.push({ value: "__SELECT_CURRENT__", label: pc7.green(`\u2713 Select "${currentFolderName}"`) });
+      options.push({ value: "__BACK__", label: pc7.dim("\u2190 Go back") });
+    }
+    options.push({
+      value: "__NEW_FOLDER__",
+      label: pc7.cyan("+ Create new folder here")
+    });
+    const choice = await p2.select({
+      message: "Choose a folder or action:",
+      options
+    });
+    if (p2.isCancel(choice)) {
+      p2.cancel("Upload cancelled.");
+      process.exit(0);
+    }
+    const selected = choice;
+    if (selected === "__BACK__") {
+      navigationStack.pop();
+      currentParentId = navigationStack.length > 0 ? navigationStack[navigationStack.length - 1].id : null;
+      currentOffset = 0;
+      loadedFolders = [];
+      needsFetch = true;
+      continue;
+    }
+    if (selected === "__LOAD_MORE__") {
+      currentOffset += PAGE_SIZE;
+      needsFetch = true;
+      continue;
+    }
+    if (selected === "__SELECT_CURRENT__") {
+      const current = navigationStack[navigationStack.length - 1];
+      return { folderId: current.id, folderName: current.name };
+    }
+    if (selected === "__NEW_FOLDER__") {
+      return promptCreateFolder(currentParentId, opts);
+    }
+    const folder = loadedFolders.find((f) => f.kb_node_id === selected);
+    if (folder) {
+      navigationStack.push({ id: folder.kb_node_id, name: folder.name });
+      currentParentId = folder.kb_node_id;
+      currentOffset = 0;
+      loadedFolders = [];
+      needsFetch = true;
+    }
+  }
+}
+
+// src/commands/ingest.ts
 var MIME_TYPES = {
   ".pdf": "application/pdf",
   ".txt": "text/plain",
@@ -834,49 +1171,98 @@ async function uploadToS3(url, buffer, contentType) {
 }
 function registerIngestCommands(program2) {
   const ingest = program2.command("ingest").description("Ingest files into the knowledge base. Upload documents (PDF, TXT, DOCX, etc.) to be parsed, chunked, and embedded for semantic search.");
-  ingest.command("upload <files...>").description("Upload files to the knowledge base. Accepts local file paths (up to 10). Files are hashed, uploaded to S3, then parsed and embedded by a background worker. Poll 'senso content get <content-id>' until processing_status is 'complete' before searching the uploaded content.").action(async (files) => {
+  ingest.command("upload <files...>").description("Upload files to the knowledge base. Accepts local file paths (up to 10). Files are hashed, uploaded to S3, then parsed and embedded by a background worker. Poll 'senso content get <content-id>' until processing_status is 'complete' before searching the uploaded content.").option("--folder-id <id>", "Destination folder ID (skip interactive prompt)").action(async (files, cmdOpts) => {
     const opts = program2.opts();
     if (files.length > 10) {
       error("Maximum 10 files per upload request.");
       process.exit(1);
     }
+    for (const file of files) {
+      try {
+        await access(resolve(file));
+      } catch {
+        error(`File not found: "${file}". Please check the file name and try again.`);
+        process.exit(1);
+      }
+    }
+    const prepSpin = p3.spinner();
     try {
+      let kbFolderNodeId;
+      if (cmdOpts.folderId) {
+        kbFolderNodeId = cmdOpts.folderId;
+      } else if (process.stdin.isTTY) {
+        const folder = await pickFolder({ apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        const fileList = files.map((f) => basename(f)).join(", ");
+        const answer = await p3.text({
+          message: `You want to upload ${pc8.bold(`"${fileList}"`)} to the folder ${pc8.bold(pc8.cyan(`"${folder.folderName}"`))}? Type 'yes' or 'no' to continue:`,
+          validate: (val) => {
+            const v = val.trim().toLowerCase();
+            if (v !== "yes" && v !== "no") return "Please type 'yes' or 'no'";
+          }
+        });
+        if (p3.isCancel(answer) || answer.trim().toLowerCase() === "no") {
+          p3.cancel("Upload cancelled.");
+          process.exit(0);
+        }
+        kbFolderNodeId = folder.folderId;
+      }
       const fileData = await Promise.all(files.map(getFileMetadata));
+      const emptyFiles = fileData.filter((f) => f.meta.file_size_bytes < 1);
+      if (emptyFiles.length > 0) {
+        for (const f of emptyFiles) {
+          error(`File "${f.meta.filename}" is empty. Please select a valid file with content.`);
+        }
+        process.exit(1);
+      }
+      const body = { files: fileData.map((f) => f.meta) };
+      if (kbFolderNodeId) body.kb_folder_node_id = kbFolderNodeId;
+      prepSpin.start("Preparing upload...");
       const response = await apiRequest({
         method: "POST",
         path: "/org/kb/upload",
-        body: { files: fileData.map((f) => f.meta) },
+        body,
         apiKey: opts.apiKey,
         baseUrl: opts.baseUrl
       });
       const items = response.results ?? [];
+      const pendingCount = items.filter((i) => i.status === "upload_pending" && i.upload_url).length;
+      prepSpin.stop(`${pendingCount} file(s) ready for upload`);
       let uploaded = 0;
+      const failed = [];
       for (const item of items) {
         if (item.status === "upload_pending" && item.upload_url) {
           const match = fileData.find((f) => f.meta.filename === item.filename);
           if (!match) {
-            error(`Could not match server filename "${item.filename}" to a local file \u2014 skipping upload.`);
+            failed.push({ filename: item.filename, reason: "Could not match to a local file." });
             continue;
           }
+          const uploadSpin = p3.spinner();
+          uploadSpin.start(`Uploading ${item.filename}...`);
           try {
             await uploadToS3(item.upload_url, match.buffer, match.meta.content_type);
             uploaded++;
-            success(`Uploaded ${item.filename} (content_id: ${item.content_id})`);
+            uploadSpin.stop(`Uploaded ${item.filename}`);
           } catch (uploadErr) {
-            error(`S3 upload failed for ${item.filename}: ${uploadErr instanceof Error ? uploadErr.message : String(uploadErr)}`);
+            uploadSpin.stop(`Failed to upload ${item.filename}`);
+            failed.push({
+              filename: item.filename,
+              reason: `Upload failed: ${uploadErr instanceof Error ? uploadErr.message : String(uploadErr)}`
+            });
           }
         } else {
-          warn(`Skipped ${item.filename}: ${item.status}${item.error ? ` \u2014 ${item.error}` : ""}`);
+          failed.push({
+            filename: item.filename,
+            reason: uploadStatusToReason(item.status, item.error)
+          });
         }
       }
-      if (uploaded > 0) {
-        success(`${uploaded} file(s) uploaded. Background processing will parse, chunk, and embed them.`);
-      }
+      printUploadSummary(uploaded, failed, items);
       if (opts.output === "json") {
         console.log(JSON.stringify(response, null, 2));
       }
     } catch (err) {
-      error(formatApiError(err));
+      prepSpin.stop("Upload failed");
+      handleUploadError(err);
       process.exit(1);
     }
   });
@@ -908,7 +1294,7 @@ function registerIngestCommands(program2) {
 }
 
 // src/commands/content.ts
-import pc6 from "picocolors";
+import pc9 from "picocolors";
 function registerContentCommands(program2) {
   const content = program2.command("content").description("Manage content items in the knowledge base. List, inspect, delete, unpublish, and manage the verification workflow and ownership of content.");
   content.command("list").description("List top-level files and folders in the knowledge base. Use 'kb my-files' for the same result with richer KB node output.").option("--limit <n>", "Items per page", "10").option("--offset <n>", "Pagination offset", "0").action(async (cmdOpts) => {
@@ -934,7 +1320,7 @@ function registerContentCommands(program2) {
           columns: ["id", "name", "type", "status"]
         },
         plain: rows.length ? rows.map(
-          (r) => `  ${pc6.bold(String(r.name || "Untitled"))} ${pc6.dim(`(${r.kb_node_id})`)} ${r.type ? pc6.dim(`[${r.type}]`) : ""}`
+          (r) => `  ${pc9.bold(String(r.name || "Untitled"))} ${pc9.dim(`(${r.kb_node_id})`)} ${r.type ? pc9.dim(`[${r.type}]`) : ""}`
         ) : ["  No content found."]
       });
     } catch (err) {
@@ -1493,12 +1879,12 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 var execFileAsync = promisify(execFile);
 var SENSO_SKILLS = [
-  "@senso/senso-search",
-  "@senso/senso-ingest",
-  "@senso/senso-content-gen",
-  "@senso/senso-brand-setup",
-  "@senso/senso-kb-organize",
-  "@senso/senso-review-publish"
+  "senso-ai/senso-search",
+  "senso-ai/senso-ingest",
+  "senso-ai/senso-content-gen",
+  "senso-ai/senso-brand-setup",
+  "senso-ai/senso-kb-organize",
+  "senso-ai/senso-review-publish"
 ];
 var AGENT_FLAGS = {
   claude: "--claude",
@@ -1542,7 +1928,7 @@ function registerSkillsCommands(program2) {
     } else {
       skillPackages = names.map((n) => {
         if (n.startsWith("@")) return n;
-        return `@senso/senso-${n}`;
+        return `senso-ai/senso-${n}`;
       });
     }
     let agentFlags;
@@ -1567,10 +1953,10 @@ function registerSkillsCommands(program2) {
           if (stdout.trim()) console.log(stdout.trim());
           if (stderr.trim()) console.error(stderr.trim());
         }
-        const shortName = pkg.replace("@senso/senso-", "");
+        const shortName = pkg.replace("senso-ai/senso-", "");
         success(`Installed ${shortName}`);
       } catch (err) {
-        const shortName = pkg.replace("@senso/senso-", "");
+        const shortName = pkg.replace("senso-ai/senso-", "");
         const msg = err instanceof Error ? err.message : String(err);
         error(`Failed to install ${shortName}: ${msg}`);
       }
@@ -1601,7 +1987,7 @@ function registerSkillsCommands(program2) {
     const opts = program2.opts();
     const available = SENSO_SKILLS.map((pkg) => ({
       package: pkg,
-      shortName: pkg.replace("@senso/senso-", "")
+      shortName: pkg.replace("senso-ai/senso-", "")
     }));
     if (opts.output === "json") {
       console.log(JSON.stringify(available, null, 2));
@@ -1616,7 +2002,7 @@ function registerSkillsCommands(program2) {
   });
   skills.command("remove <name>").description("Remove an installed Senso skill. Use the short name (e.g., search, ingest, content-gen).").option("--global", "Remove from global install").action(async (name, cmdOpts) => {
     const opts = program2.opts();
-    const pkg = name.startsWith("@") ? name : `@senso/senso-${name}`;
+    const pkg = name.startsWith("@") ? name : `senso-ai/senso-${name}`;
     const globalFlag = cmdOpts.global ? ["--global"] : [];
     try {
       const { stdout, stderr } = await runShipables(["uninstall", pkg, ...globalFlag, "--yes"]);
@@ -1624,7 +2010,7 @@ function registerSkillsCommands(program2) {
         if (stdout.trim()) console.log(stdout.trim());
         if (stderr.trim()) console.error(stderr.trim());
       }
-      const shortName = pkg.replace("@senso/senso-", "");
+      const shortName = pkg.replace("senso-ai/senso-", "");
       success(`Removed ${shortName}`);
     } catch (err) {
       error(err instanceof Error ? err.message : String(err));
@@ -1781,12 +2167,12 @@ function registerKBCommands(program2) {
       process.exit(1);
     }
   });
-  kb.command("my-files").description("List top-level files and folders in the knowledge base.").option("--limit <n>", "Items per page", "50").option("--offset <n>", "Pagination offset", "0").action(async (cmdOpts) => {
+  kb.command("my-files").description("List top-level files and folders in the knowledge base.").option("--limit <n>", "Items per page", "50").option("--offset <n>", "Pagination offset", "0").option("--type <type>", "Filter by node type (folder or content)").action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
       const data = await apiRequest({
         path: "/org/kb/my-files",
-        params: { limit: cmdOpts.limit, offset: cmdOpts.offset },
+        params: { limit: cmdOpts.limit, offset: cmdOpts.offset, type: cmdOpts.type },
         apiKey: opts.apiKey,
         baseUrl: opts.baseUrl
       });
@@ -1796,12 +2182,12 @@ function registerKBCommands(program2) {
       process.exit(1);
     }
   });
-  kb.command("find").description("Search KB nodes by name.").requiredOption("--query <q>", "Name search query").option("--limit <n>", "Items per page", "20").option("--offset <n>", "Pagination offset", "0").action(async (cmdOpts) => {
+  kb.command("find").description("Search KB nodes by name.").requiredOption("--query <q>", "Name search query").option("--limit <n>", "Items per page", "20").option("--offset <n>", "Pagination offset", "0").option("--type <type>", "Filter by node type (folder or content)").action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
       const data = await apiRequest({
         path: "/org/kb/find",
-        params: { q: cmdOpts.query, limit: cmdOpts.limit, offset: cmdOpts.offset },
+        params: { q: cmdOpts.query, limit: cmdOpts.limit, offset: cmdOpts.offset, type: cmdOpts.type },
         apiKey: opts.apiKey,
         baseUrl: opts.baseUrl
       });
@@ -1831,12 +2217,12 @@ function registerKBCommands(program2) {
       process.exit(1);
     }
   });
-  kb.command("children <id>").description("List children of a KB folder node.").option("--limit <n>", "Items per page", "50").option("--offset <n>", "Pagination offset", "0").action(async (id, cmdOpts) => {
+  kb.command("children <id>").description("List children of a KB folder node.").option("--limit <n>", "Items per page", "50").option("--offset <n>", "Pagination offset", "0").option("--type <type>", "Filter by node type (folder or content)").action(async (id, cmdOpts) => {
     const opts = program2.opts();
     try {
       const data = await apiRequest({
         path: `/org/kb/nodes/${id}/children`,
-        params: { limit: cmdOpts.limit, offset: cmdOpts.offset },
+        params: { limit: cmdOpts.limit, offset: cmdOpts.offset, type: cmdOpts.type },
         apiKey: opts.apiKey,
         baseUrl: opts.baseUrl
       });
@@ -1986,30 +2372,34 @@ function registerKBCommands(program2) {
       });
       const items = response.results ?? [];
       let uploaded = 0;
+      const failed = [];
       for (const item of items) {
         if (item.status === "upload_pending" && item.upload_url) {
           const match = fileData.find((f) => f.meta.filename === item.filename);
           if (!match) {
-            error(`Could not match server filename "${item.filename}" to a local file \u2014 skipping upload.`);
+            failed.push({ filename: item.filename, reason: "Could not match to a local file." });
             continue;
           }
           try {
             await uploadToS32(item.upload_url, match.buffer, match.meta.content_type);
             uploaded++;
-            success(`Uploaded ${item.filename} (content_id: ${item.content_id})`);
           } catch (uploadErr) {
-            error(`S3 upload failed for ${item.filename}: ${uploadErr instanceof Error ? uploadErr.message : String(uploadErr)}`);
+            failed.push({
+              filename: item.filename,
+              reason: `Upload failed: ${uploadErr instanceof Error ? uploadErr.message : String(uploadErr)}`
+            });
           }
         } else {
-          warn(`Skipped ${item.filename}: ${item.status}${item.error ? ` \u2014 ${item.error}` : ""}`);
+          failed.push({
+            filename: item.filename,
+            reason: uploadStatusToReason(item.status, item.error)
+          });
         }
       }
-      if (uploaded > 0) {
-        success(`${uploaded} file(s) uploaded. Background processing will parse, chunk, and embed them.`);
-      }
+      printUploadSummary(uploaded, failed, items);
       if (opts.output === "json") console.log(JSON.stringify(response, null, 2));
     } catch (err) {
-      error(formatApiError(err));
+      handleUploadError(err);
       process.exit(1);
     }
   });
@@ -2055,12 +2445,12 @@ function registerPermissionsCommands(program2) {
 
 // src/commands/update.ts
 import semver2 from "semver";
-import pc7 from "picocolors";
+import pc10 from "picocolors";
 import { execSync } from "child_process";
 var NPM_PACKAGE2 = "@senso-ai/cli";
 function registerUpdateCommand(program2) {
   program2.command("update").description("Update CLI to the latest version").action(async () => {
-    info(`Current version: ${pc7.bold(version)}`);
+    info(`Current version: ${pc10.bold(version)}`);
     info("Checking npm for updates...");
     const latest = await getLatestVersion();
     if (!latest) {
@@ -2071,7 +2461,7 @@ function registerUpdateCommand(program2) {
       success(`Already on the latest version (${version}).`);
       return;
     }
-    info(`New version available: ${pc7.bold(latest)}`);
+    info(`New version available: ${pc10.bold(latest)}`);
     info("Updating...");
     try {
       execSync(`npm install -g ${NPM_PACKAGE2}@latest`, {
@@ -2081,7 +2471,7 @@ function registerUpdateCommand(program2) {
     } catch {
       error("Update failed. Please reinstall manually:");
       console.log(
-        `  ${pc7.cyan(`npm install -g ${NPM_PACKAGE2}`)}`
+        `  ${pc10.cyan(`npm install -g ${NPM_PACKAGE2}`)}`
       );
       process.exit(1);
     }
