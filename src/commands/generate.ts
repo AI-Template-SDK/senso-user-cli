@@ -2,6 +2,27 @@ import { Command } from "commander";
 import { apiRequest, formatApiError } from "../lib/api-client.js";
 import * as log from "../utils/logger.js";
 
+interface ContentGenerationSampleJobSubmitResponse {
+  message: string;
+  sample_job_id: string;
+  org_id: string;
+  status: string;
+}
+
+interface ContentGenerationSampleJobResponse {
+  sample_job_id: string;
+  org_id: string;
+  status: "queued" | "running" | "completed" | "failed" | "expired";
+  result?: unknown;
+  error?: {
+    code?: string;
+    message?: string;
+  };
+}
+
+const SAMPLE_JOB_POLL_INTERVAL_MS = 2_000;
+const SAMPLE_JOB_TIMEOUT_MS = 180_000;
+
 export function registerGenerateCommands(program: Command): void {
   const gen = program
     .command("generate")
@@ -40,11 +61,12 @@ export function registerGenerateCommands(program: Command): void {
 
   gen
     .command("sample")
-    .description("Generate an ad hoc content sample for a specific prompt and content type. Returns the generated markdown, SEO title, and publish results. Use 'prompts list' to find a prompt ID, and 'content-types list' to find a content-type ID.")
+    .description("Generate an ad hoc content sample for a specific prompt and content type. Submits an async job, waits for completion by default, then returns the generated markdown, SEO title, and publish results. Use 'prompts list' to find a prompt ID, and 'content-types list' to find a content-type ID.")
     .requiredOption("--prompt-id <id>", "Prompt (geo question) ID to generate content for")
     .requiredOption("--content-type-id <id>", "Content type ID that defines the output format (use 'content-types list' to find)")
     .option("--destination <dest>", "Publisher slug to publish to immediately after generation. Omit to save as draft only.")
-    .action(async (cmdOpts: { promptId: string; contentTypeId: string; destination?: string }) => {
+    .option("--no-wait", "Return the accepted sample job immediately instead of polling for the generated content.")
+    .action(async (cmdOpts: { promptId: string; contentTypeId: string; destination?: string; wait?: boolean }) => {
       const opts = program.opts();
       try {
         const body: Record<string, unknown> = {
@@ -60,8 +82,31 @@ export function registerGenerateCommands(program: Command): void {
           body,
           apiKey: opts.apiKey,
           baseUrl: opts.baseUrl,
+        }) as ContentGenerationSampleJobSubmitResponse;
+
+        if (cmdOpts.wait === false) {
+          console.log(JSON.stringify(data, null, 2));
+          return;
+        }
+
+        const quiet = opts.quiet || opts.output === "json";
+        if (!quiet) {
+          log.info(`Sample job accepted: ${data.sample_job_id}`);
+        }
+
+        const job = await waitForSampleJob(data.sample_job_id, {
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+          quiet,
         });
-        console.log(JSON.stringify(data, null, 2));
+
+        if (job.status === "completed") {
+          console.log(JSON.stringify(job.result ?? job, null, 2));
+          return;
+        }
+
+        const message = job.error?.message || `Sample job ended with status: ${job.status}`;
+        throw new Error(job.error?.code ? `${message} (${job.error.code})` : message);
       } catch (err) {
         log.error(formatApiError(err));
         process.exit(1);
@@ -191,4 +236,37 @@ export function registerGenerateCommands(program: Command): void {
         process.exit(1);
       }
     });
+}
+
+async function waitForSampleJob(
+  sampleJobId: string,
+  opts: { apiKey?: string; baseUrl?: string; quiet?: boolean },
+): Promise<ContentGenerationSampleJobResponse> {
+  const deadline = Date.now() + SAMPLE_JOB_TIMEOUT_MS;
+  let lastStatus = "";
+
+  while (Date.now() < deadline) {
+    const job = await apiRequest<ContentGenerationSampleJobResponse>({
+      path: `/org/content-generation/sample-jobs/${sampleJobId}`,
+      apiKey: opts.apiKey,
+      baseUrl: opts.baseUrl,
+    });
+
+    if (!opts.quiet && job.status !== lastStatus) {
+      log.info(`Sample job status: ${job.status}`);
+      lastStatus = job.status;
+    }
+
+    if (job.status === "completed" || job.status === "failed" || job.status === "expired") {
+      return job;
+    }
+
+    await sleep(SAMPLE_JOB_POLL_INTERVAL_MS);
+  }
+
+  throw new Error(`Timed out waiting for sample job ${sampleJobId}. Poll /org/content-generation/sample-jobs/${sampleJobId} for status.`);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
