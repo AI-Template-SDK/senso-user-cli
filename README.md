@@ -141,7 +141,7 @@ Options: `content list` supports `--limit`, `--offset`, `--search`, `--sort`. `c
 ```
 senso generate settings              Get generation settings
 senso generate update-settings       Update generation settings (--data)
-senso generate sample                Generate sample for a prompt (--prompt-id, --content-type-id)
+senso generate sample                Generate sample for a prompt; waits for async job by default (--prompt-id, --content-type-id, --no-wait)
 senso generate run                   Trigger a content engine run (--prompt-ids)
 ```
 

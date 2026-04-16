@@ -1433,6 +1433,8 @@ function registerContentCommands(program2) {
 }
 
 // src/commands/generate.ts
+var SAMPLE_JOB_POLL_INTERVAL_MS = 2e3;
+var SAMPLE_JOB_TIMEOUT_MS = 18e4;
 function registerGenerateCommands(program2) {
   const gen = program2.command("generate").description("AI content generation. Configure settings, generate content samples from prompts, or trigger full content engine runs.");
   gen.command("settings").description("Get content generation settings. Shows whether generation and auto-publish are enabled, the content schedule, and configured publishers.").action(async () => {
@@ -1457,7 +1459,7 @@ function registerGenerateCommands(program2) {
       process.exit(1);
     }
   });
-  gen.command("sample").description("Generate an ad hoc content sample for a specific prompt and content type. Returns the generated markdown, SEO title, and publish results. Use 'prompts list' to find a prompt ID, and 'content-types list' to find a content-type ID.").requiredOption("--prompt-id <id>", "Prompt (geo question) ID to generate content for").requiredOption("--content-type-id <id>", "Content type ID that defines the output format (use 'content-types list' to find)").option("--destination <dest>", "Publisher slug to publish to immediately after generation. Omit to save as draft only.").action(async (cmdOpts) => {
+  gen.command("sample").description("Generate an ad hoc content sample for a specific prompt and content type. Submits an async job, waits for completion by default, then returns the generated markdown, SEO title, and publish results. Use 'prompts list' to find a prompt ID, and 'content-types list' to find a content-type ID.").requiredOption("--prompt-id <id>", "Prompt (geo question) ID to generate content for").requiredOption("--content-type-id <id>", "Content type ID that defines the output format (use 'content-types list' to find)").option("--destination <dest>", "Publisher slug to publish to immediately after generation. Omit to save as draft only.").option("--no-wait", "Return the accepted sample job immediately instead of polling for the generated content.").action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
       const body = {
@@ -1474,7 +1476,25 @@ function registerGenerateCommands(program2) {
         apiKey: opts.apiKey,
         baseUrl: opts.baseUrl
       });
-      console.log(JSON.stringify(data, null, 2));
+      if (cmdOpts.wait === false) {
+        console.log(JSON.stringify(data, null, 2));
+        return;
+      }
+      const quiet = opts.quiet || opts.output === "json";
+      if (!quiet) {
+        info(`Sample job accepted: ${data.sample_job_id}`);
+      }
+      const job = await waitForSampleJob(data.sample_job_id, {
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl,
+        quiet
+      });
+      if (job.status === "completed") {
+        console.log(JSON.stringify(job.result ?? job, null, 2));
+        return;
+      }
+      const message = job.error?.message || `Sample job ended with status: ${job.status}`;
+      throw new Error(job.error?.code ? `${message} (${job.error.code})` : message);
     } catch (err) {
       error(formatApiError(err));
       process.exit(1);
@@ -1567,6 +1587,29 @@ function registerGenerateCommands(program2) {
       process.exit(1);
     }
   });
+}
+async function waitForSampleJob(sampleJobId, opts) {
+  const deadline = Date.now() + SAMPLE_JOB_TIMEOUT_MS;
+  let lastStatus = "";
+  while (Date.now() < deadline) {
+    const job = await apiRequest({
+      path: `/org/content-generation/sample-jobs/${sampleJobId}`,
+      apiKey: opts.apiKey,
+      baseUrl: opts.baseUrl
+    });
+    if (!opts.quiet && job.status !== lastStatus) {
+      info(`Sample job status: ${job.status}`);
+      lastStatus = job.status;
+    }
+    if (job.status === "completed" || job.status === "failed" || job.status === "expired") {
+      return job;
+    }
+    await sleep(SAMPLE_JOB_POLL_INTERVAL_MS);
+  }
+  throw new Error(`Timed out waiting for sample job ${sampleJobId}. Poll /org/content-generation/sample-jobs/${sampleJobId} for status.`);
+}
+function sleep(ms) {
+  return new Promise((resolve3) => setTimeout(resolve3, ms));
 }
 
 // src/commands/engine.ts
