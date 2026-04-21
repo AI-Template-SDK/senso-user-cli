@@ -1295,6 +1295,27 @@ function registerIngestCommands(program2) {
 
 // src/commands/content.ts
 import pc9 from "picocolors";
+
+// src/lib/tag-args.ts
+function parseCsv(v) {
+  if (!v) return [];
+  return v.split(",").map((s) => s.trim()).filter(Boolean);
+}
+function buildSetTagsBody(cmdOpts) {
+  const body = {};
+  const names = parseCsv(cmdOpts.names);
+  const ids = parseCsv(cmdOpts.ids);
+  if (names.length > 0) body.tag_names = names;
+  if (ids.length > 0) body.tag_ids = ids;
+  return body;
+}
+function buildAttachTagBody(cmdOpts) {
+  if (cmdOpts.id) return { tag_id: cmdOpts.id };
+  if (cmdOpts.name) return { tag_name: cmdOpts.name };
+  return null;
+}
+
+// src/commands/content.ts
 function registerContentCommands(program2) {
   const content = program2.command("content").description("Manage content items in the knowledge base. List, inspect, delete, unpublish, and manage the verification workflow and ownership of content.");
   content.command("list").description("List top-level files and folders in the knowledge base. Use 'kb my-files' for the same result with richer KB node output.").option("--limit <n>", "Items per page", "10").option("--offset <n>", "Pagination offset", "0").action(async (cmdOpts) => {
@@ -1425,6 +1446,85 @@ function registerContentCommands(program2) {
     try {
       await apiRequest({ method: "DELETE", path: `/org/content/${id}/owners/${userId}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
       success(`Owner ${userId} removed from content ${id}.`);
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  const tags = content.command("tags").description("Manage tags attached to a content item (both KB-ingested and generated). Tag names are resolved against the org's tag library; unknown names are created automatically.");
+  tags.command("list <id>").description("List tags attached to a content item.").action(async (id) => {
+    const opts = program2.opts();
+    try {
+      const data = await apiRequest({ path: `/org/content/${id}/tags`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  tags.command("set <id>").description("Replace the content item's full tag collection. Provide --names (comma-separated) and/or --ids (comma-separated UUIDs). Unknown names are created.").option("--names <list>", "Comma-separated tag names (created if missing)").option("--ids <list>", "Comma-separated existing tag UUIDs").action(async (id, cmdOpts) => {
+    const opts = program2.opts();
+    try {
+      const body = buildSetTagsBody(cmdOpts);
+      const data = await apiRequest({
+        method: "PUT",
+        path: `/org/content/${id}/tags`,
+        body,
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      success(`Content ${id} tags updated.`);
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  tags.command("add <id>").description("Attach a single tag by --name (created if missing) or --id.").option("--name <name>", "Tag name (created if missing)").option("--id <tagId>", "Existing tag UUID").action(async (id, cmdOpts) => {
+    const opts = program2.opts();
+    const body = buildAttachTagBody(cmdOpts);
+    if (!body) {
+      error("Provide --name or --id.");
+      process.exit(1);
+    }
+    try {
+      await apiRequest({
+        method: "POST",
+        path: `/org/content/${id}/tags`,
+        body,
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      success(`Tag attached to content ${id}.`);
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  tags.command("remove <id>").description("Detach a single tag by --name or --id. Idempotent.").option("--name <name>", "Tag name to detach").option("--id <tagId>", "Existing tag UUID to detach").action(async (id, cmdOpts) => {
+    const opts = program2.opts();
+    if (!cmdOpts.name && !cmdOpts.id) {
+      error("Provide --name or --id.");
+      process.exit(1);
+    }
+    try {
+      if (cmdOpts.id) {
+        await apiRequest({
+          method: "DELETE",
+          path: `/org/content/${id}/tags/${cmdOpts.id}`,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl
+        });
+      } else {
+        await apiRequest({
+          method: "DELETE",
+          path: `/org/content/${id}/tags`,
+          params: { name: cmdOpts.name },
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl
+        });
+      }
+      success(`Tag detached from content ${id}.`);
     } catch (err) {
       error(formatApiError(err));
       process.exit(1);
@@ -1849,6 +1949,85 @@ function registerPromptCommands(program2) {
     try {
       await apiRequest({ method: "DELETE", path: `/org/prompts/${promptId}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
       success(`Prompt ${promptId} deleted.`);
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  const tags = prompts.command("tags").description("Manage tags attached to a prompt. Tag names are resolved against the org's tag library; unknown names are created automatically.");
+  tags.command("list <promptId>").description("List tags attached to a prompt.").action(async (promptId) => {
+    const opts = program2.opts();
+    try {
+      const data = await apiRequest({ path: `/org/prompts/${promptId}/tags`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  tags.command("set <promptId>").description("Replace the prompt's full tag collection. Provide --names (comma-separated) and/or --ids (comma-separated UUIDs). Unknown names are created.").option("--names <list>", "Comma-separated tag names (created if missing)").option("--ids <list>", "Comma-separated existing tag UUIDs").action(async (promptId, cmdOpts) => {
+    const opts = program2.opts();
+    try {
+      const body = buildSetTagsBody(cmdOpts);
+      const data = await apiRequest({
+        method: "PUT",
+        path: `/org/prompts/${promptId}/tags`,
+        body,
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      success(`Prompt ${promptId} tags updated.`);
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  tags.command("add <promptId>").description("Attach a single tag by --name (created if missing) or --id.").option("--name <name>", "Tag name (created if missing)").option("--id <tagId>", "Existing tag UUID").action(async (promptId, cmdOpts) => {
+    const opts = program2.opts();
+    const body = buildAttachTagBody(cmdOpts);
+    if (!body) {
+      error("Provide --name or --id.");
+      process.exit(1);
+    }
+    try {
+      await apiRequest({
+        method: "POST",
+        path: `/org/prompts/${promptId}/tags`,
+        body,
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      success(`Tag attached to prompt ${promptId}.`);
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  tags.command("remove <promptId>").description("Detach a single tag by --name or --id. Idempotent.").option("--name <name>", "Tag name to detach").option("--id <tagId>", "Existing tag UUID to detach").action(async (promptId, cmdOpts) => {
+    const opts = program2.opts();
+    if (!cmdOpts.name && !cmdOpts.id) {
+      error("Provide --name or --id.");
+      process.exit(1);
+    }
+    try {
+      if (cmdOpts.id) {
+        await apiRequest({
+          method: "DELETE",
+          path: `/org/prompts/${promptId}/tags/${cmdOpts.id}`,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl
+        });
+      } else {
+        await apiRequest({
+          method: "DELETE",
+          path: `/org/prompts/${promptId}/tags`,
+          params: { name: cmdOpts.name },
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl
+        });
+      }
+      success(`Tag detached from prompt ${promptId}.`);
     } catch (err) {
       error(formatApiError(err));
       process.exit(1);
@@ -2469,6 +2648,85 @@ function registerKBCommands(program2) {
       process.exit(1);
     }
   });
+  const tags = kb.command("tags").description("Manage tags attached to a KB node. Tags can only be applied to content nodes, not folders. Names are resolved against the org's tag library; unknown names are created.");
+  tags.command("list <id>").description("List tags attached to a KB node.").action(async (id) => {
+    const opts = program2.opts();
+    try {
+      const data = await apiRequest({ path: `/org/kb/nodes/${id}/tags`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  tags.command("set <id>").description("Replace the KB node's full tag collection. Provide --names (comma-separated) and/or --ids. Unknown names are created.").option("--names <list>", "Comma-separated tag names (created if missing)").option("--ids <list>", "Comma-separated existing tag UUIDs").action(async (id, cmdOpts) => {
+    const opts = program2.opts();
+    try {
+      const body = buildSetTagsBody(cmdOpts);
+      const data = await apiRequest({
+        method: "PUT",
+        path: `/org/kb/nodes/${id}/tags`,
+        body,
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      success(`KB node ${id} tags updated.`);
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  tags.command("add <id>").description("Attach a single tag by --name (created if missing) or --id.").option("--name <name>", "Tag name (created if missing)").option("--id <tagId>", "Existing tag UUID").action(async (id, cmdOpts) => {
+    const opts = program2.opts();
+    const body = buildAttachTagBody(cmdOpts);
+    if (!body) {
+      error("Provide --name or --id.");
+      process.exit(1);
+    }
+    try {
+      await apiRequest({
+        method: "POST",
+        path: `/org/kb/nodes/${id}/tags`,
+        body,
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      success(`Tag attached to KB node ${id}.`);
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  tags.command("remove <id>").description("Detach a single tag by --name or --id. Idempotent.").option("--name <name>", "Tag name to detach").option("--id <tagId>", "Existing tag UUID to detach").action(async (id, cmdOpts) => {
+    const opts = program2.opts();
+    if (!cmdOpts.name && !cmdOpts.id) {
+      error("Provide --name or --id.");
+      process.exit(1);
+    }
+    try {
+      if (cmdOpts.id) {
+        await apiRequest({
+          method: "DELETE",
+          path: `/org/kb/nodes/${id}/tags/${cmdOpts.id}`,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl
+        });
+      } else {
+        await apiRequest({
+          method: "DELETE",
+          path: `/org/kb/nodes/${id}/tags`,
+          params: { name: cmdOpts.name },
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl
+        });
+      }
+      success(`Tag detached from KB node ${id}.`);
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
 }
 
 // src/commands/permissions.ts
@@ -2479,6 +2737,174 @@ function registerPermissionsCommands(program2) {
     try {
       const data = await apiRequest({ path: "/org/permissions", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
       console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+}
+
+// src/commands/product-lines.ts
+function registerProductLineCommands(program2) {
+  const pl = program2.command("product-lines").description("Manage product lines \u2014 flexible org-scoped product/service definitions. Each product line has a name and an arbitrary JSON 'details' blob carried by downstream generation and evaluation pipelines.");
+  pl.command("list").description("List all product lines for the organization.").option("--limit <n>", "Maximum items to return (default: 50)").option("--offset <n>", "Number of items to skip (for pagination)").action(async (cmdOpts) => {
+    const opts = program2.opts();
+    try {
+      const data = await apiRequest({
+        path: "/org/product-lines",
+        params: { limit: cmdOpts.limit, offset: cmdOpts.offset },
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  pl.command("create").description("Create a new product line. 'details' is an open-ended JSON object \u2014 put whatever structured metadata (SKUs, URLs, positioning, pricing tiers) your workflows need.").requiredOption("--data <json>", 'JSON: { "name": "Pro Plan", "details": { ... } }').action(async (cmdOpts) => {
+    const opts = program2.opts();
+    try {
+      const body = JSON.parse(cmdOpts.data);
+      const data = await apiRequest({
+        method: "POST",
+        path: "/org/product-lines",
+        body,
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      success("Product line created.");
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(err instanceof SyntaxError ? "Invalid JSON in --data" : formatApiError(err));
+      process.exit(1);
+    }
+  });
+  pl.command("get <id>").description("Get a product line by ID.").action(async (id) => {
+    const opts = program2.opts();
+    try {
+      const data = await apiRequest({ path: `/org/product-lines/${id}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  pl.command("update <id>").description("Replace a product line's name and details (PUT). Both fields are required \u2014 run 'get <id>' first to preserve existing values. For single-field updates, use 'product-lines patch <id>'.").requiredOption("--data <json>", 'JSON: { "name": "Updated Name", "details": { ... } }').action(async (id, cmdOpts) => {
+    const opts = program2.opts();
+    try {
+      const body = JSON.parse(cmdOpts.data);
+      const data = await apiRequest({
+        method: "PUT",
+        path: `/org/product-lines/${id}`,
+        body,
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      success(`Product line ${id} updated.`);
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(err instanceof SyntaxError ? "Invalid JSON in --data" : formatApiError(err));
+      process.exit(1);
+    }
+  });
+  pl.command("patch <id>").description("Partially update a product line (PATCH). Only the fields you provide are changed \u2014 existing fields are preserved.").requiredOption("--data <json>", 'JSON: { "details": { "price": 99 } }').action(async (id, cmdOpts) => {
+    const opts = program2.opts();
+    try {
+      const body = JSON.parse(cmdOpts.data);
+      const data = await apiRequest({
+        method: "PATCH",
+        path: `/org/product-lines/${id}`,
+        body,
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      success(`Product line ${id} updated.`);
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(err instanceof SyntaxError ? "Invalid JSON in --data" : formatApiError(err));
+      process.exit(1);
+    }
+  });
+  pl.command("delete <id>").description("Delete a product line. This cannot be undone.").action(async (id) => {
+    const opts = program2.opts();
+    try {
+      await apiRequest({ method: "DELETE", path: `/org/product-lines/${id}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+      success(`Product line ${id} deleted.`);
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+}
+
+// src/commands/tags.ts
+function registerTagsCommands(program2) {
+  const tags = program2.command("tags").description("Manage the organization's tag library. Tags are labels you attach to prompts, KB nodes, and content items to group them for filtering or metric rollups. Most workflows skip these commands entirely and rely on attach-by-name on the resource commands, which creates tags automatically.");
+  tags.command("list").description("List all tags for the organization. Pass --counts to include per-tag usage counts.").option("--counts", "Include prompt/content usage counts").action(async (cmdOpts) => {
+    const opts = program2.opts();
+    try {
+      const data = await apiRequest({
+        path: "/org/tags",
+        params: cmdOpts.counts ? { counts: "true" } : {},
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  tags.command("create").description("Create a new tag. Tag names are unique per org (case-insensitive).").requiredOption("--name <name>", "Tag name").action(async (cmdOpts) => {
+    const opts = program2.opts();
+    try {
+      const data = await apiRequest({
+        method: "POST",
+        path: "/org/tags",
+        body: { name: cmdOpts.name },
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      success(`Tag "${cmdOpts.name}" created.`);
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  tags.command("get <id>").description("Get a tag by ID, including usage counts.").action(async (id) => {
+    const opts = program2.opts();
+    try {
+      const data = await apiRequest({ path: `/org/tags/${id}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  tags.command("update <id>").description("Rename a tag. Existing attachments on prompts, content, and KB nodes are preserved.").requiredOption("--name <name>", "New tag name").action(async (id, cmdOpts) => {
+    const opts = program2.opts();
+    try {
+      const data = await apiRequest({
+        method: "PATCH",
+        path: `/org/tags/${id}`,
+        body: { name: cmdOpts.name },
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      success(`Tag ${id} renamed to "${cmdOpts.name}".`);
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  tags.command("delete <id>").description("Delete a tag and detach it from every prompt, content item, and KB node it was applied to. This cannot be undone.").action(async (id) => {
+    const opts = program2.opts();
+    try {
+      await apiRequest({ method: "DELETE", path: `/org/tags/${id}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+      success(`Tag ${id} deleted.`);
     } catch (err) {
       error(formatApiError(err));
       process.exit(1);
@@ -2548,6 +2974,8 @@ registerCreditsCommands(program);
 registerQuestionsCommands(program);
 registerKBCommands(program);
 registerPermissionsCommands(program);
+registerTagsCommands(program);
+registerProductLineCommands(program);
 registerUpdateCommand(program);
 async function main() {
   const quiet = process.argv.includes("--quiet") || process.argv.includes("--output") && process.argv[process.argv.indexOf("--output") + 1] === "json";

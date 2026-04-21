@@ -23,6 +23,8 @@ import { registerCreditsCommands } from "./commands/credits.js";
 import { registerQuestionsCommands } from "./commands/questions.js";
 import { registerKBCommands } from "./commands/kb.js";
 import { registerPermissionsCommands } from "./commands/permissions.js";
+import { registerProductLineCommands } from "./commands/product-lines.js";
+import { registerTagsCommands } from "./commands/tags.js";
 import { registerUpdateCommand } from "./commands/update.js";
 
 const program = new Command();
@@ -63,6 +65,8 @@ registerCreditsCommands(program);
 registerQuestionsCommands(program);
 registerKBCommands(program);
 registerPermissionsCommands(program);
+registerTagsCommands(program);
+registerProductLineCommands(program);
 registerUpdateCommand(program);
 
 // Parse and execute

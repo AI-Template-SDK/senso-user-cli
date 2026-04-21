@@ -2,6 +2,7 @@ import { Command } from "commander";
 import pc from "picocolors";
 import { apiRequest, formatApiError } from "../lib/api-client.js";
 import { output, type OutputFormat } from "../lib/output.js";
+import { buildSetTagsBody, buildAttachTagBody } from "../lib/tag-args.js";
 import * as log from "../utils/logger.js";
 
 export function registerContentCommands(program: Command): void {
@@ -187,6 +188,110 @@ export function registerContentCommands(program: Command): void {
       try {
         await apiRequest({ method: "DELETE", path: `/org/content/${id}/owners/${userId}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
         log.success(`Owner ${userId} removed from content ${id}.`);
+      } catch (err) {
+        log.error(formatApiError(err));
+        process.exit(1);
+      }
+    });
+
+  const tags = content
+    .command("tags")
+    .description("Manage tags attached to a content item (both KB-ingested and generated). Tag names are resolved against the org's tag library; unknown names are created automatically.");
+
+  tags
+    .command("list <id>")
+    .description("List tags attached to a content item.")
+    .action(async (id: string) => {
+      const opts = program.opts();
+      try {
+        const data = await apiRequest({ path: `/org/content/${id}/tags`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        console.log(JSON.stringify(data, null, 2));
+      } catch (err) {
+        log.error(formatApiError(err));
+        process.exit(1);
+      }
+    });
+
+  tags
+    .command("set <id>")
+    .description("Replace the content item's full tag collection. Provide --names (comma-separated) and/or --ids (comma-separated UUIDs). Unknown names are created.")
+    .option("--names <list>", "Comma-separated tag names (created if missing)")
+    .option("--ids <list>", "Comma-separated existing tag UUIDs")
+    .action(async (id: string, cmdOpts: { names?: string; ids?: string }) => {
+      const opts = program.opts();
+      try {
+        const body = buildSetTagsBody(cmdOpts);
+        const data = await apiRequest({
+          method: "PUT",
+          path: `/org/content/${id}/tags`,
+          body,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
+        log.success(`Content ${id} tags updated.`);
+        console.log(JSON.stringify(data, null, 2));
+      } catch (err) {
+        log.error(formatApiError(err));
+        process.exit(1);
+      }
+    });
+
+  tags
+    .command("add <id>")
+    .description("Attach a single tag by --name (created if missing) or --id.")
+    .option("--name <name>", "Tag name (created if missing)")
+    .option("--id <tagId>", "Existing tag UUID")
+    .action(async (id: string, cmdOpts: { name?: string; id?: string }) => {
+      const opts = program.opts();
+      const body = buildAttachTagBody(cmdOpts);
+      if (!body) {
+        log.error("Provide --name or --id.");
+        process.exit(1);
+      }
+      try {
+        await apiRequest({
+          method: "POST",
+          path: `/org/content/${id}/tags`,
+          body,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
+        log.success(`Tag attached to content ${id}.`);
+      } catch (err) {
+        log.error(formatApiError(err));
+        process.exit(1);
+      }
+    });
+
+  tags
+    .command("remove <id>")
+    .description("Detach a single tag by --name or --id. Idempotent.")
+    .option("--name <name>", "Tag name to detach")
+    .option("--id <tagId>", "Existing tag UUID to detach")
+    .action(async (id: string, cmdOpts: { name?: string; id?: string }) => {
+      const opts = program.opts();
+      if (!cmdOpts.name && !cmdOpts.id) {
+        log.error("Provide --name or --id.");
+        process.exit(1);
+      }
+      try {
+        if (cmdOpts.id) {
+          await apiRequest({
+            method: "DELETE",
+            path: `/org/content/${id}/tags/${cmdOpts.id}`,
+            apiKey: opts.apiKey,
+            baseUrl: opts.baseUrl,
+          });
+        } else {
+          await apiRequest({
+            method: "DELETE",
+            path: `/org/content/${id}/tags`,
+            params: { name: cmdOpts.name! },
+            apiKey: opts.apiKey,
+            baseUrl: opts.baseUrl,
+          });
+        }
+        log.success(`Tag detached from content ${id}.`);
       } catch (err) {
         log.error(formatApiError(err));
         process.exit(1);
