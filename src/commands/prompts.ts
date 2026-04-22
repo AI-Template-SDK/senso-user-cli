@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { apiRequest, formatApiError } from "../lib/api-client.js";
+import { buildSetTagsBody, buildAttachTagBody } from "../lib/tag-args.js";
 import * as log from "../utils/logger.js";
 
 export function registerPromptCommands(program: Command): void {
@@ -80,4 +81,109 @@ export function registerPromptCommands(program: Command): void {
         process.exit(1);
       }
     });
+
+  const tags = prompts
+    .command("tags")
+    .description("Manage tags attached to a prompt. Tag names are resolved against the org's tag library; unknown names are created automatically.");
+
+  tags
+    .command("list <promptId>")
+    .description("List tags attached to a prompt.")
+    .action(async (promptId: string) => {
+      const opts = program.opts();
+      try {
+        const data = await apiRequest({ path: `/org/prompts/${promptId}/tags`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        console.log(JSON.stringify(data, null, 2));
+      } catch (err) {
+        log.error(formatApiError(err));
+        process.exit(1);
+      }
+    });
+
+  tags
+    .command("set <promptId>")
+    .description("Replace the prompt's full tag collection. Provide --names (comma-separated) and/or --ids (comma-separated UUIDs). Unknown names are created.")
+    .option("--names <list>", "Comma-separated tag names (created if missing)")
+    .option("--ids <list>", "Comma-separated existing tag UUIDs")
+    .action(async (promptId: string, cmdOpts: { names?: string; ids?: string }) => {
+      const opts = program.opts();
+      try {
+        const body = buildSetTagsBody(cmdOpts);
+        const data = await apiRequest({
+          method: "PUT",
+          path: `/org/prompts/${promptId}/tags`,
+          body,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
+        log.success(`Prompt ${promptId} tags updated.`);
+        console.log(JSON.stringify(data, null, 2));
+      } catch (err) {
+        log.error(formatApiError(err));
+        process.exit(1);
+      }
+    });
+
+  tags
+    .command("add <promptId>")
+    .description("Attach a single tag by --name (created if missing) or --id.")
+    .option("--name <name>", "Tag name (created if missing)")
+    .option("--id <tagId>", "Existing tag UUID")
+    .action(async (promptId: string, cmdOpts: { name?: string; id?: string }) => {
+      const opts = program.opts();
+      const body = buildAttachTagBody(cmdOpts);
+      if (!body) {
+        log.error("Provide --name or --id.");
+        process.exit(1);
+      }
+      try {
+        await apiRequest({
+          method: "POST",
+          path: `/org/prompts/${promptId}/tags`,
+          body,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
+        log.success(`Tag attached to prompt ${promptId}.`);
+      } catch (err) {
+        log.error(formatApiError(err));
+        process.exit(1);
+      }
+    });
+
+  tags
+    .command("remove <promptId>")
+    .description("Detach a single tag by --name or --id. Idempotent.")
+    .option("--name <name>", "Tag name to detach")
+    .option("--id <tagId>", "Existing tag UUID to detach")
+    .action(async (promptId: string, cmdOpts: { name?: string; id?: string }) => {
+      const opts = program.opts();
+      if (!cmdOpts.name && !cmdOpts.id) {
+        log.error("Provide --name or --id.");
+        process.exit(1);
+      }
+      try {
+        if (cmdOpts.id) {
+          await apiRequest({
+            method: "DELETE",
+            path: `/org/prompts/${promptId}/tags/${cmdOpts.id}`,
+            apiKey: opts.apiKey,
+            baseUrl: opts.baseUrl,
+          });
+        } else {
+          await apiRequest({
+            method: "DELETE",
+            path: `/org/prompts/${promptId}/tags`,
+            params: { name: cmdOpts.name! },
+            apiKey: opts.apiKey,
+            baseUrl: opts.baseUrl,
+          });
+        }
+        log.success(`Tag detached from prompt ${promptId}.`);
+      } catch (err) {
+        log.error(formatApiError(err));
+        process.exit(1);
+      }
+    });
 }
+

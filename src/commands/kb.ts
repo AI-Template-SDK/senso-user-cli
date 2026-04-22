@@ -10,6 +10,7 @@ import {
   uploadStatusToReason,
   type UploadResponse,
 } from "../lib/api-client.js";
+import { buildSetTagsBody, buildAttachTagBody } from "../lib/tag-args.js";
 import * as log from "../utils/logger.js";
 
 const MIME_TYPES: Record<string, string> = {
@@ -423,6 +424,110 @@ export function registerKBCommands(program: Command): void {
           log.warn(`Skipped: ${item.status}${item.error ? ` — ${item.error}` : ""}`);
         }
         if (opts.output === "json") console.log(JSON.stringify(item, null, 2));
+      } catch (err) {
+        log.error(formatApiError(err));
+        process.exit(1);
+      }
+    });
+
+  const tags = kb
+    .command("tags")
+    .description("Manage tags attached to a KB node. Tags can only be applied to content nodes, not folders. Names are resolved against the org's tag library; unknown names are created.");
+
+  tags
+    .command("list <id>")
+    .description("List tags attached to a KB node.")
+    .action(async (id: string) => {
+      const opts = program.opts();
+      try {
+        const data = await apiRequest({ path: `/org/kb/nodes/${id}/tags`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        console.log(JSON.stringify(data, null, 2));
+      } catch (err) {
+        log.error(formatApiError(err));
+        process.exit(1);
+      }
+    });
+
+  tags
+    .command("set <id>")
+    .description("Replace the KB node's full tag collection. Provide --names (comma-separated) and/or --ids. Unknown names are created.")
+    .option("--names <list>", "Comma-separated tag names (created if missing)")
+    .option("--ids <list>", "Comma-separated existing tag UUIDs")
+    .action(async (id: string, cmdOpts: { names?: string; ids?: string }) => {
+      const opts = program.opts();
+      try {
+        const body = buildSetTagsBody(cmdOpts);
+        const data = await apiRequest({
+          method: "PUT",
+          path: `/org/kb/nodes/${id}/tags`,
+          body,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
+        log.success(`KB node ${id} tags updated.`);
+        console.log(JSON.stringify(data, null, 2));
+      } catch (err) {
+        log.error(formatApiError(err));
+        process.exit(1);
+      }
+    });
+
+  tags
+    .command("add <id>")
+    .description("Attach a single tag by --name (created if missing) or --id.")
+    .option("--name <name>", "Tag name (created if missing)")
+    .option("--id <tagId>", "Existing tag UUID")
+    .action(async (id: string, cmdOpts: { name?: string; id?: string }) => {
+      const opts = program.opts();
+      const body = buildAttachTagBody(cmdOpts);
+      if (!body) {
+        log.error("Provide --name or --id.");
+        process.exit(1);
+      }
+      try {
+        await apiRequest({
+          method: "POST",
+          path: `/org/kb/nodes/${id}/tags`,
+          body,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
+        log.success(`Tag attached to KB node ${id}.`);
+      } catch (err) {
+        log.error(formatApiError(err));
+        process.exit(1);
+      }
+    });
+
+  tags
+    .command("remove <id>")
+    .description("Detach a single tag by --name or --id. Idempotent.")
+    .option("--name <name>", "Tag name to detach")
+    .option("--id <tagId>", "Existing tag UUID to detach")
+    .action(async (id: string, cmdOpts: { name?: string; id?: string }) => {
+      const opts = program.opts();
+      if (!cmdOpts.name && !cmdOpts.id) {
+        log.error("Provide --name or --id.");
+        process.exit(1);
+      }
+      try {
+        if (cmdOpts.id) {
+          await apiRequest({
+            method: "DELETE",
+            path: `/org/kb/nodes/${id}/tags/${cmdOpts.id}`,
+            apiKey: opts.apiKey,
+            baseUrl: opts.baseUrl,
+          });
+        } else {
+          await apiRequest({
+            method: "DELETE",
+            path: `/org/kb/nodes/${id}/tags`,
+            params: { name: cmdOpts.name! },
+            apiKey: opts.apiKey,
+            baseUrl: opts.baseUrl,
+          });
+        }
+        log.success(`Tag detached from KB node ${id}.`);
       } catch (err) {
         log.error(formatApiError(err));
         process.exit(1);
