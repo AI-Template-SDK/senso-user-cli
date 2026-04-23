@@ -1,6 +1,6 @@
 {
   "name": "@senso-ai/cli",
-  "version": "0.10.1",
+  "version": "0.11.0",
   "description": "Senso CLI — Infrastructure for the Agentic Web. Interact with your Senso knowledge base from the terminal.",
   "type": "module",
   "bin": {
