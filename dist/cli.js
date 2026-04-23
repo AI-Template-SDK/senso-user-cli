@@ -1369,11 +1369,23 @@ function registerContentCommands(program2) {
       process.exit(1);
     }
   });
-  content.command("unpublish <id>").description("Unpublish a content item. Removes it from external destinations and sets its status back to draft.").action(async (id) => {
+  content.command("unpublish <id>").description("Unpublish a content item. Without --publish-record-ids, removes the content from every destination it's live on and sets its status back to draft. With --publish-record-ids, only the specified publish records are retracted \u2014 use this to unpublish from a subset of destinations while leaving the rest live. The content status only flips back to draft once no publish records remain live.").option("--publish-record-ids <ids...>", "Restrict unpublish to specific publish_record UUIDs. Use 'content get <id>' to find publish record IDs for a content item.").action(async (id, cmdOpts) => {
     const opts = program2.opts();
     try {
-      await apiRequest({ method: "POST", path: `/org/content/${id}/unpublish`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
-      success(`Content ${id} unpublished.`);
+      const body = cmdOpts.publishRecordIds && cmdOpts.publishRecordIds.length > 0 ? { publish_record_ids: cmdOpts.publishRecordIds } : void 0;
+      const data = await apiRequest({
+        method: "POST",
+        path: `/org/content/${id}/unpublish`,
+        body,
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      success(
+        cmdOpts.publishRecordIds && cmdOpts.publishRecordIds.length > 0 ? `Unpublished ${cmdOpts.publishRecordIds.length} record(s) from content ${id}.` : `Content ${id} unpublished.`
+      );
+      if (data) {
+        console.log(JSON.stringify(data, null, 2));
+      }
     } catch (err) {
       error(formatApiError(err));
       process.exit(1);
@@ -1451,7 +1463,7 @@ function registerContentCommands(program2) {
       process.exit(1);
     }
   });
-  const tags = content.command("tags").description("Manage tags attached to a content item (both KB-ingested and generated). Tag names are resolved against the org's tag library; unknown names are created automatically.");
+  const tags = content.command("tags").description("Manage tags attached to a content item (both KB-ingested and generated). Content is auto-tagged on creation (KB uploads get tagged once ingestion finishes, raw content is tagged on create) \u2014 use these commands to override, add, or remove tags afterwards. Tag names are resolved against the org's tag library; unknown names are created automatically.");
   tags.command("list <id>").description("List tags attached to a content item.").action(async (id) => {
     const opts = program2.opts();
     try {
@@ -1714,11 +1726,14 @@ function sleep(ms) {
 
 // src/commands/engine.ts
 function registerEngineCommands(program2) {
-  const engine = program2.command("engine").description("Publish or draft content through the content engine. Used to push AI-generated content to external destinations or save it as a draft for review.");
-  engine.command("publish").description("Publish content to external destinations via the content engine. Requires geo_question_id, raw_markdown, and seo_title.").requiredOption("--data <json>", 'JSON: { "geo_question_id": "uuid", "raw_markdown": "...", "seo_title": "...", "summary": "..." }').action(async (cmdOpts) => {
+  const engine = program2.command("engine").description("Publish or draft content through the content engine. Used to push AI-generated content to external destinations (citeables by default) or save it as a draft for review.");
+  engine.command("publish").description("Publish content to external destinations via the content engine. Requires geo_question_id, raw_markdown, and seo_title. By default publishes to every destination currently selected for generation (citeables is the default for most orgs \u2014 see 'senso destinations list'). Pass --publisher-ids to restrict publishing to a specific subset, or include 'publisher_ids' inside --data.").requiredOption("--data <json>", 'JSON: { "geo_question_id": "uuid", "raw_markdown": "...", "seo_title": "...", "summary": "...", "publisher_ids": ["<uuid>", ...] }').option("--publisher-ids <ids...>", "Restrict publishing to specific publisher IDs. Overrides any publisher_ids present in --data. Omit to publish to all configured destinations (citeables by default).").action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
       const body = JSON.parse(cmdOpts.data);
+      if (cmdOpts.publisherIds && cmdOpts.publisherIds.length > 0) {
+        body.publisher_ids = cmdOpts.publisherIds;
+      }
       const data = await apiRequest({
         method: "POST",
         path: "/org/content-engine/publish",
@@ -1733,7 +1748,7 @@ function registerEngineCommands(program2) {
       process.exit(1);
     }
   });
-  engine.command("draft").description("Save content as a draft for review before publishing. Requires geo_question_id, raw_markdown, and seo_title.").requiredOption("--data <json>", 'JSON: { "geo_question_id": "uuid", "raw_markdown": "...", "seo_title": "...", "summary": "..." }').action(async (cmdOpts) => {
+  engine.command("draft").description("Save content as a draft for review before publishing. Requires geo_question_id, raw_markdown, and seo_title. Drafts do not hit any destination until you run 'senso engine publish' on them.").requiredOption("--data <json>", 'JSON: { "geo_question_id": "uuid", "raw_markdown": "...", "seo_title": "...", "summary": "..." }').action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
       const body = JSON.parse(cmdOpts.data);
@@ -1748,6 +1763,100 @@ function registerEngineCommands(program2) {
       console.log(JSON.stringify(data, null, 2));
     } catch (err) {
       error(err instanceof SyntaxError ? "Invalid JSON in --data" : formatApiError(err));
+      process.exit(1);
+    }
+  });
+}
+
+// src/commands/destinations.ts
+var SUPPORTED_TYPES = ["citeables", "codeables", "cucopilot"];
+var REMOVE_ACTIONS = ["leave", "unpublish", "delete"];
+function registerDestinationsCommands(program2) {
+  const dest = program2.command("destinations").description("Manage publish destinations. Destinations are where generated content gets published \u2014 shared domains (citeables, codeables, cucopilot) plus any custom citeables domains registered for your org. Most orgs publish to 'citeables' by default; additional destinations are opt-in.");
+  dest.command("list").description("List all destinations available to the organization. Includes shared destinations (citeables, codeables, cucopilot) and any custom domains you've added, with per-destination live article counts and last publish timestamps. 'selected_for_generation: true' means a destination is active in your generation pipeline.").action(async () => {
+    const opts = program2.opts();
+    try {
+      const data = await apiRequest({
+        path: "/org/destinations",
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  dest.command("add").description("Register a custom publish destination (a citeables-system domain owned by your org). The domain is registered synchronously with the citeables service and linked to the org. Today only citeables-type destinations (slugs: citeables, codeables, cucopilot) are supported \u2014 pass --type if you need to target one of the non-default systems; new destination types may be added in future releases.").requiredOption("--domain <domain>", 'Custom domain to register (e.g. "content.example.com")').requiredOption("--name <name>", 'Display name for the destination (e.g. "Example Citeables")').option("--type <type>", "Destination type. One of: citeables, codeables, cucopilot. Defaults to citeables.", "citeables").action(async (cmdOpts) => {
+    const opts = program2.opts();
+    const type = cmdOpts.type.toLowerCase();
+    if (!SUPPORTED_TYPES.includes(type)) {
+      error(`Invalid --type "${cmdOpts.type}". Must be one of: ${SUPPORTED_TYPES.join(", ")}.`);
+      process.exit(1);
+    }
+    try {
+      const data = await apiRequest({
+        method: "POST",
+        path: "/org/destinations",
+        body: {
+          type,
+          name: cmdOpts.name,
+          domain: cmdOpts.domain
+        },
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      success(`Destination "${cmdOpts.name}" registered for ${cmdOpts.domain}.`);
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  dest.command("remove <publisherId>").description("Remove a destination from the org. --action controls what happens to live content: 'leave' keeps the articles live at the destination (org stops publishing to it but published records remain), 'unpublish' removes live articles from the destination and returns content to draft, 'delete' unpublishes AND hard-deletes the local content records. Shared destinations (citeables/codeables/cucopilot) can be removed from the org without affecting the underlying domain. --keep-domain preserves the custom domain registration on the citeables side (useful for SEO) when removing a custom destination.").requiredOption("--action <action>", "One of: leave, unpublish, delete. See command description.").option("--also-remove-destination", "Also delete the publisher row (not just the org link). Only valid for custom destinations you own.", false).option("--keep-domain", "Keep the custom domain registered on citeables after removing (custom destinations only).", false).action(async (publisherId, cmdOpts) => {
+    const opts = program2.opts();
+    const action = cmdOpts.action.toLowerCase();
+    if (!REMOVE_ACTIONS.includes(action)) {
+      error(`Invalid --action "${cmdOpts.action}". Must be one of: ${REMOVE_ACTIONS.join(", ")}.`);
+      process.exit(1);
+    }
+    try {
+      const data = await apiRequest({
+        method: "POST",
+        path: `/org/destinations/${publisherId}/remove`,
+        body: {
+          action,
+          also_remove_destination: cmdOpts.alsoRemoveDestination ?? false,
+          keep_domain: cmdOpts.keepDomain ?? false
+        },
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      success(`Destination ${publisherId} removed (action: ${action}).`);
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+}
+
+// src/commands/publish-records.ts
+function registerPublishRecordsCommands(program2) {
+  const pr = program2.command("publish-records").description("Inspect and retry publish records. A publish_record is the unit that tracks one content item's publication to one destination \u2014 published/live, pending, failed, unpublished, etc. When a publish fails for a single destination, retry it here without redoing the whole publish.");
+  pr.command("retry <publishRecordId>").description("Retry a failed publish record. Re-runs the publish for that specific content+destination pair and flips the record's state based on the new attempt. Only works on records currently in the 'failed' state.").action(async (publishRecordId) => {
+    const opts = program2.opts();
+    try {
+      const data = await apiRequest({
+        method: "POST",
+        path: `/org/publish-records/${publishRecordId}/retry`,
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      success(`Publish record ${publishRecordId} retry triggered.`);
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
       process.exit(1);
     }
   });
@@ -1954,7 +2063,7 @@ function registerPromptCommands(program2) {
       process.exit(1);
     }
   });
-  const tags = prompts.command("tags").description("Manage tags attached to a prompt. Tag names are resolved against the org's tag library; unknown names are created automatically.");
+  const tags = prompts.command("tags").description("Manage tags attached to a prompt. Prompts are auto-tagged on creation \u2014 use these commands to override, add, or remove tags afterwards. Tag names are resolved against the org's tag library; unknown names are created automatically.");
   tags.command("list <promptId>").description("List tags attached to a prompt.").action(async (promptId) => {
     const opts = program2.opts();
     try {
@@ -2648,7 +2757,7 @@ function registerKBCommands(program2) {
       process.exit(1);
     }
   });
-  const tags = kb.command("tags").description("Manage tags attached to a KB node. Tags can only be applied to content nodes, not folders. Names are resolved against the org's tag library; unknown names are created.");
+  const tags = kb.command("tags").description("Manage tags attached to a KB node. KB content is auto-tagged on creation (raw content on create, uploaded files once ingestion finishes) \u2014 use these commands to override, add, or remove tags afterwards. Tags can only be applied to content nodes, not folders. Names are resolved against the org's tag library; unknown names are created.");
   tags.command("list <id>").description("List tags attached to a KB node.").action(async (id) => {
     const opts = program2.opts();
     try {
@@ -2840,7 +2949,7 @@ function registerProductLineCommands(program2) {
 
 // src/commands/tags.ts
 function registerTagsCommands(program2) {
-  const tags = program2.command("tags").description("Manage the organization's tag library. Tags are labels you attach to prompts, KB nodes, and content items to group them for filtering or metric rollups. Most workflows skip these commands entirely and rely on attach-by-name on the resource commands, which creates tags automatically.");
+  const tags = program2.command("tags").description("Manage the organization's tag library. Tags are labels attached to prompts, KB nodes, and content items to group them for filtering or metric rollups. Senso auto-tags prompts, KB content, and search queries on creation, so the tag library grows automatically \u2014 most workflows skip these commands and rely on attach-by-name on the resource commands, which also creates tags on demand.");
   tags.command("list").description("List all tags for the organization. Pass --counts to include per-tag usage counts.").option("--counts", "Include prompt/content usage counts").action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
@@ -2964,6 +3073,8 @@ registerIngestCommands(program);
 registerContentCommands(program);
 registerGenerateCommands(program);
 registerEngineCommands(program);
+registerDestinationsCommands(program);
+registerPublishRecordsCommands(program);
 registerBrandKitCommands(program);
 registerContentTypeCommands(program);
 registerPromptCommands(program);

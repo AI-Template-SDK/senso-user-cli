@@ -80,12 +80,30 @@ export function registerContentCommands(program: Command): void {
 
   content
     .command("unpublish <id>")
-    .description("Unpublish a content item. Removes it from external destinations and sets its status back to draft.")
-    .action(async (id: string) => {
+    .description("Unpublish a content item. Without --publish-record-ids, removes the content from every destination it's live on and sets its status back to draft. With --publish-record-ids, only the specified publish records are retracted — use this to unpublish from a subset of destinations while leaving the rest live. The content status only flips back to draft once no publish records remain live.")
+    .option("--publish-record-ids <ids...>", "Restrict unpublish to specific publish_record UUIDs. Use 'content get <id>' to find publish record IDs for a content item.")
+    .action(async (id: string, cmdOpts: { publishRecordIds?: string[] }) => {
       const opts = program.opts();
       try {
-        await apiRequest({ method: "POST", path: `/org/content/${id}/unpublish`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
-        log.success(`Content ${id} unpublished.`);
+        const body: Record<string, unknown> | undefined =
+          cmdOpts.publishRecordIds && cmdOpts.publishRecordIds.length > 0
+            ? { publish_record_ids: cmdOpts.publishRecordIds }
+            : undefined;
+        const data = await apiRequest({
+          method: "POST",
+          path: `/org/content/${id}/unpublish`,
+          body,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
+        log.success(
+          cmdOpts.publishRecordIds && cmdOpts.publishRecordIds.length > 0
+            ? `Unpublished ${cmdOpts.publishRecordIds.length} record(s) from content ${id}.`
+            : `Content ${id} unpublished.`,
+        );
+        if (data) {
+          console.log(JSON.stringify(data, null, 2));
+        }
       } catch (err) {
         log.error(formatApiError(err));
         process.exit(1);
@@ -196,7 +214,7 @@ export function registerContentCommands(program: Command): void {
 
   const tags = content
     .command("tags")
-    .description("Manage tags attached to a content item (both KB-ingested and generated). Tag names are resolved against the org's tag library; unknown names are created automatically.");
+    .description("Manage tags attached to a content item (both KB-ingested and generated). Content is auto-tagged on creation (KB uploads get tagged once ingestion finishes, raw content is tagged on create) — use these commands to override, add, or remove tags afterwards. Tag names are resolved against the org's tag library; unknown names are created automatically.");
 
   tags
     .command("list <id>")

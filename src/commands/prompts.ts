@@ -84,7 +84,7 @@ export function registerPromptCommands(program: Command): void {
 
   const tags = prompts
     .command("tags")
-    .description("Manage tags attached to a prompt. Tag names are resolved against the org's tag library; unknown names are created automatically.");
+    .description("Manage tags attached to a prompt. Prompts are auto-tagged on creation — use these commands to override, add, or remove tags afterwards. Tag names are resolved against the org's tag library; unknown names are created automatically.");
 
   tags
     .command("list <promptId>")

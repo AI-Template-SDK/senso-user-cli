@@ -432,7 +432,7 @@ export function registerKBCommands(program: Command): void {
 
   const tags = kb
     .command("tags")
-    .description("Manage tags attached to a KB node. Tags can only be applied to content nodes, not folders. Names are resolved against the org's tag library; unknown names are created.");
+    .description("Manage tags attached to a KB node. KB content is auto-tagged on creation (raw content on create, uploaded files once ingestion finishes) — use these commands to override, add, or remove tags afterwards. Tags can only be applied to content nodes, not folders. Names are resolved against the org's tag library; unknown names are created.");
 
   tags
     .command("list <id>")

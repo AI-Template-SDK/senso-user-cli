@@ -5,7 +5,7 @@ import * as log from "../utils/logger.js";
 export function registerTagsCommands(program: Command): void {
   const tags = program
     .command("tags")
-    .description("Manage the organization's tag library. Tags are labels you attach to prompts, KB nodes, and content items to group them for filtering or metric rollups. Most workflows skip these commands entirely and rely on attach-by-name on the resource commands, which creates tags automatically.");
+    .description("Manage the organization's tag library. Tags are labels attached to prompts, KB nodes, and content items to group them for filtering or metric rollups. Senso auto-tags prompts, KB content, and search queries on creation, so the tag library grows automatically — most workflows skip these commands and rely on attach-by-name on the resource commands, which also creates tags on demand.");
 
   tags
     .command("list")
