@@ -121,4 +121,64 @@ export function registerUserCommands(program: Command): void {
         process.exit(1);
       }
     });
+
+  users
+    .command("invite")
+    .description("Invite a brand-new user by email. Creates the user (in Clerk and Senso) and adds them to the organization with the given role. Use `roles list` to find a role_id. If the email already belongs to a Senso user, use `users invite-existing` instead.")
+    .requiredOption("--email <email>", "User's email address")
+    .requiredOption("--given-name <name>", "First name")
+    .requiredOption("--family-name <name>", "Last name")
+    .requiredOption("--role-id <uuid>", "Role to assign — resolve with `senso roles list`")
+    .option("--is-current", "Make this org the new user's current org")
+    .action(async (cmdOpts: { email: string; givenName: string; familyName: string; roleId: string; isCurrent?: boolean }) => {
+      const opts = program.opts();
+      try {
+        const data = await apiRequest({
+          method: "POST",
+          path: "/org/users/invite",
+          body: {
+            email: cmdOpts.email,
+            given_name: cmdOpts.givenName,
+            family_name: cmdOpts.familyName,
+            role_id: cmdOpts.roleId,
+            is_current: cmdOpts.isCurrent ?? false,
+          },
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
+        log.success(`Invited ${cmdOpts.email} to the organization.`);
+        console.log(JSON.stringify(data, null, 2));
+      } catch (err) {
+        log.error(formatApiError(err));
+        process.exit(1);
+      }
+    });
+
+  users
+    .command("invite-existing")
+    .description("Add an existing Senso user to the organization by email. Returns 404 if no user with that email exists — use `users invite` for brand-new users.")
+    .requiredOption("--email <email>", "Email of an existing Senso user")
+    .requiredOption("--role-id <uuid>", "Role to assign — resolve with `senso roles list`")
+    .option("--is-current", "Make this org the user's current org")
+    .action(async (cmdOpts: { email: string; roleId: string; isCurrent?: boolean }) => {
+      const opts = program.opts();
+      try {
+        const data = await apiRequest({
+          method: "POST",
+          path: "/org/users/invite/existing",
+          body: {
+            email: cmdOpts.email,
+            role_id: cmdOpts.roleId,
+            is_current: cmdOpts.isCurrent ?? false,
+          },
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
+        log.success(`Added ${cmdOpts.email} to the organization.`);
+        console.log(JSON.stringify(data, null, 2));
+      } catch (err) {
+        log.error(formatApiError(err));
+        process.exit(1);
+      }
+    });
 }

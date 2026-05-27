@@ -499,6 +499,29 @@ function registerOrgCommands(program2) {
       process.exit(1);
     }
   });
+  org.command("set-runs").description("Toggle the org-wide runs master switch. Pause every scheduled prompt run and content-generation run, or re-enable them.").requiredOption("--enabled <bool>", "Set to true or false").action(async (cmdOpts) => {
+    const opts = program2.opts();
+    const raw = cmdOpts.enabled.toLowerCase();
+    if (raw !== "true" && raw !== "false") {
+      error("--enabled must be `true` or `false`.");
+      process.exit(1);
+    }
+    const enable = raw === "true";
+    try {
+      const data = await apiRequest({
+        method: "PATCH",
+        path: "/org/me/runs-enabled",
+        body: { enable_runs: enable },
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      success(`Org-wide runs ${enable ? "enabled" : "disabled"}.`);
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
 }
 
 // src/commands/users.ts
@@ -586,6 +609,50 @@ function registerUserCommands(program2) {
         baseUrl: opts.baseUrl
       });
       success(`Organization set as current for user ${userId}.`);
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  users.command("invite").description("Invite a brand-new user by email. Creates the user (in Clerk and Senso) and adds them to the organization with the given role. Use `roles list` to find a role_id. If the email already belongs to a Senso user, use `users invite-existing` instead.").requiredOption("--email <email>", "User's email address").requiredOption("--given-name <name>", "First name").requiredOption("--family-name <name>", "Last name").requiredOption("--role-id <uuid>", "Role to assign \u2014 resolve with `senso roles list`").option("--is-current", "Make this org the new user's current org").action(async (cmdOpts) => {
+    const opts = program2.opts();
+    try {
+      const data = await apiRequest({
+        method: "POST",
+        path: "/org/users/invite",
+        body: {
+          email: cmdOpts.email,
+          given_name: cmdOpts.givenName,
+          family_name: cmdOpts.familyName,
+          role_id: cmdOpts.roleId,
+          is_current: cmdOpts.isCurrent ?? false
+        },
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      success(`Invited ${cmdOpts.email} to the organization.`);
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  users.command("invite-existing").description("Add an existing Senso user to the organization by email. Returns 404 if no user with that email exists \u2014 use `users invite` for brand-new users.").requiredOption("--email <email>", "Email of an existing Senso user").requiredOption("--role-id <uuid>", "Role to assign \u2014 resolve with `senso roles list`").option("--is-current", "Make this org the user's current org").action(async (cmdOpts) => {
+    const opts = program2.opts();
+    try {
+      const data = await apiRequest({
+        method: "POST",
+        path: "/org/users/invite/existing",
+        body: {
+          email: cmdOpts.email,
+          role_id: cmdOpts.roleId,
+          is_current: cmdOpts.isCurrent ?? false
+        },
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      success(`Added ${cmdOpts.email} to the organization.`);
+      console.log(JSON.stringify(data, null, 2));
     } catch (err) {
       error(formatApiError(err));
       process.exit(1);
@@ -3021,6 +3088,130 @@ function registerTagsCommands(program2) {
   });
 }
 
+// src/commands/roles.ts
+function registerRolesCommands(program2) {
+  const roles = program2.command("roles").description("Inspect the roles defined for your organization. Each organization has its own per-org role_ids \u2014 resolve a role name to its UUID here before passing role_id to `users invite`, `users add`, or `users update`.");
+  roles.command("list").description("List every role for the current organization, including the built-in admin/collaborator/viewer roles and any custom roles.").action(async () => {
+    const opts = program2.opts();
+    try {
+      const data = await apiRequest({
+        path: "/org/roles",
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+}
+
+// src/commands/competitors.ts
+function registerCompetitorsCommands(program2) {
+  const competitors = program2.command("competitors").description("Manage the curated list of competitor brands your organization tracks. Tracked competitors feed downstream share-of-voice analytics and inform content-generation prompts.");
+  competitors.command("list").description("List every tracked competitor for the current organization.").action(async () => {
+    const opts = program2.opts();
+    try {
+      const data = await apiRequest({
+        path: "/org/competitors",
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  competitors.command("add").description("Add a single tracked competitor.").requiredOption("--name <name>", "Competitor brand name").option("--url <url>", "Competitor website URL").action(async (cmdOpts) => {
+    const opts = program2.opts();
+    try {
+      const body = { name: cmdOpts.name };
+      if (cmdOpts.url) body.url = cmdOpts.url;
+      const data = await apiRequest({
+        method: "POST",
+        path: "/org/competitors",
+        body,
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      success(`Tracked competitor "${cmdOpts.name}" added.`);
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  competitors.command("batch-add").description("Add up to 50 tracked competitors in one call. Designed for accepting AI-generated suggestions returned by `competitors suggest`.").requiredOption("--data <json>", 'JSON: { "items": [{ "name": "...", "url": "...", "source": "manual|suggested_run_text|suggested_web_search", "rationale": "...", "confidence": 0.85 }, ...] }').action(async (cmdOpts) => {
+    const opts = program2.opts();
+    try {
+      const body = JSON.parse(cmdOpts.data);
+      const data = await apiRequest({
+        method: "POST",
+        path: "/org/competitors/batch",
+        body,
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      success("Tracked competitors added.");
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(err instanceof SyntaxError ? "Invalid JSON in --data" : formatApiError(err));
+      process.exit(1);
+    }
+  });
+  competitors.command("suggest").description("Get AI-generated competitor suggestions seeded from your org's website and recent prompt-run results. Pipe accepted suggestions into `competitors batch-add`.").action(async () => {
+    const opts = program2.opts();
+    try {
+      const data = await apiRequest({
+        method: "POST",
+        path: "/org/competitors/suggest",
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  competitors.command("update <competitorId>").description("Update a tracked competitor's name or URL.").requiredOption("--name <name>", "Competitor brand name").option("--url <url>", "Competitor website URL").action(async (competitorId, cmdOpts) => {
+    const opts = program2.opts();
+    try {
+      const body = { name: cmdOpts.name };
+      if (cmdOpts.url) body.url = cmdOpts.url;
+      const data = await apiRequest({
+        method: "PUT",
+        path: `/org/competitors/${competitorId}`,
+        body,
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      success(`Tracked competitor ${competitorId} updated.`);
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  competitors.command("delete <competitorId>").description("Remove a tracked competitor.").action(async (competitorId) => {
+    const opts = program2.opts();
+    try {
+      await apiRequest({
+        method: "DELETE",
+        path: `/org/competitors/${competitorId}`,
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      success(`Tracked competitor ${competitorId} removed.`);
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+}
+
 // src/commands/update.ts
 import semver2 from "semver";
 import pc10 from "picocolors";
@@ -3087,6 +3278,8 @@ registerKBCommands(program);
 registerPermissionsCommands(program);
 registerTagsCommands(program);
 registerProductLineCommands(program);
+registerRolesCommands(program);
+registerCompetitorsCommands(program);
 registerUpdateCommand(program);
 async function main() {
   const quiet = process.argv.includes("--quiet") || process.argv.includes("--output") && process.argv[process.argv.indexOf("--output") + 1] === "json";

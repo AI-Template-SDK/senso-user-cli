@@ -27,6 +27,8 @@ import { registerKBCommands } from "./commands/kb.js";
 import { registerPermissionsCommands } from "./commands/permissions.js";
 import { registerProductLineCommands } from "./commands/product-lines.js";
 import { registerTagsCommands } from "./commands/tags.js";
+import { registerRolesCommands } from "./commands/roles.js";
+import { registerCompetitorsCommands } from "./commands/competitors.js";
 import { registerUpdateCommand } from "./commands/update.js";
 
 const program = new Command();
@@ -71,6 +73,8 @@ registerKBCommands(program);
 registerPermissionsCommands(program);
 registerTagsCommands(program);
 registerProductLineCommands(program);
+registerRolesCommands(program);
+registerCompetitorsCommands(program);
 registerUpdateCommand(program);
 
 // Parse and execute

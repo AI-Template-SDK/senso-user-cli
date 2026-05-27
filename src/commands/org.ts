@@ -43,4 +43,32 @@ export function registerOrgCommands(program: Command): void {
         process.exit(1);
       }
     });
+
+  org
+    .command("set-runs")
+    .description("Toggle the org-wide runs master switch. Pause every scheduled prompt run and content-generation run, or re-enable them.")
+    .requiredOption("--enabled <bool>", "Set to true or false")
+    .action(async (cmdOpts: { enabled: string }) => {
+      const opts = program.opts();
+      const raw = cmdOpts.enabled.toLowerCase();
+      if (raw !== "true" && raw !== "false") {
+        log.error("--enabled must be `true` or `false`.");
+        process.exit(1);
+      }
+      const enable = raw === "true";
+      try {
+        const data = await apiRequest({
+          method: "PATCH",
+          path: "/org/me/runs-enabled",
+          body: { enable_runs: enable },
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
+        log.success(`Org-wide runs ${enable ? "enabled" : "disabled"}.`);
+        console.log(JSON.stringify(data, null, 2));
+      } catch (err) {
+        log.error(formatApiError(err));
+        process.exit(1);
+      }
+    });
 }
