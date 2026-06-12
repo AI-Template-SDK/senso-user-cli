@@ -30,8 +30,8 @@ export function registerContentTypeCommands(program: Command): void {
 
   ct
     .command("create")
-    .description("Create a new content type. Requires a name and configuration defining the output structure.")
-    .requiredOption("--data <json>", 'JSON: { "name": "Blog Post", "config": { ... } }')
+    .description("Create a new content type. Requires a name and a config defining the output structure. config accepts a defined set of keys: template, template_spec, cta_text, cta_destination, writing_rules (array). Unknown keys are rejected.")
+    .requiredOption("--data <json>", 'JSON: { "name": "Blog Post", "config": { "template": "...", "cta_text": "...", "cta_destination": "...", "writing_rules": [] } }')
     .action(async (cmdOpts: { data: string }) => {
       const opts = program.opts();
       try {

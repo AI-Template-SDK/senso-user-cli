@@ -117,12 +117,49 @@ export function registerContentCommands(program: Command): void {
     .option("--offset <n>", "Number of items to skip (for pagination)")
     .option("--search <query>", "Filter by title")
     .option("--status <status>", "Filter by status: all, draft, review, rejected, published")
+    .option("--substatus <substatus>", "Narrow further (only valid with --status published): pending_draft")
     .action(async (cmdOpts: Record<string, string>) => {
       const opts = program.opts();
       try {
         const data = await apiRequest({
           path: "/org/content/verification",
-          params: { limit: cmdOpts.limit, offset: cmdOpts.offset, search: cmdOpts.search, status: cmdOpts.status },
+          params: { limit: cmdOpts.limit, offset: cmdOpts.offset, search: cmdOpts.search, status: cmdOpts.status, substatus: cmdOpts.substatus },
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
+        console.log(JSON.stringify(data, null, 2));
+      } catch (err) {
+        log.error(formatApiError(err));
+        process.exit(1);
+      }
+    });
+
+  content
+    .command("verification-counts")
+    .description("Get counts of content by editorial status (draft, published, rejected, pending published-draft) plus per-destination published-domain summaries. A lightweight alternative to paging through 'content verification'.")
+    .action(async () => {
+      const opts = program.opts();
+      try {
+        const data = await apiRequest({
+          path: "/org/content/verification/counts",
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
+        console.log(JSON.stringify(data, null, 2));
+      } catch (err) {
+        log.error(formatApiError(err));
+        process.exit(1);
+      }
+    });
+
+  content
+    .command("versions <id>")
+    .description("List the version history for a content item, newest first. The current version is flagged with is_current.")
+    .action(async (id: string) => {
+      const opts = program.opts();
+      try {
+        const data = await apiRequest({
+          path: `/org/content/${id}/versions`,
           apiKey: opts.apiKey,
           baseUrl: opts.baseUrl,
         });

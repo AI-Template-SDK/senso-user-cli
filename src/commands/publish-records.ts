@@ -13,14 +13,13 @@ export function registerPublishRecordsCommands(program: Command): void {
     .action(async (publishRecordId: string) => {
       const opts = program.opts();
       try {
-        const data = await apiRequest({
+        await apiRequest({
           method: "POST",
           path: `/org/publish-records/${publishRecordId}/retry`,
           apiKey: opts.apiKey,
           baseUrl: opts.baseUrl,
         });
-        log.success(`Publish record ${publishRecordId} retry triggered.`);
-        console.log(JSON.stringify(data, null, 2));
+        log.success(`Publish record ${publishRecordId} retry completed.`);
       } catch (err) {
         log.error(formatApiError(err));
         process.exit(1);

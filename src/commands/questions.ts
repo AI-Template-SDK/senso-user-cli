@@ -46,8 +46,8 @@ export function registerQuestionsCommands(program: Command): void {
 
   questions
     .command("patch <questionId>")
-    .description("Partially update a question. Currently supports updating tag associations.")
-    .requiredOption("--data <json>", 'JSON: { "tag_ids": ["<uuid>", ...] } — pass null to clear all tags')
+    .description("Partially update a question. Supports updating tag associations and/or the funnel stage (type). At least one of tag_ids or type must be provided.")
+    .requiredOption("--data <json>", 'JSON: { "tag_ids": ["<uuid>", ...], "type": "decision|consideration|awareness|evaluation" } — pass tag_ids: null to clear all tags')
     .action(async (questionId: string, cmdOpts: { data: string }) => {
       const opts = program.opts();
       try {

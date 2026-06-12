@@ -200,12 +200,13 @@ export function registerGenerateCommands(program: Command): void {
     .description("List individual prompt items within a content generation run and their per-item status.")
     .option("--limit <n>", "Items per page", "100")
     .option("--offset <n>", "Pagination offset", "0")
+    .option("--status <status>", "Filter by item status: pending, running, succeeded, failed, skipped, stopped")
     .action(async (runId: string, cmdOpts: Record<string, string>) => {
       const opts = program.opts();
       try {
         const data = await apiRequest({
           path: `/org/content-generation/runs/${runId}/items`,
-          params: { limit: cmdOpts.limit, offset: cmdOpts.offset },
+          params: { limit: cmdOpts.limit, offset: cmdOpts.offset, status: cmdOpts.status },
           apiKey: opts.apiKey,
           baseUrl: opts.baseUrl,
         });

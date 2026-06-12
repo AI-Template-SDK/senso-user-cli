@@ -5,7 +5,7 @@ import * as log from "../utils/logger.js";
 export function registerBrandKitCommands(program: Command): void {
   const bk = program
     .command("brand-kit")
-    .description("Manage the organization's brand kit guidelines. The brand kit is a free-form JSON object that informs AI content generation about your brand voice, tone, and style.");
+    .description("Manage the organization's brand kit guidelines that inform AI content generation about your brand voice, tone, and style. The guidelines object accepts a defined set of keys: brand_name, brand_domain, brand_description, voice_and_tone, author_persona, and global_writing_rules (array). Unknown keys are rejected.");
 
   bk
     .command("get")

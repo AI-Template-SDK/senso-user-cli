@@ -124,9 +124,11 @@ Options: `--max-results <n>`
 ```
 senso content list                   List all knowledge base items
 senso content get <id>               Get full content detail by ID
+senso content versions <id>          List version history for a content item
 senso content delete <id>            Delete content (knowledge base + external)
 senso content unpublish <id>         Unpublish and revert to draft
 senso content verification           List items in verification workflow
+senso content verification-counts    Counts by status + published-domain summaries
 senso content reject <versionId>     Reject a content version
 senso content restore <versionId>    Restore rejected version to draft
 senso content owners <id>            List owners of a content item
@@ -134,7 +136,16 @@ senso content set-owners <id>        Replace owners (--user-ids)
 senso content remove-owner <id> <userId>  Remove a single owner
 ```
 
-Options: `content list` supports `--limit`, `--offset`, `--search`, `--sort`. `content verification` supports `--limit`, `--offset`, `--search`, `--status`. `content reject` supports `--reason`.
+Options: `content list` supports `--limit`, `--offset`, `--search`, `--sort`. `content verification` supports `--limit`, `--offset`, `--search`, `--status`, `--substatus`. `content reject` supports `--reason`.
+
+### Generated Content (GEO)
+
+```
+senso generated-content list         List published or draft generated content (--status published|drafts)
+senso generated-content get <id>     Get a generated content item with its rendered body
+```
+
+Options: `generated-content list` supports `--status`, `--limit`, `--offset`, `--search`.
 
 ### Content Generation
 
@@ -151,6 +162,24 @@ senso generate run                   Trigger a content engine run (--prompt-ids)
 senso engine publish                 Publish content to external destinations (--data)
 senso engine draft                   Save content as draft for review (--data)
 ```
+
+### Tracked Competitors & Sources
+
+```
+senso competitors list               List tracked competitors
+senso competitors add                Add a competitor (--name, --url)
+senso competitors suggest            Get AI-generated competitor suggestions
+senso competitors batch-add          Add up to 50 competitors (--data)
+senso competitors update <id>        Update a competitor (--name, --url)
+senso competitors delete <id>        Remove a competitor
+
+senso tracked-sources list           List citation-classification rules
+senso tracked-sources add            Add a rule (--pattern, --match-type, --tier)
+senso tracked-sources update <id>    Replace a rule (--pattern, --match-type, --tier)
+senso tracked-sources delete <id>    Remove a rule
+```
+
+Options: `tracked-sources add`/`update` support `--category`, `--label`, `--priority`; `update` also supports `--active`/`--no-active`. `--match-type` is one of `domain | host | path_prefix | exact_url`; `--tier` is one of `primary | tracked | secondary`.
 
 ### Ingestion
 
@@ -344,12 +373,15 @@ npm test
 ```
 src/
 ├── cli.ts                 # Entry point — arg parsing, command dispatch
-├── commands/              # One file per command group (16 files)
+├── commands/              # One file per command group
 │   ├── auth.ts            # login, logout, whoami
 │   ├── search.ts          # search, search context, search content
-│   ├── content.ts         # CRUD + verification + owners
+│   ├── content.ts         # CRUD + versions + verification + owners
+│   ├── generated-content.ts  # GEO generated content (list, get)
 │   ├── generate.ts        # content generation settings + triggers
 │   ├── engine.ts          # publish, draft
+│   ├── competitors.ts     # tracked competitors CRUD + suggest
+│   ├── tracked-sources.ts # citation-classification rules CRUD
 │   ├── ingest.ts          # upload, reprocess (with S3 upload)
 │   ├── brand-kit.ts       # get, set
 │   ├── content-types.ts   # CRUD

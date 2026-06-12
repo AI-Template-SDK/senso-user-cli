@@ -29,6 +29,8 @@ import { registerProductLineCommands } from "./commands/product-lines.js";
 import { registerTagsCommands } from "./commands/tags.js";
 import { registerRolesCommands } from "./commands/roles.js";
 import { registerCompetitorsCommands } from "./commands/competitors.js";
+import { registerTrackedSourcesCommands } from "./commands/tracked-sources.js";
+import { registerGeneratedContentCommands } from "./commands/generated-content.js";
 import { registerUpdateCommand } from "./commands/update.js";
 
 const program = new Command();
@@ -75,6 +77,8 @@ registerTagsCommands(program);
 registerProductLineCommands(program);
 registerRolesCommands(program);
 registerCompetitorsCommands(program);
+registerTrackedSourcesCommands(program);
+registerGeneratedContentCommands(program);
 registerUpdateCommand(program);
 
 // Parse and execute

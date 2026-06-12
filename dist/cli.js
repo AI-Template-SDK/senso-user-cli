@@ -1458,12 +1458,40 @@ function registerContentCommands(program2) {
       process.exit(1);
     }
   });
-  content.command("verification").description("List content items in the verification workflow. Filter by editorial status (draft, review, rejected, published) to manage the review pipeline.").option("--limit <n>", "Maximum items to return").option("--offset <n>", "Number of items to skip (for pagination)").option("--search <query>", "Filter by title").option("--status <status>", "Filter by status: all, draft, review, rejected, published").action(async (cmdOpts) => {
+  content.command("verification").description("List content items in the verification workflow. Filter by editorial status (draft, review, rejected, published) to manage the review pipeline.").option("--limit <n>", "Maximum items to return").option("--offset <n>", "Number of items to skip (for pagination)").option("--search <query>", "Filter by title").option("--status <status>", "Filter by status: all, draft, review, rejected, published").option("--substatus <substatus>", "Narrow further (only valid with --status published): pending_draft").action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
       const data = await apiRequest({
         path: "/org/content/verification",
-        params: { limit: cmdOpts.limit, offset: cmdOpts.offset, search: cmdOpts.search, status: cmdOpts.status },
+        params: { limit: cmdOpts.limit, offset: cmdOpts.offset, search: cmdOpts.search, status: cmdOpts.status, substatus: cmdOpts.substatus },
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  content.command("verification-counts").description("Get counts of content by editorial status (draft, published, rejected, pending published-draft) plus per-destination published-domain summaries. A lightweight alternative to paging through 'content verification'.").action(async () => {
+    const opts = program2.opts();
+    try {
+      const data = await apiRequest({
+        path: "/org/content/verification/counts",
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  content.command("versions <id>").description("List the version history for a content item, newest first. The current version is flagged with is_current.").action(async (id) => {
+    const opts = program2.opts();
+    try {
+      const data = await apiRequest({
+        path: `/org/content/${id}/versions`,
         apiKey: opts.apiKey,
         baseUrl: opts.baseUrl
       });
@@ -1736,12 +1764,12 @@ function registerGenerateCommands(program2) {
       process.exit(1);
     }
   });
-  gen.command("runs-items <runId>").description("List individual prompt items within a content generation run and their per-item status.").option("--limit <n>", "Items per page", "100").option("--offset <n>", "Pagination offset", "0").action(async (runId, cmdOpts) => {
+  gen.command("runs-items <runId>").description("List individual prompt items within a content generation run and their per-item status.").option("--limit <n>", "Items per page", "100").option("--offset <n>", "Pagination offset", "0").option("--status <status>", "Filter by item status: pending, running, succeeded, failed, skipped, stopped").action(async (runId, cmdOpts) => {
     const opts = program2.opts();
     try {
       const data = await apiRequest({
         path: `/org/content-generation/runs/${runId}/items`,
-        params: { limit: cmdOpts.limit, offset: cmdOpts.offset },
+        params: { limit: cmdOpts.limit, offset: cmdOpts.offset, status: cmdOpts.status },
         apiKey: opts.apiKey,
         baseUrl: opts.baseUrl
       });
@@ -1794,7 +1822,7 @@ function sleep(ms) {
 // src/commands/engine.ts
 function registerEngineCommands(program2) {
   const engine = program2.command("engine").description("Publish or draft content through the content engine. Used to push AI-generated content to external destinations (citeables by default) or save it as a draft for review.");
-  engine.command("publish").description("Publish content to external destinations via the content engine. Requires geo_question_id, raw_markdown, and seo_title. By default publishes to every destination currently selected for generation (citeables is the default for most orgs \u2014 see 'senso destinations list'). Pass --publisher-ids to restrict publishing to a specific subset, or include 'publisher_ids' inside --data.").requiredOption("--data <json>", 'JSON: { "geo_question_id": "uuid", "raw_markdown": "...", "seo_title": "...", "summary": "...", "publisher_ids": ["<uuid>", ...] }').option("--publisher-ids <ids...>", "Restrict publishing to specific publisher IDs. Overrides any publisher_ids present in --data. Omit to publish to all configured destinations (citeables by default).").action(async (cmdOpts) => {
+  engine.command("publish").description("Publish content to external destinations via the content engine. Requires geo_question_id, raw_markdown, and seo_title. By default publishes to every destination currently selected for generation (citeables is the default for most orgs \u2014 see 'senso destinations list'). Pass --publisher-ids to restrict publishing to a specific subset, or include 'publisher_ids' inside --data. To record content as already published externally rather than pushing it to destinations, set mark_as_published (and optionally manual_published_at) in --data.").requiredOption("--data <json>", 'JSON: { "geo_question_id": "uuid", "raw_markdown": "...", "seo_title": "...", "summary": "...", "publisher_ids": ["<uuid>", ...], "mark_as_published": false, "manual_published_at": "2026-06-11T00:00:00Z" }').option("--publisher-ids <ids...>", "Restrict publishing to specific publisher IDs. Overrides any publisher_ids present in --data. Omit to publish to all configured destinations (citeables by default).").action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
       const body = JSON.parse(cmdOpts.data);
@@ -1914,14 +1942,13 @@ function registerPublishRecordsCommands(program2) {
   pr.command("retry <publishRecordId>").description("Retry a failed publish record. Re-runs the publish for that specific content+destination pair and flips the record's state based on the new attempt. Only works on records currently in the 'failed' state.").action(async (publishRecordId) => {
     const opts = program2.opts();
     try {
-      const data = await apiRequest({
+      await apiRequest({
         method: "POST",
         path: `/org/publish-records/${publishRecordId}/retry`,
         apiKey: opts.apiKey,
         baseUrl: opts.baseUrl
       });
-      success(`Publish record ${publishRecordId} retry triggered.`);
-      console.log(JSON.stringify(data, null, 2));
+      success(`Publish record ${publishRecordId} retry completed.`);
     } catch (err) {
       error(formatApiError(err));
       process.exit(1);
@@ -1931,7 +1958,7 @@ function registerPublishRecordsCommands(program2) {
 
 // src/commands/brand-kit.ts
 function registerBrandKitCommands(program2) {
-  const bk = program2.command("brand-kit").description("Manage the organization's brand kit guidelines. The brand kit is a free-form JSON object that informs AI content generation about your brand voice, tone, and style.");
+  const bk = program2.command("brand-kit").description("Manage the organization's brand kit guidelines that inform AI content generation about your brand voice, tone, and style. The guidelines object accepts a defined set of keys: brand_name, brand_domain, brand_description, voice_and_tone, author_persona, and global_writing_rules (array). Unknown keys are rejected.");
   bk.command("get").description("Get the current brand kit guidelines.").action(async () => {
     const opts = program2.opts();
     try {
@@ -1998,7 +2025,7 @@ function registerContentTypeCommands(program2) {
       process.exit(1);
     }
   });
-  ct.command("create").description("Create a new content type. Requires a name and configuration defining the output structure.").requiredOption("--data <json>", 'JSON: { "name": "Blog Post", "config": { ... } }').action(async (cmdOpts) => {
+  ct.command("create").description("Create a new content type. Requires a name and a config defining the output structure. config accepts a defined set of keys: template, template_spec, cta_text, cta_destination, writing_rules (array). Unknown keys are rejected.").requiredOption("--data <json>", 'JSON: { "name": "Blog Post", "config": { "template": "...", "cta_text": "...", "cta_destination": "...", "writing_rules": [] } }').action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
       const body = JSON.parse(cmdOpts.data);
@@ -2482,7 +2509,7 @@ function registerQuestionsCommands(program2) {
       process.exit(1);
     }
   });
-  questions.command("patch <questionId>").description("Partially update a question. Currently supports updating tag associations.").requiredOption("--data <json>", 'JSON: { "tag_ids": ["<uuid>", ...] } \u2014 pass null to clear all tags').action(async (questionId, cmdOpts) => {
+  questions.command("patch <questionId>").description("Partially update a question. Supports updating tag associations and/or the funnel stage (type). At least one of tag_ids or type must be provided.").requiredOption("--data <json>", 'JSON: { "tag_ids": ["<uuid>", ...], "type": "decision|consideration|awareness|evaluation" } \u2014 pass tag_ids: null to clear all tags').action(async (questionId, cmdOpts) => {
     const opts = program2.opts();
     try {
       const body = JSON.parse(cmdOpts.data);
@@ -3212,6 +3239,123 @@ function registerCompetitorsCommands(program2) {
   });
 }
 
+// src/commands/tracked-sources.ts
+var MATCH_TYPES = "domain | host | path_prefix | exact_url";
+var TIERS = "primary (Owned) | tracked | secondary (External)";
+var CATEGORIES = "affiliated_domain | published_content | social | press";
+function buildSourceBody(cmdOpts) {
+  const body = {};
+  if (cmdOpts.pattern !== void 0) body.pattern = cmdOpts.pattern;
+  if (cmdOpts.matchType !== void 0) body.match_type = cmdOpts.matchType;
+  if (cmdOpts.tier !== void 0) body.tier = cmdOpts.tier;
+  if (cmdOpts.category !== void 0) body.category = cmdOpts.category;
+  if (cmdOpts.label !== void 0) body.label = cmdOpts.label;
+  if (cmdOpts.priority !== void 0) body.priority = Number(cmdOpts.priority);
+  if (cmdOpts.active !== void 0) body.active = cmdOpts.active;
+  return body;
+}
+function registerTrackedSourcesCommands(program2) {
+  const sources = program2.command("tracked-sources").description("Manage citation-classification rules that tier each cited URL as Owned (primary), Tracked, or External (secondary). Tracked sources drive share-of-voice and citation analytics. Rules created from published content are read-only.");
+  sources.command("list").description("List every tracked source rule for the current organization.").action(async () => {
+    const opts = program2.opts();
+    try {
+      const data = await apiRequest({
+        path: "/org/tracked-sources",
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  sources.command("add").description("Add a tracked source rule. New rules are always created active.").requiredOption("--pattern <pattern>", "Value to match cited URLs against, interpreted per --match-type").requiredOption("--match-type <type>", `Match strategy: ${MATCH_TYPES}`).requiredOption("--tier <tier>", `Classification tier: ${TIERS}`).option("--category <category>", `Optional sub-category (only meaningful for the 'tracked' tier): ${CATEGORIES}`).option("--label <label>", "Optional human-readable label").option("--priority <n>", "Optional ordering priority (integer)").action(async (cmdOpts) => {
+    const opts = program2.opts();
+    try {
+      const data = await apiRequest({
+        method: "POST",
+        path: "/org/tracked-sources",
+        body: buildSourceBody(cmdOpts),
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      success(`Tracked source "${cmdOpts.pattern}" added.`);
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  sources.command("update <sourceId>").description("Replace a tracked source rule (PUT). Pattern, match type, and tier are required. Published rules are read-only.").requiredOption("--pattern <pattern>", "Value to match cited URLs against, interpreted per --match-type").requiredOption("--match-type <type>", `Match strategy: ${MATCH_TYPES}`).requiredOption("--tier <tier>", `Classification tier: ${TIERS}`).option("--category <category>", `Optional sub-category (only meaningful for the 'tracked' tier): ${CATEGORIES}`).option("--label <label>", "Optional human-readable label").option("--priority <n>", "Optional ordering priority (integer)").option("--active", "Mark the rule active").option("--no-active", "Mark the rule inactive").action(async (sourceId, cmdOpts) => {
+    const opts = program2.opts();
+    try {
+      const data = await apiRequest({
+        method: "PUT",
+        path: `/org/tracked-sources/${sourceId}`,
+        body: buildSourceBody(cmdOpts),
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      success(`Tracked source ${sourceId} updated.`);
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  sources.command("delete <sourceId>").description("Remove a tracked source rule.").action(async (sourceId) => {
+    const opts = program2.opts();
+    try {
+      await apiRequest({
+        method: "DELETE",
+        path: `/org/tracked-sources/${sourceId}`,
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      success(`Tracked source ${sourceId} removed.`);
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+}
+
+// src/commands/generated-content.ts
+function registerGeneratedContentCommands(program2) {
+  const gc = program2.command("generated-content").description("Browse AI-generated content (GEO). List published or draft generated items, or fetch a single item with its rendered body. Requires the GEO product and read:content permission.");
+  gc.command("list").description("List generated content. Use --status to switch between published and draft items.").option("--status <status>", "Which items to list: published | drafts", "published").option("--limit <n>", "Items per page (max 100)", "10").option("--offset <n>", "Pagination offset", "0").option("--search <query>", "Filter by title").action(async (cmdOpts) => {
+    const opts = program2.opts();
+    const status = cmdOpts.status === "drafts" || cmdOpts.status === "draft" ? "drafts" : "published";
+    try {
+      const data = await apiRequest({
+        path: `/org/generated-content/${status}`,
+        params: { limit: cmdOpts.limit, offset: cmdOpts.offset, search: cmdOpts.search },
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  gc.command("get <id>").description("Get a single generated content item including its question text and rendered body.").action(async (id) => {
+    const opts = program2.opts();
+    try {
+      const data = await apiRequest({
+        path: `/org/generated-content/${id}`,
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+}
+
 // src/commands/update.ts
 import semver2 from "semver";
 import pc10 from "picocolors";
@@ -3280,6 +3424,8 @@ registerTagsCommands(program);
 registerProductLineCommands(program);
 registerRolesCommands(program);
 registerCompetitorsCommands(program);
+registerTrackedSourcesCommands(program);
+registerGeneratedContentCommands(program);
 registerUpdateCommand(program);
 async function main() {
   const quiet = process.argv.includes("--quiet") || process.argv.includes("--output") && process.argv[process.argv.indexOf("--output") + 1] === "json";
