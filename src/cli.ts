@@ -31,6 +31,7 @@ import { registerRolesCommands } from "./commands/roles.js";
 import { registerCompetitorsCommands } from "./commands/competitors.js";
 import { registerTrackedSourcesCommands } from "./commands/tracked-sources.js";
 import { registerGeneratedContentCommands } from "./commands/generated-content.js";
+import { registerIndustriesCommands } from "./commands/industries.js";
 import { registerUpdateCommand } from "./commands/update.js";
 
 const program = new Command();
@@ -79,6 +80,7 @@ registerRolesCommands(program);
 registerCompetitorsCommands(program);
 registerTrackedSourcesCommands(program);
 registerGeneratedContentCommands(program);
+registerIndustriesCommands(program);
 registerUpdateCommand(program);
 
 // Parse and execute
