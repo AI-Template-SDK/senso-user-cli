@@ -3411,8 +3411,10 @@ function windowParams(o) {
     tag: o.tag
   };
 }
-function addWindowOptions(cmd) {
-  return cmd.option("--from <date>", "Window start, YYYY-MM-DD (default: 30 days ending at the most recent day with data)").option("--to <date>", "Window end, YYYY-MM-DD (max window: 365 days)").option("--models <list>", "Comma-separated model filter \u2014 see 'senso analytics filters'").option("--location <list>", "Comma-separated location filter, case-sensitive (e.g. US, US/California)").option("--prompt-type <type>", "Funnel stage: awareness | consideration | evaluation | decision").option("--tag <tag>", "Restrict to prompts carrying this tag");
+function addWindowOptions(cmd, opts = {}) {
+  const withTag = opts.tag !== false;
+  const base = cmd.option("--from <date>", "Window start, YYYY-MM-DD (default: 30 days ending at the most recent day with data)").option("--to <date>", "Window end, YYYY-MM-DD (max window: 365 days)").option("--models <list>", "Comma-separated model filter \u2014 see 'senso analytics filters'").option("--location <list>", "Comma-separated location filter, case-sensitive (e.g. US, US/California)").option("--prompt-type <type>", "Funnel stage: awareness | consideration | evaluation | decision");
+  return withTag ? base.option("--tag <tag>", "Restrict to prompts carrying this tag") : base;
 }
 function addPagingOptions(cmd, defaultLimit) {
   return cmd.option("--limit <n>", `Maximum rows to return (default: ${defaultLimit}, max: 100)`).option("--offset <n>", "Rows to skip (for pagination)");
@@ -3663,7 +3665,8 @@ function registerAnalyticsCommands(program2) {
     addWindowOptions(
       analytics.command("domains").description(
         "Every domain the models cited, ranked. Citation Coverage is this domain's cited answers \xF7 D; Citation Share is its citation instances \xF7 S. Tiers: primary (Owned) | tracked | secondary (External)."
-      )
+      ),
+      { tag: false }
     ).option("--tier <tier>", "Filter by tier: primary | tracked | secondary").option("--domain-contains <text>", "Substring filter on the domain").option("--sort <field>", "Sort by: citations | coverage (default: citations)"),
     50
   ).action(
@@ -3737,7 +3740,8 @@ function registerAnalyticsCommands(program2) {
     addWindowOptions(
       analytics.command("pages").description(
         "URL-grain citation table plus the prompts driving each page's citations. Same Coverage (\xF7D) and Share (\xF7S) denominators as 'analytics domains'."
-      )
+      ),
+      { tag: false }
     ).option("--tier <tier>", "Filter by tier: primary | tracked | secondary").option("--domain <domain>", "Restrict to one exact domain").option("--domain-contains <text>", "Substring filter on the domain").option("--url-contains <text>", "Substring filter on the URL").option("--sort <field>", "Sort by: citations | coverage (default: citations)"),
     50
   ).action(

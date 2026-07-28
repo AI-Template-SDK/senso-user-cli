@@ -321,14 +321,26 @@ function windowParams(o: WindowFilters): Record<string, string | undefined> {
   };
 }
 
-function addWindowOptions(cmd: Command): Command {
-  return cmd
+/**
+ * Shared window/filter options.
+ *
+ * `tag` is opt-out because the cited-source endpoints (domains, pages) cannot
+ * honor it — the domain and webpage rollups have no prompt grain to resolve a
+ * tag through. Offering the flag there would advertise a filter that silently
+ * does nothing, which is the one failure mode this CLI works hardest to avoid:
+ * an unapplied filter returns MORE data, so the mistake is invisible.
+ */
+function addWindowOptions(cmd: Command, opts: { tag?: boolean } = {}): Command {
+  const withTag = opts.tag !== false;
+  const base = cmd
     .option("--from <date>", "Window start, YYYY-MM-DD (default: 30 days ending at the most recent day with data)")
     .option("--to <date>", "Window end, YYYY-MM-DD (max window: 365 days)")
     .option("--models <list>", "Comma-separated model filter — see 'senso analytics filters'")
     .option("--location <list>", "Comma-separated location filter, case-sensitive (e.g. US, US/California)")
-    .option("--prompt-type <type>", "Funnel stage: awareness | consideration | evaluation | decision")
-    .option("--tag <tag>", "Restrict to prompts carrying this tag");
+    .option("--prompt-type <type>", "Funnel stage: awareness | consideration | evaluation | decision");
+  return withTag
+    ? base.option("--tag <tag>", "Restrict to prompts carrying this tag")
+    : base;
 }
 
 function addPagingOptions(cmd: Command, defaultLimit: number): Command {
@@ -654,6 +666,7 @@ export function registerAnalyticsCommands(program: Command): void {
         .description(
           "Every domain the models cited, ranked. Citation Coverage is this domain's cited answers ÷ D; Citation Share is its citation instances ÷ S. Tiers: primary (Owned) | tracked | secondary (External).",
         ),
+      { tag: false },
     )
       .option("--tier <tier>", "Filter by tier: primary | tracked | secondary")
       .option("--domain-contains <text>", "Substring filter on the domain")
@@ -755,6 +768,7 @@ export function registerAnalyticsCommands(program: Command): void {
         .description(
           "URL-grain citation table plus the prompts driving each page's citations. Same Coverage (÷D) and Share (÷S) denominators as 'analytics domains'.",
         ),
+      { tag: false },
     )
       .option("--tier <tier>", "Filter by tier: primary | tracked | secondary")
       .option("--domain <domain>", "Restrict to one exact domain")
