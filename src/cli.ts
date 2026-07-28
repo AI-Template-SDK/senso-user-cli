@@ -31,6 +31,7 @@ import { registerRolesCommands } from "./commands/roles.js";
 import { registerCompetitorsCommands } from "./commands/competitors.js";
 import { registerTrackedSourcesCommands } from "./commands/tracked-sources.js";
 import { registerGeneratedContentCommands } from "./commands/generated-content.js";
+import { registerAnalyticsCommands } from "./commands/analytics.js";
 import { registerIndustriesCommands } from "./commands/industries.js";
 import { registerUpdateCommand } from "./commands/update.js";
 
@@ -80,6 +81,7 @@ registerRolesCommands(program);
 registerCompetitorsCommands(program);
 registerTrackedSourcesCommands(program);
 registerGeneratedContentCommands(program);
+registerAnalyticsCommands(program);
 registerIndustriesCommands(program);
 registerUpdateCommand(program);
 

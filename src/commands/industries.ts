@@ -1,6 +1,33 @@
 import { Command } from "commander";
-import { apiRequest, formatApiError } from "../lib/api-client.js";
+import { ApiError, apiRequest, formatApiError } from "../lib/api-client.js";
 import * as log from "../utils/logger.js";
+
+/**
+ * Every command in this group calls a /partner/* route. Those routes are gated
+ * by partner authentication in senso-api, so the organization API key that
+ * `senso login` stores is rejected with a 401/403 — and the generic handler
+ * would tell the user to log in again, which never fixes it. Explain the real
+ * cause instead, and point at the org-scoped equivalent.
+ */
+function handlePartnerError(err: unknown): never {
+  if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+    log.error(
+      "This request was rejected by the Senso API's partner authentication.",
+    );
+    log.info(
+      "`senso industries` reads partner-scoped endpoints (/partner/*) and needs a PARTNER API key. The organization key stored by `senso login` cannot access them — logging in again will not help.",
+    );
+    log.info(
+      "If you have a partner key, pass it per-command with `--api-key <partner-key>` or export SENSO_API_KEY.",
+    );
+    log.info(
+      "For metrics about your own organization, use `senso analytics` — e.g. `senso analytics summary`, `senso analytics domains`, `senso analytics glossary`.",
+    );
+    process.exit(1);
+  }
+  log.error(formatApiError(err));
+  process.exit(1);
+}
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -54,7 +81,7 @@ async function resolveIndustryId(
 export function registerIndustriesCommands(program: Command): void {
   const industries = program
     .command("industries")
-    .description("Explore industry-level competitive intelligence across a partner network — brand share-of-voice, domain citations, and per-prompt metrics. The <industry> argument accepts either a UUID or a name (e.g. \"Automotive\").");
+    .description("Explore industry-level competitive intelligence across a partner network — brand share-of-voice, domain citations, and per-prompt metrics. The <industry> argument accepts either a UUID or a name (e.g. \"Automotive\"). REQUIRES A PARTNER API KEY: these commands read /partner/* endpoints, which reject the organization key stored by `senso login`. For metrics about your own organization, use `senso analytics`.");
 
   industries
     .command("list")
@@ -71,8 +98,7 @@ export function registerIndustriesCommands(program: Command): void {
         });
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
+        handlePartnerError(err);
       }
     });
 
@@ -95,8 +121,7 @@ export function registerIndustriesCommands(program: Command): void {
         });
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
+        handlePartnerError(err);
       }
     });
 
@@ -119,8 +144,7 @@ export function registerIndustriesCommands(program: Command): void {
         });
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
+        handlePartnerError(err);
       }
     });
 
@@ -143,8 +167,7 @@ export function registerIndustriesCommands(program: Command): void {
         });
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
+        handlePartnerError(err);
       }
     });
 
@@ -169,8 +192,7 @@ export function registerIndustriesCommands(program: Command): void {
         });
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
+        handlePartnerError(err);
       }
     });
 
@@ -187,8 +209,7 @@ export function registerIndustriesCommands(program: Command): void {
         });
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
+        handlePartnerError(err);
       }
     });
 }
