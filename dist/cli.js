@@ -3356,7 +3356,827 @@ function registerGeneratedContentCommands(program2) {
   });
 }
 
+// src/commands/analytics.ts
+import pc10 from "picocolors";
+var NO_VALUE = "\u2014";
+function rate(r) {
+  return r && typeof r.display === "string" ? r.display : NO_VALUE;
+}
+function count(v) {
+  return v === void 0 || v === null ? NO_VALUE : v.toLocaleString("en-US");
+}
+function position(v) {
+  return v === void 0 || v === null ? NO_VALUE : `#${v.toFixed(1)}`;
+}
+function trend(t) {
+  return t ? `${t.display} (${t.direction})` : NO_VALUE;
+}
+function ratio(numerator, denominator, unit) {
+  return `${count(numerator)} / ${count(denominator)} ${unit}`;
+}
+function truncate(value, max) {
+  const flat = (value ?? "").replace(/\s+/g, " ").trim();
+  return flat.length > max ? `${flat.slice(0, max - 1)}\u2026` : flat;
+}
+function windowLine(w) {
+  if (!w) return "";
+  const fresh = w.latest_data_day ? `, latest data ${w.latest_data_day}` : ", no data days in window";
+  return `  ${pc10.dim(`Window ${w.from} \u2192 ${w.to} (${w.days} days${fresh})`)}`;
+}
+function qualityLine(dq) {
+  if (!dq) return "";
+  return `  ${pc10.dim(`Data quality: ${dq.level} \u2014 ${count(dq.answered_count)} answered runs`)}`;
+}
+function emitContext(format, lines) {
+  if (format !== "table") return;
+  const visible = lines.filter(Boolean);
+  if (visible.length === 0) return;
+  outputPlain([...visible, ""]);
+}
+function emitNotes(format, notes) {
+  if (format === "json" || !notes || notes.length === 0) return;
+  outputPlain([
+    "",
+    `  ${pc10.bold("Notes")}`,
+    ...notes.map((note) => `  ${pc10.dim("\u2022")} ${note}`)
+  ]);
+}
+function windowParams(o) {
+  return {
+    from: o.from,
+    to: o.to,
+    models: o.models,
+    location: o.location,
+    prompt_type: o.promptType,
+    tag: o.tag
+  };
+}
+function addWindowOptions(cmd, opts = {}) {
+  const withTag = opts.tag !== false;
+  const base = cmd.option("--from <date>", "Window start, YYYY-MM-DD (default: 30 days ending at the most recent day with data)").option("--to <date>", "Window end, YYYY-MM-DD (max window: 365 days)").option("--models <list>", "Comma-separated model filter \u2014 see 'senso analytics filters'").option("--location <list>", "Comma-separated location filter, case-sensitive (e.g. US, US/California)").option("--prompt-type <type>", "Funnel stage: awareness | consideration | evaluation | decision");
+  return withTag ? base.option("--tag <tag>", "Restrict to prompts carrying this tag") : base;
+}
+function addPagingOptions(cmd, defaultLimit) {
+  return cmd.option("--limit <n>", `Maximum rows to return (default: ${defaultLimit}, max: 100)`).option("--offset <n>", "Rows to skip (for pagination)");
+}
+var BOOL_VALUES = /* @__PURE__ */ new Set(["true", "false", "1", "0", "yes", "no"]);
+function normalizeBool(flag, raw) {
+  if (raw === void 0) return void 0;
+  const value = raw.trim().toLowerCase();
+  if (!BOOL_VALUES.has(value)) {
+    error(`Invalid --${flag}: expected true or false.`);
+    process.exit(1);
+  }
+  return value;
+}
+function metricRows(totals, metrics, deltas) {
+  return [
+    {
+      metric: "Mention Rate",
+      value: rate(metrics.mention_rate),
+      counts: ratio(totals.mentioned_count, totals.answered_count, "answers"),
+      "vs prev": trend(deltas?.mention_rate)
+    },
+    {
+      metric: "Share of Voice",
+      value: rate(metrics.share_of_voice),
+      counts: ratio(totals.mention_total, totals.brand_mention_total, "mentions (all brands)"),
+      "vs prev": trend(deltas?.share_of_voice)
+    },
+    {
+      metric: "Avg Rank",
+      value: rate(metrics.avg_rank),
+      counts: `over ${count(totals.mentioned_count)} mentioned answers`,
+      "vs prev": NO_VALUE
+    },
+    {
+      metric: "Citation Rate (Owned)",
+      value: rate(metrics.primary_citation_rate),
+      counts: ratio(totals.primary_cited_run_count, totals.cited_run_count, "cited answers"),
+      "vs prev": trend(deltas?.primary_citation_rate)
+    },
+    {
+      metric: "Citation Rate (Tracked)",
+      value: rate(metrics.tracked_citation_rate),
+      counts: ratio(totals.tracked_cited_run_count, totals.cited_run_count, "cited answers"),
+      "vs prev": NO_VALUE
+    },
+    {
+      metric: "Citation Rate (External)",
+      value: rate(metrics.external_citation_rate),
+      counts: ratio(totals.external_cited_run_count, totals.cited_run_count, "cited answers"),
+      "vs prev": NO_VALUE
+    },
+    {
+      metric: "Citation Share (Owned)",
+      value: rate(metrics.primary_citation_share),
+      counts: ratio(totals.primary_cited_total, totals.cited_total, "citations"),
+      "vs prev": NO_VALUE
+    },
+    {
+      metric: "Citation Share (Tracked)",
+      value: rate(metrics.tracked_citation_share),
+      counts: ratio(totals.tracked_cited_total, totals.cited_total, "citations"),
+      "vs prev": NO_VALUE
+    },
+    {
+      metric: "Citation Share (External)",
+      value: rate(metrics.external_citation_share),
+      counts: ratio(totals.external_cited_total, totals.cited_total, "citations"),
+      "vs prev": NO_VALUE
+    },
+    {
+      metric: "Citations per Answer",
+      value: rate(metrics.citations_per_answer),
+      counts: ratio(totals.cited_total, totals.cited_run_count, "cited answers"),
+      "vs prev": NO_VALUE
+    },
+    {
+      metric: "Sentiment (pos/neu/neg)",
+      value: `${count(totals.sentiment?.positive)} / ${count(totals.sentiment?.neutral)} / ${count(totals.sentiment?.negative)}`,
+      counts: `sums to ${count(totals.mentioned_count)} mentioned answers`,
+      "vs prev": NO_VALUE
+    }
+  ];
+}
+var METRIC_COLUMNS = ["metric", "value", "counts", "vs prev"];
+function metricPlainLines(rows) {
+  const width = rows.reduce((max, r) => Math.max(max, String(r.metric).length), 0);
+  return rows.map(
+    (r) => `  ${pc10.bold(String(r.metric).padEnd(width))}  ${String(r.value)}  ${pc10.dim(`(${r.counts})`)}` + (r["vs prev"] !== NO_VALUE ? `  ${pc10.dim(`vs prev: ${r["vs prev"]}`)}` : "")
+  );
+}
+function registerAnalyticsCommands(program2) {
+  const analytics = program2.command("analytics").description(
+    "GEO analytics for your organization \u2014 brand visibility, share of voice, and citations across the AI models you monitor. Every payload ships raw counts alongside the rates, and a rate is null (shown as \u201C\u2014\u201D) when its denominator is zero, never a silent 0%. Run 'senso analytics glossary' for the canonical definition and denominator of every metric."
+  );
+  addWindowOptions(
+    analytics.command("summary").description(
+      "One-call dashboard: every headline metric with its raw counts, plus the preceding equal-length window and the deltas between them."
+    )
+  ).action(async (cmdOpts) => {
+    const opts = program2.opts();
+    const format = opts.output || "plain";
+    try {
+      const data = await apiRequest({
+        path: "/org/analytics/summary",
+        params: windowParams(cmdOpts),
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      const rows = metricRows(data.totals, data.metrics, data.deltas);
+      emitContext(format, [
+        "",
+        `  ${pc10.bold("Analytics summary")}`,
+        windowLine(data.window),
+        qualityLine(data.data_quality)
+      ]);
+      output(format, {
+        json: data,
+        table: { rows, columns: METRIC_COLUMNS },
+        plain: [
+          "",
+          `  ${pc10.bold("Analytics summary")}`,
+          windowLine(data.window),
+          qualityLine(data.data_quality),
+          "",
+          ...metricPlainLines(rows),
+          "",
+          `  ${pc10.dim(`Monitoring ${count(data.totals.prompt_count)} prompts \xD7 ${count(data.totals.model_count)} models \xD7 ${count(data.totals.location_count)} locations \u2014 ${count(data.totals.answered_count)} of ${count(data.totals.run_count)} runs answered`)}`
+        ]
+      });
+      emitNotes(format, data.notes);
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  addWindowOptions(
+    analytics.command("mentions").description(
+      "Visibility time series: mention counts, share of voice (your mentions \xF7 mentions of every brand), average rank and sentiment, bucketed by day or week."
+    )
+  ).option("--group-by <bucket>", "Time bucket: day | week (default: day)").action(async (cmdOpts) => {
+    const opts = program2.opts();
+    const format = opts.output || "plain";
+    try {
+      const data = await apiRequest({
+        path: "/org/analytics/mentions",
+        params: { ...windowParams(cmdOpts), group_by: cmdOpts.groupBy },
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      const series = data.series ?? [];
+      const context = [
+        "",
+        `  ${pc10.bold("Mentions")} ${pc10.dim(`by ${data.group_by}`)}`,
+        windowLine(data.window),
+        qualityLine(data.data_quality),
+        `  ${pc10.dim(`Window totals \u2014 mention rate ${rate(data.metrics.mention_rate)}, share of voice ${rate(data.metrics.share_of_voice)}, avg rank ${rate(data.metrics.avg_rank)}`)}`
+      ];
+      emitContext(format, context);
+      output(format, {
+        json: data,
+        table: {
+          rows: series.map((p4) => ({
+            period: p4.period_start,
+            answered: count(p4.answered_count),
+            mentioned: count(p4.mentioned_count),
+            mention_rate: rate(p4.mention_rate),
+            sov: rate(p4.share_of_voice),
+            avg_rank: rate(p4.avg_rank)
+          })),
+          columns: ["period", "answered", "mentioned", "mention_rate", "sov", "avg_rank"]
+        },
+        plain: [
+          ...context,
+          "",
+          ...series.length ? series.map(
+            (p4) => `  ${pc10.bold(p4.period_start)}  answered ${count(p4.answered_count)}  mentioned ${count(p4.mentioned_count)}  rate ${rate(p4.mention_rate)}  SoV ${rate(p4.share_of_voice)}  rank ${rate(p4.avg_rank)}`
+          ) : ["  No rollup days in this window."]
+        ]
+      });
+      emitNotes(format, data.notes);
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  addWindowOptions(
+    analytics.command("citations").description(
+      "Citation overview: both denominators (D = cited answers, S = citation instances), every tier numerator, the tier rates (\xF7D) and tier shares (\xF7S), and the series underneath."
+    )
+  ).option("--group-by <bucket>", "Time bucket: day | week (default: day)").action(async (cmdOpts) => {
+    const opts = program2.opts();
+    const format = opts.output || "plain";
+    try {
+      const data = await apiRequest({
+        path: "/org/analytics/citations",
+        params: { ...windowParams(cmdOpts), group_by: cmdOpts.groupBy },
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      const series = data.series ?? [];
+      const context = [
+        "",
+        `  ${pc10.bold("Citations")} ${pc10.dim(`by ${data.group_by}`)}`,
+        windowLine(data.window),
+        qualityLine(data.data_quality),
+        `  ${pc10.dim(`D = ${count(data.totals.cited_run_count)} cited answers, S = ${count(data.totals.cited_total)} citation instances`)}`,
+        `  ${pc10.dim(`Owned rate ${rate(data.metrics.primary_citation_rate)} (\xF7D) \xB7 Owned share ${rate(data.metrics.primary_citation_share)} (\xF7S) \xB7 ${rate(data.metrics.citations_per_answer)}`)}`
+      ];
+      emitContext(format, context);
+      output(format, {
+        json: data,
+        table: {
+          rows: series.map((p4) => ({
+            period: p4.period_start,
+            cited_answers: count(p4.cited_run_count),
+            citations: count(p4.cited_total),
+            owned_rate: rate(p4.primary_citation_rate),
+            tracked_rate: rate(p4.tracked_citation_rate),
+            external_rate: rate(p4.external_citation_rate),
+            owned_share: rate(p4.primary_citation_share)
+          })),
+          columns: [
+            "period",
+            "cited_answers",
+            "citations",
+            "owned_rate",
+            "tracked_rate",
+            "external_rate",
+            "owned_share"
+          ]
+        },
+        plain: [
+          ...context,
+          "",
+          ...series.length ? series.map(
+            (p4) => `  ${pc10.bold(p4.period_start)}  cited answers ${count(p4.cited_run_count)}  citations ${count(p4.cited_total)}  owned ${rate(p4.primary_citation_rate)}  tracked ${rate(p4.tracked_citation_rate)}  external ${rate(p4.external_citation_rate)}`
+          ) : ["  No rollup days in this window."]
+        ]
+      });
+      emitNotes(format, data.notes);
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  addPagingOptions(
+    addWindowOptions(
+      analytics.command("domains").description(
+        "Every domain the models cited, ranked. Citation Coverage is this domain's cited answers \xF7 D; Citation Share is its citation instances \xF7 S. Tiers: primary (Owned) | tracked | secondary (External)."
+      ),
+      { tag: false }
+    ).option("--tier <tier>", "Filter by tier: primary | tracked | secondary").option("--domain-contains <text>", "Substring filter on the domain").option("--sort <field>", "Sort by: citations | coverage (default: citations)"),
+    50
+  ).action(
+    async (cmdOpts) => {
+      const opts = program2.opts();
+      const format = opts.output || "plain";
+      try {
+        const data = await apiRequest({
+          path: "/org/analytics/citations/domains",
+          params: {
+            ...windowParams(cmdOpts),
+            tier: cmdOpts.tier,
+            domain_contains: cmdOpts.domainContains,
+            sort: cmdOpts.sort,
+            limit: cmdOpts.limit,
+            offset: cmdOpts.offset
+          },
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl
+        });
+        const domains = data.domains ?? [];
+        const context = [
+          "",
+          `  ${pc10.bold("Cited domains")} ${pc10.dim(`${domains.length} of ${count(data.total)} (offset ${count(data.offset)})`)}`,
+          windowLine(data.window),
+          qualityLine(data.data_quality),
+          `  ${pc10.dim(`D = ${count(data.denominators?.cited_run_count)} cited answers, S = ${count(data.denominators?.cited_total)} citation instances`)}`
+        ];
+        emitContext(format, context);
+        output(format, {
+          json: data,
+          table: {
+            rows: domains.map((d) => ({
+              rank: d.rank_by_citations,
+              domain: d.domain,
+              tier: d.tier_label || d.tier,
+              answers: count(d.cited_run_count),
+              citations: count(d.cited_total),
+              coverage: rate(d.citation_coverage),
+              share: rate(d.citation_share),
+              avg_pos: position(d.avg_citation_rank)
+            })),
+            columns: [
+              "rank",
+              "domain",
+              "tier",
+              "answers",
+              "citations",
+              "coverage",
+              "share",
+              "avg_pos"
+            ]
+          },
+          plain: [
+            ...context,
+            "",
+            ...domains.length ? domains.map(
+              (d) => `  ${pc10.dim(`#${d.rank_by_citations}`)} ${pc10.bold(d.domain)} ${pc10.dim(`[${d.tier_label || d.tier}]`)}
+     coverage ${rate(d.citation_coverage)} \xB7 share ${rate(d.citation_share)} \xB7 ${count(d.cited_run_count)} cited answers \xB7 ${count(d.cited_total)} citations \xB7 avg position ${position(d.avg_citation_rank)}`
+            ) : ["  No cited domains in this window."]
+          ]
+        });
+        emitNotes(format, data.notes);
+      } catch (err) {
+        error(formatApiError(err));
+        process.exit(1);
+      }
+    }
+  );
+  addPagingOptions(
+    addWindowOptions(
+      analytics.command("pages").description(
+        "URL-grain citation table plus the prompts driving each page's citations. Same Coverage (\xF7D) and Share (\xF7S) denominators as 'analytics domains'."
+      ),
+      { tag: false }
+    ).option("--tier <tier>", "Filter by tier: primary | tracked | secondary").option("--domain <domain>", "Restrict to one exact domain").option("--domain-contains <text>", "Substring filter on the domain").option("--url-contains <text>", "Substring filter on the URL").option("--sort <field>", "Sort by: citations | coverage (default: citations)"),
+    50
+  ).action(
+    async (cmdOpts) => {
+      const opts = program2.opts();
+      const format = opts.output || "plain";
+      try {
+        const data = await apiRequest({
+          path: "/org/analytics/citations/pages",
+          params: {
+            ...windowParams(cmdOpts),
+            tier: cmdOpts.tier,
+            domain: cmdOpts.domain,
+            domain_contains: cmdOpts.domainContains,
+            url_contains: cmdOpts.urlContains,
+            sort: cmdOpts.sort,
+            limit: cmdOpts.limit,
+            offset: cmdOpts.offset
+          },
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl
+        });
+        const pages = data.pages ?? [];
+        const context = [
+          "",
+          `  ${pc10.bold("Cited pages")} ${pc10.dim(`${pages.length} of ${count(data.total)} (offset ${count(data.offset)})`)}`,
+          windowLine(data.window),
+          qualityLine(data.data_quality),
+          `  ${pc10.dim(`D = ${count(data.denominators?.cited_run_count)} cited answers, S = ${count(data.denominators?.cited_total)} citation instances`)}`
+        ];
+        emitContext(format, context);
+        output(format, {
+          json: data,
+          table: {
+            rows: pages.map((p4) => ({
+              url: truncate(p4.url, 70),
+              tier: p4.tier_label || p4.tier,
+              answers: count(p4.cited_run_count),
+              citations: count(p4.cited_total),
+              coverage: rate(p4.citation_coverage),
+              share: rate(p4.citation_share),
+              avg_pos: position(p4.avg_citation_rank)
+            })),
+            columns: [
+              "url",
+              "tier",
+              "answers",
+              "citations",
+              "coverage",
+              "share",
+              "avg_pos"
+            ]
+          },
+          plain: [
+            ...context,
+            "",
+            ...pages.length ? pages.map(
+              (p4) => [
+                `  ${pc10.bold(p4.url)} ${pc10.dim(`[${p4.tier_label || p4.tier}]`)}`,
+                `     coverage ${rate(p4.citation_coverage)} \xB7 share ${rate(p4.citation_share)} \xB7 ${count(p4.cited_run_count)} cited answers \xB7 ${count(p4.cited_total)} citations`,
+                ...(p4.top_prompts ?? []).map(
+                  (tp) => `     ${pc10.dim(`\u21B3 ${truncate(tp.prompt_text, 80)} (${count(tp.cited_run_count)} cited answers)`)}`
+                )
+              ].join("\n")
+            ) : ["  No cited pages in this window."]
+          ]
+        });
+        emitNotes(format, data.notes);
+      } catch (err) {
+        error(formatApiError(err));
+        process.exit(1);
+      }
+    }
+  );
+  addPagingOptions(
+    addWindowOptions(
+      analytics.command("prompts").description(
+        "Per-prompt performance over the window \u2014 sort ascending by mention_rate to find the prompts where you are invisible. Drill into one with 'senso analytics prompt <promptId>'."
+      )
+    ).option("--search <query>", "Filter prompts by question text").option(
+      "--sort <field>",
+      "Sort by: mention_rate | share_of_voice | citations | answered | text (default: mention_rate)"
+    ).option("--order <dir>", "Sort direction: asc | desc (default: desc)"),
+    50
+  ).action(
+    async (cmdOpts) => {
+      const opts = program2.opts();
+      const format = opts.output || "plain";
+      try {
+        const data = await apiRequest({
+          path: "/org/analytics/prompts",
+          params: {
+            ...windowParams(cmdOpts),
+            search: cmdOpts.search,
+            sort: cmdOpts.sort,
+            order: cmdOpts.order,
+            limit: cmdOpts.limit,
+            offset: cmdOpts.offset
+          },
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl
+        });
+        const prompts = data.prompts ?? [];
+        const context = [
+          "",
+          `  ${pc10.bold("Prompt performance")} ${pc10.dim(`${prompts.length} of ${count(data.total)} (offset ${count(data.offset)})`)}`,
+          windowLine(data.window),
+          qualityLine(data.data_quality),
+          `  ${pc10.dim(`Org-wide over the same window \u2014 mention rate ${rate(data.metrics.mention_rate)}, share of voice ${rate(data.metrics.share_of_voice)}`)}`
+        ];
+        emitContext(format, context);
+        output(format, {
+          json: data,
+          table: {
+            rows: prompts.map((p4) => ({
+              prompt_id: p4.prompt_id,
+              prompt: truncate(p4.prompt_text, 40),
+              answered: count(p4.answered_count),
+              mention_rate: rate(p4.mention_rate),
+              sov: rate(p4.share_of_voice),
+              latest_sov: rate(p4.latest?.share_of_voice ?? null),
+              avg_rank: rate(p4.avg_rank),
+              owned_cite_rate: rate(p4.primary_citation_rate)
+            })),
+            columns: [
+              "prompt_id",
+              "prompt",
+              "answered",
+              "mention_rate",
+              "sov",
+              "latest_sov",
+              "avg_rank",
+              "owned_cite_rate"
+            ]
+          },
+          plain: [
+            ...context,
+            "",
+            ...prompts.length ? prompts.map(
+              (p4) => [
+                `  ${pc10.bold(truncate(p4.prompt_text, 100))} ${pc10.dim(`[${p4.prompt_type}]`)}`,
+                `     mention rate ${rate(p4.mention_rate)} (${count(p4.mentioned_count)}/${count(p4.answered_count)}) \xB7 SoV ${rate(p4.share_of_voice)} (window) \xB7 ${rate(p4.latest?.share_of_voice ?? null)} (latest) \xB7 avg rank ${rate(p4.avg_rank)} \xB7 owned citation rate ${rate(p4.primary_citation_rate)}`,
+                `     ${pc10.dim(`ID: ${p4.prompt_id}${p4.tags?.length ? ` \xB7 tags: ${p4.tags.join(", ")}` : ""}`)}`
+              ].join("\n")
+            ) : ["  No prompts matched this filter."]
+          ]
+        });
+        emitNotes(format, data.notes);
+      } catch (err) {
+        error(formatApiError(err));
+        process.exit(1);
+      }
+    }
+  );
+  analytics.command("prompt <promptId>").description(
+    "One prompt end to end: its metric history over the window plus the latest full answer from every model \xD7 location."
+  ).option("--from <date>", "Window start, YYYY-MM-DD").option("--to <date>", "Window end, YYYY-MM-DD").option("--models <list>", "Comma-separated model filter").option("--location <list>", "Comma-separated location filter, case-sensitive").option("--no-include-answers", "Omit the latest answer bodies (included by default)").action(
+    async (promptId, cmdOpts) => {
+      const opts = program2.opts();
+      const format = opts.output || "plain";
+      try {
+        const data = await apiRequest({
+          path: `/org/analytics/prompts/${promptId}`,
+          params: {
+            from: cmdOpts.from,
+            to: cmdOpts.to,
+            models: cmdOpts.models,
+            location: cmdOpts.location,
+            include_answers: cmdOpts.includeAnswers === false ? "false" : void 0
+          },
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl
+        });
+        const series = data.series ?? [];
+        const answers = data.latest_answers ?? [];
+        const rows = metricRows(data.totals, data.metrics);
+        const context = [
+          "",
+          `  ${pc10.bold(data.prompt_text)} ${pc10.dim(`[${data.prompt_type}]`)}`,
+          `  ${pc10.dim(`ID: ${data.prompt_id}${data.tags?.length ? ` \xB7 tags: ${data.tags.join(", ")}` : ""}`)}`,
+          windowLine(data.window),
+          qualityLine(data.data_quality)
+        ];
+        emitContext(format, context);
+        output(format, {
+          json: data,
+          table: {
+            rows: series.map((p4) => ({
+              period: p4.period_start,
+              answered: count(p4.answered_count),
+              mentioned: count(p4.mentioned_count),
+              mention_rate: rate(p4.mention_rate),
+              sov: rate(p4.share_of_voice),
+              avg_rank: rate(p4.avg_rank)
+            })),
+            columns: [
+              "period",
+              "answered",
+              "mentioned",
+              "mention_rate",
+              "sov",
+              "avg_rank"
+            ]
+          },
+          plain: [
+            ...context,
+            "",
+            ...metricPlainLines(rows),
+            "",
+            `  ${pc10.bold("Series")}`,
+            ...series.length ? series.map(
+              (p4) => `  ${p4.period_start}  answered ${count(p4.answered_count)}  mentioned ${count(p4.mentioned_count)}  rate ${rate(p4.mention_rate)}  SoV ${rate(p4.share_of_voice)}  rank ${rate(p4.avg_rank)}`
+            ) : ["  No rollup days in this window."],
+            ...answers.length ? [
+              "",
+              `  ${pc10.bold("Latest answers")}`,
+              ...answers.map(
+                (a) => [
+                  `  ${pc10.bold(`${a.model} \xB7 ${a.location}`)} ${pc10.dim(a.run_at)}`,
+                  `     mentioned ${a.mentioned ? "yes" : "no"} \xB7 rank ${a.rank === null || a.rank === void 0 ? NO_VALUE : `#${a.rank}`} \xB7 sentiment ${a.sentiment ?? NO_VALUE} \xB7 ${count(a.citations?.length ?? 0)} citations`,
+                  `     ${pc10.dim(truncate(a.response_text, 200))}`
+                ].join("\n")
+              )
+            ] : []
+          ]
+        });
+        emitNotes(format, data.notes);
+      } catch (err) {
+        error(formatApiError(err));
+        process.exit(1);
+      }
+    }
+  );
+  addPagingOptions(
+    analytics.command("answers").description(
+      "The newest stored answer per prompt \xD7 model \xD7 location, with its citations and competitor mentions. This is a snapshot, not a window: --from/--to filter on when each answer was collected, so narrowing them hides combinations instead of returning older answers. Historical answer text is not retained."
+    ).option("--from <date>", "Answers collected on or after this date, YYYY-MM-DD (hides rows, never reveals older answers)").option("--to <date>", "Answers collected on or before this date, YYYY-MM-DD (hides rows, never reveals older answers)").option("--models <list>", "Comma-separated model filter").option("--location <list>", "Comma-separated location filter, case-sensitive").option("--prompt-type <type>", "Funnel stage: awareness | consideration | evaluation | decision").option("--tag <tag>", "Restrict to prompts carrying this tag").option("--mentioned <bool>", "Only answers that did (true) or did not (false) name your brand").option("--cited <bool>", "Only answers that did (true) or did not (false) cite anything").option("--citation-tier <tier>", "Only answers citing this tier: primary | tracked | secondary"),
+    25
+  ).action(
+    async (cmdOpts) => {
+      const opts = program2.opts();
+      const format = opts.output || "plain";
+      const mentioned = normalizeBool("mentioned", cmdOpts.mentioned);
+      const cited = normalizeBool("cited", cmdOpts.cited);
+      try {
+        const data = await apiRequest({
+          path: "/org/analytics/answers/latest",
+          params: {
+            from: cmdOpts.from,
+            to: cmdOpts.to,
+            models: cmdOpts.models,
+            location: cmdOpts.location,
+            prompt_type: cmdOpts.promptType,
+            tag: cmdOpts.tag,
+            mentioned,
+            cited,
+            citation_tier: cmdOpts.citationTier,
+            limit: cmdOpts.limit,
+            offset: cmdOpts.offset
+          },
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl
+        });
+        const answers = data.answers ?? [];
+        const collectedLine = cmdOpts.from || cmdOpts.to ? `  ${pc10.dim(`Collected ${cmdOpts.from ?? "any"} \u2192 ${cmdOpts.to ?? "any"} \u2014 combinations whose newest answer falls outside this window are hidden, not replaced by older answers.`)}` : "";
+        const context = [
+          "",
+          `  ${pc10.bold("Latest answers")} ${pc10.dim(`${answers.length} of ${count(data.total)} (offset ${count(data.offset)})`)}`,
+          `  ${pc10.dim("Snapshot of the newest answer per prompt \xD7 model \xD7 location \u2014 not a sample of any window.")}`,
+          ...collectedLine ? [collectedLine] : []
+        ];
+        emitContext(format, context);
+        output(format, {
+          json: data,
+          table: {
+            rows: answers.map((a) => ({
+              run_at: (a.run_at || "").slice(0, 10),
+              model: a.model,
+              location: a.location,
+              prompt: truncate(a.prompt_text, 40),
+              mentioned: a.mentioned ? "yes" : "no",
+              rank: a.rank === null || a.rank === void 0 ? NO_VALUE : `#${a.rank}`,
+              sentiment: a.sentiment ?? NO_VALUE,
+              citations: count(a.citations?.length ?? 0)
+            })),
+            columns: [
+              "run_at",
+              "model",
+              "location",
+              "prompt",
+              "mentioned",
+              "rank",
+              "sentiment",
+              "citations"
+            ]
+          },
+          plain: [
+            ...context,
+            "",
+            ...answers.length ? answers.map(
+              (a) => [
+                `  ${pc10.bold(truncate(a.prompt_text, 100))} ${pc10.dim(`[${a.prompt_type}]`)}`,
+                `     ${a.model} \xB7 ${a.location} \xB7 ${pc10.dim(a.run_at)}`,
+                `     mentioned ${a.mentioned ? "yes" : "no"} \xB7 rank ${a.rank === null || a.rank === void 0 ? NO_VALUE : `#${a.rank}`} \xB7 sentiment ${a.sentiment ?? NO_VALUE} \xB7 ${count(a.citations?.length ?? 0)} citations`,
+                `     ${pc10.dim(truncate(a.response_text, 200))}`,
+                `     ${pc10.dim(`ID: ${a.prompt_id}`)}`
+              ].join("\n")
+            ) : ["  No answers matched this filter."]
+          ]
+        });
+        emitNotes(format, data.notes);
+      } catch (err) {
+        error(formatApiError(err));
+        process.exit(1);
+      }
+    }
+  );
+  analytics.command("glossary").description(
+    "Canonical definition, denominator and gotcha for every metric these endpoints emit. Read this before quoting a number \u2014 a Citation Rate divides by cited answers (D), a Citation Share divides by citation instances (S), and they are not interchangeable."
+  ).action(async () => {
+    const opts = program2.opts();
+    const format = opts.output || "plain";
+    try {
+      const data = await apiRequest({
+        path: "/org/analytics/glossary",
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      const entries = data.entries ?? [];
+      emitContext(format, [
+        "",
+        `  ${pc10.bold("Metric glossary")} ${pc10.dim(`${entries.length} metrics \u2014 gotchas shown in plain and json output`)}`
+      ]);
+      output(format, {
+        json: data,
+        table: {
+          rows: entries.map((e) => ({
+            metric: e.metric,
+            denominator: e.denominator || NO_VALUE,
+            definition: e.definition
+          })),
+          columns: ["metric", "denominator", "definition"]
+        },
+        plain: [
+          "",
+          `  ${pc10.bold("Metric glossary")}`,
+          "",
+          ...entries.map(
+            (e) => [
+              `  ${pc10.bold(e.metric)}`,
+              `     ${e.definition}`,
+              ...e.denominator ? [`     ${pc10.dim(`Denominator: ${e.denominator}`)}`] : [],
+              ...e.gotcha ? [`     ${pc10.yellow("Gotcha:")} ${e.gotcha}`] : []
+            ].join("\n")
+          )
+        ]
+      });
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+  analytics.command("filters").description(
+    "The models, locations, prompt types, tags and tracked competitors that actually have data for this org, plus the span of rollup days available \u2014 so you never guess a model spelling or query an empty window."
+  ).action(async () => {
+    const opts = program2.opts();
+    const format = opts.output || "plain";
+    try {
+      const data = await apiRequest({
+        path: "/org/analytics/filters",
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl
+      });
+      const models = (data.models ?? []).map((m) => m.display_name || m.id);
+      const competitors = (data.tracked_competitors ?? []).map(
+        (c) => c.display_name || c.id
+      );
+      const range = data.date_range;
+      const rangeText = range?.earliest_day && range?.latest_day ? `${range.earliest_day} \u2192 ${range.latest_day}` : "no rollup days yet";
+      const list = (values) => values.length ? values.join(", ") : NO_VALUE;
+      emitContext(format, ["", `  ${pc10.bold("Available filters")}`]);
+      output(format, {
+        json: data,
+        table: {
+          rows: [
+            { filter: "--models", values: list(models) },
+            { filter: "--location", values: list(data.locations ?? []) },
+            { filter: "--prompt-type", values: list(data.prompt_types ?? []) },
+            { filter: "--tag", values: list(data.tags ?? []) },
+            { filter: "tracked competitors", values: list(competitors) },
+            { filter: "date range", values: rangeText }
+          ],
+          columns: ["filter", "values"]
+        },
+        plain: [
+          "",
+          `  ${pc10.bold("Available filters")}`,
+          "",
+          `  ${pc10.bold("--models")}        ${list(models)}`,
+          `  ${pc10.bold("--location")}      ${list(data.locations ?? [])}`,
+          `  ${pc10.bold("--prompt-type")}   ${list(data.prompt_types ?? [])}`,
+          `  ${pc10.bold("--tag")}           ${list(data.tags ?? [])}`,
+          "",
+          `  ${pc10.bold("Tracked competitors")}  ${list(competitors)}`,
+          `  ${pc10.bold("Date range")}           ${rangeText}`
+        ]
+      });
+      emitNotes(format, data.notes);
+    } catch (err) {
+      error(formatApiError(err));
+      process.exit(1);
+    }
+  });
+}
+
 // src/commands/industries.ts
+function handlePartnerError(err) {
+  if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+    error(
+      "This request was rejected by the Senso API's partner authentication."
+    );
+    info(
+      "`senso industries` reads partner-scoped endpoints (/partner/*) and needs a PARTNER API key. The organization key stored by `senso login` cannot access them \u2014 logging in again will not help."
+    );
+    info(
+      "If you have a partner key, pass it per-command with `--api-key <partner-key>` or export SENSO_API_KEY."
+    );
+    info(
+      "For metrics about your own organization, use `senso analytics` \u2014 e.g. `senso analytics summary`, `senso analytics domains`, `senso analytics glossary`."
+    );
+    process.exit(1);
+  }
+  error(formatApiError(err));
+  process.exit(1);
+}
 var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function isUuid(value) {
   return UUID_RE.test(value.trim());
@@ -3384,7 +4204,7 @@ async function resolveIndustryId(industry, opts) {
   return match.industry_id;
 }
 function registerIndustriesCommands(program2) {
-  const industries = program2.command("industries").description('Explore industry-level competitive intelligence across a partner network \u2014 brand share-of-voice, domain citations, and per-prompt metrics. The <industry> argument accepts either a UUID or a name (e.g. "Automotive").');
+  const industries = program2.command("industries").description('Explore industry-level competitive intelligence across a partner network \u2014 brand share-of-voice, domain citations, and per-prompt metrics. The <industry> argument accepts either a UUID or a name (e.g. "Automotive"). REQUIRES A PARTNER API KEY: these commands read /partner/* endpoints, which reject the organization key stored by `senso login`. For metrics about your own organization, use `senso analytics`.');
   industries.command("list").description("List industries visible to the partner. Use --search to filter by name.").option("--search <q>", "Filter industries by name").action(async (cmdOpts) => {
     const opts = program2.opts();
     try {
@@ -3396,8 +4216,7 @@ function registerIndustriesCommands(program2) {
       });
       console.log(JSON.stringify(data, null, 2));
     } catch (err) {
-      error(formatApiError(err));
-      process.exit(1);
+      handlePartnerError(err);
     }
   });
   industries.command("summary <industry>").description("One-call, slide-ready overview of an industry: brand counts, share-of-voice, and citation totals over a time window.").option("--from <date>", "Start date (YYYY-MM-DD)").option("--to <date>", "End date (YYYY-MM-DD)").option("--location <code>", "2-letter location code (e.g. US)").option("--models <list>", "Comma-separated model filter").action(async (industry, cmdOpts) => {
@@ -3412,8 +4231,7 @@ function registerIndustriesCommands(program2) {
       });
       console.log(JSON.stringify(data, null, 2));
     } catch (err) {
-      error(formatApiError(err));
-      process.exit(1);
+      handlePartnerError(err);
     }
   });
   industries.command("brand <industry> <brandName>").description("Everything about one brand within an industry, merged across surface-form spellings. Returns mentioned=false when the brand is never named.").option("--from <date>", "Start date (YYYY-MM-DD)").option("--to <date>", "End date (YYYY-MM-DD)").option("--location <code>", "2-letter location code (e.g. US)").option("--models <list>", "Comma-separated model filter").action(async (industry, brandName, cmdOpts) => {
@@ -3428,8 +4246,7 @@ function registerIndustriesCommands(program2) {
       });
       console.log(JSON.stringify(data, null, 2));
     } catch (err) {
-      error(formatApiError(err));
-      process.exit(1);
+      handlePartnerError(err);
     }
   });
   industries.command("domain <industry> <domainOrUrl>").description("Direct domain/URL citation lookup within an industry. Returns cited=false when the domain is never cited.").option("--from <date>", "Start date (YYYY-MM-DD)").option("--to <date>", "End date (YYYY-MM-DD)").option("--location <code>", "2-letter location code (e.g. US)").option("--models <list>", "Comma-separated model filter").action(async (industry, domainOrUrl, cmdOpts) => {
@@ -3444,8 +4261,7 @@ function registerIndustriesCommands(program2) {
       });
       console.log(JSON.stringify(data, null, 2));
     } catch (err) {
-      error(formatApiError(err));
-      process.exit(1);
+      handlePartnerError(err);
     }
   });
   industries.command("prompt-metrics <industry>").description("Pure-industry per-prompt metrics (no single-org overlay) \u2014 how each tracked prompt performs across the industry.").option("--from <date>", "Start date (YYYY-MM-DD)").option("--to <date>", "End date (YYYY-MM-DD)").option("--location <code>", "2-letter location code (e.g. US)").option("--models <list>", "Comma-separated model filter").option("--limit <n>", "Maximum prompts to return").option("--offset <n>", "Number of prompts to skip (for pagination)").action(async (industry, cmdOpts) => {
@@ -3460,8 +4276,7 @@ function registerIndustriesCommands(program2) {
       });
       console.log(JSON.stringify(data, null, 2));
     } catch (err) {
-      error(formatApiError(err));
-      process.exit(1);
+      handlePartnerError(err);
     }
   });
   industries.command("glossary").description("Canonical metric glossary \u2014 the citable definition of every competitive-intelligence metric returned by these endpoints.").action(async () => {
@@ -3474,20 +4289,19 @@ function registerIndustriesCommands(program2) {
       });
       console.log(JSON.stringify(data, null, 2));
     } catch (err) {
-      error(formatApiError(err));
-      process.exit(1);
+      handlePartnerError(err);
     }
   });
 }
 
 // src/commands/update.ts
 import semver2 from "semver";
-import pc10 from "picocolors";
+import pc11 from "picocolors";
 import { execSync } from "child_process";
 var NPM_PACKAGE2 = "@senso-ai/cli";
 function registerUpdateCommand(program2) {
   program2.command("update").description("Update CLI to the latest version").action(async () => {
-    info(`Current version: ${pc10.bold(version)}`);
+    info(`Current version: ${pc11.bold(version)}`);
     info("Checking npm for updates...");
     const latest = await getLatestVersion();
     if (!latest) {
@@ -3498,7 +4312,7 @@ function registerUpdateCommand(program2) {
       success(`Already on the latest version (${version}).`);
       return;
     }
-    info(`New version available: ${pc10.bold(latest)}`);
+    info(`New version available: ${pc11.bold(latest)}`);
     info("Updating...");
     try {
       execSync(`npm install -g ${NPM_PACKAGE2}@latest`, {
@@ -3508,7 +4322,7 @@ function registerUpdateCommand(program2) {
     } catch {
       error("Update failed. Please reinstall manually:");
       console.log(
-        `  ${pc10.cyan(`npm install -g ${NPM_PACKAGE2}`)}`
+        `  ${pc11.cyan(`npm install -g ${NPM_PACKAGE2}`)}`
       );
       process.exit(1);
     }
@@ -3550,6 +4364,7 @@ registerRolesCommands(program);
 registerCompetitorsCommands(program);
 registerTrackedSourcesCommands(program);
 registerGeneratedContentCommands(program);
+registerAnalyticsCommands(program);
 registerIndustriesCommands(program);
 registerUpdateCommand(program);
 async function main() {

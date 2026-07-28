@@ -214,6 +214,63 @@ senso prompts delete <promptId>      Delete a prompt
 
 Options: `prompts list` supports `--limit`, `--offset`, `--search`, `--sort`.
 
+### Analytics (GEO)
+
+Read-only metrics for your own organization: how often the AI models name your brand, your share of every brand mention the models made, and which domains and pages get cited. Works with the organization API key from `senso login`.
+
+```
+senso analytics summary              Headline metrics + previous window + deltas
+senso analytics mentions             Visibility time series (day or week buckets)
+senso analytics citations            Citation rates and shares, with the series
+senso analytics domains              Cited domains, ranked (coverage + share)
+senso analytics pages                Cited pages, with the prompts driving them
+senso analytics prompts              Per-prompt performance table
+senso analytics prompt <promptId>    One prompt: history + latest full answers
+senso analytics answers              Latest answer per prompt × model × location
+senso analytics glossary             Canonical definition of every metric
+senso analytics filters              Filter values that have data for this org
+```
+
+Options:
+
+| Command | Options |
+|---------|---------|
+| all except `prompt <promptId>`, `glossary`, `filters` | `--from`, `--to`, `--models`, `--location`, `--prompt-type`, `--tag` |
+| `mentions`, `citations` | `--group-by <day\|week>` |
+| `domains` | `--tier`, `--domain-contains`, `--sort <citations\|coverage>`, `--limit`, `--offset` |
+| `pages` | `--tier`, `--domain`, `--domain-contains`, `--url-contains`, `--sort <citations\|coverage>`, `--limit`, `--offset` |
+| `prompts` | `--search`, `--sort <mention_rate\|share_of_voice\|citations\|answered\|text>`, `--order <asc\|desc>`, `--limit`, `--offset` |
+| `prompt <promptId>` | `--from`, `--to`, `--models`, `--location`, `--no-include-answers` |
+| `answers` | `--from`, `--to`, `--models`, `--location`, `--prompt-type`, `--tag`, `--mentioned <bool>`, `--cited <bool>`, `--citation-tier <primary\|tracked\|secondary>`, `--limit`, `--offset` |
+
+`--from`/`--to` are `YYYY-MM-DD` and default to the 30 days ending at the most recent day that has data for your model/location filter (max window: 365 days). `--models` and `--location` are comma-separated; locations are case-sensitive exact codes (`US`, `US/California`) — the API also accepts `locations` as an alias for the `location` query param. Run `senso analytics filters` to see the values that actually have data.
+
+`analytics answers` is a snapshot, not a window. It always returns the newest stored answer per prompt × model × location, and `--from`/`--to` filter on `run_at` — when that answer was collected. Narrowing the window therefore **hides** prompt × model × location combinations whose latest answer falls outside it; it does not return older answers in their place. Use `analytics mentions` or `analytics citations` for history.
+
+Reading the numbers:
+
+- **Share of Voice** is your mention instances ÷ `brand_mention_total` — mentions of *every* brand the models named, not just your tracked competitors. It matches the Share of Voice in the Senso app. `tracked_mention_total` is still returned as a raw count in `totals`, but it is not the denominator.
+- **Citation Rate** and **Citation Coverage** divide by `D` — answers with at least one citation. **Citation Share** divides by `S` — total citation instances. They are different metrics on different denominators; every table shows the numerator and denominator next to the percentage so you can check.
+- The three tier **rates** are independent and can sum past 100% (one answer can cite an owned page and an external page). The three tier **shares** partition and sum to exactly 100%.
+- A metric renders as `—` when its denominator was zero. That is "not measured", not 0%.
+- Every response carries `notes[]` — caveats about window truncation, null denominators and tracking-set dependence. They are printed under a **Notes** heading in `plain` and `table` output, and are part of the payload in `--output json`.
+- `senso analytics glossary` is the canonical definition, denominator and gotcha for every metric.
+
+### Industry Intelligence (partner key required)
+
+```
+senso industries list                List industries visible to the partner
+senso industries summary <industry>  Industry overview over a time window
+senso industries brand <industry> <brandName>    One brand within an industry
+senso industries domain <industry> <domainOrUrl> Domain/URL citation lookup
+senso industries prompt-metrics <industry>       Per-prompt industry metrics
+senso industries glossary            Competitive-intelligence metric glossary
+```
+
+These commands read partner-scoped endpoints and **require a partner API key**. The organization key stored by `senso login` is rejected with a 401/403 — pass a partner key with `--api-key <key>` or `SENSO_API_KEY`. For metrics about your own organization, use `senso analytics` instead.
+
+Options: all except `list` and `glossary` support `--from`, `--to`, `--location`, `--models`; `prompt-metrics` also supports `--limit`, `--offset`; `list` supports `--search`. The `<industry>` argument accepts a UUID or a name (e.g. `"Automotive"`).
+
 ### Organization
 
 ```
@@ -247,15 +304,6 @@ senso run-config set-models          Set AI models (--data)
 senso run-config schedule            Get run schedule (days of week)
 senso run-config set-schedule        Set run schedule (--data)
 ```
-
-### Notifications
-
-```
-senso notifications list             List notifications
-senso notifications read <id>        Mark notification as read
-```
-
-Options: `notifications list` supports `--limit`, `--offset`, `--unread-only`.
 
 ### CLI Management
 
@@ -386,12 +434,13 @@ src/
 │   ├── brand-kit.ts       # get, set
 │   ├── content-types.ts   # CRUD
 │   ├── prompts.ts         # CRUD
+│   ├── analytics.ts       # org GEO analytics (summary, citations, prompts, …)
+│   ├── industries.ts      # partner-scoped competitive intelligence
 │   ├── org.ts             # get, update
 │   ├── users.ts           # CRUD + set-current
 │   ├── api-keys.ts        # CRUD + revoke
 │   ├── members.ts         # list
 │   ├── run-config.ts      # models, schedule
-│   ├── notifications.ts   # list, read
 │   └── update.ts          # self-update
 ├── lib/
 │   ├── api-client.ts      # HTTP wrapper (native fetch, X-API-Key auth)
