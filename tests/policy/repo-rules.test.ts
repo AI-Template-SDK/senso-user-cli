@@ -278,8 +278,11 @@ describe("CI and the Makefile cannot mean different things", () => {
   const ci = read(".github/workflows/testing.yml");
 
   it("has every target CI invokes", () => {
-    const invoked = [...ci.matchAll(/run: make ([a-z-]+)/g)].map((m) => m[1]!);
-    const defined = [...makefile.matchAll(/^([a-z-]+):/gm)].map((m) => m[1]!);
+    // The character class includes digits on purpose: `[a-z-]+` stopped at the
+    // digit in `e2e` and captured "e" on both sides, so this check passed by
+    // coincidence rather than by matching anything.
+    const invoked = [...ci.matchAll(/run: make ([a-z0-9-]+)/g)].map((m) => m[1]!);
+    const defined = [...makefile.matchAll(/^([a-z0-9-]+):/gm)].map((m) => m[1]!);
 
     const missing = [...new Set(invoked)].filter((t) => !defined.includes(t));
     expect(
@@ -291,7 +294,7 @@ describe("CI and the Makefile cannot mean different things", () => {
   it("documents every target with a help line", () => {
     // `make help` is the discovery mechanism; a target without `## ` is
     // invisible to anyone who has not read the file.
-    const undocumented = [...makefile.matchAll(/^([a-z-]+):(?!=)([^\n]*)$/gm)]
+    const undocumented = [...makefile.matchAll(/^([a-z0-9-]+):(?!=)([^\n]*)$/gm)]
       .filter(([, , rest]) => !rest?.includes("##"))
       .map(([, name]) => name!)
       .filter((name) => name !== "all");

@@ -264,10 +264,13 @@ describe("questions create, on the wire", () => {
     await expect(seen?.json()).resolves.toEqual(body);
   });
 
-  // BUG: the description constrains `type` to decision | consideration |
-  // awareness | evaluation, but the CLI parses --data as an opaque object and
-  // never checks it, so an invalid funnel stage is a round trip to the API
-  // rather than an exit 2. Current behavior asserted.
+  // DEFERRED, not an oversight: the description constrains `type` to decision |
+  // consideration | awareness | evaluation, but `--data` is an opaque JSON body
+  // that is forwarded verbatim. Validating a field inside it would mean the CLI
+  // holding a schema for every endpoint's body and going stale against the API
+  // whenever one changes — a different and larger question from validating a
+  // flag, which is checked (see `content verification --status`). Until that is
+  // decided, an invalid funnel stage costs a round trip and the API's own error.
   it("forwards an unrecognized type inside --data rather than rejecting it", async () => {
     let seen: Request | undefined;
     server.use(

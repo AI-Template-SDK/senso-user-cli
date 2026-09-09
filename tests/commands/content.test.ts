@@ -413,7 +413,35 @@ describe("content verification, on the wire", () => {
     expect(params.get("substatus")).toBe("pending_draft");
   });
 
-  it("forwards an unrecognized --status rather than validating it locally", async () => {
+  // --status and --substatus each document a closed set, so a typo is knowably
+  // wrong before any request is made. No handler is registered: a request here
+  // would be unmocked and fail the test, which is the assertion.
+  it("exits 2 on an unrecognized --status, naming the valid values", async () => {
+    const res = await runCli(["content", "verification", "--status", "nonsense"]);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stdout).toBe("");
+    expect(res.stderr).toContain('Invalid --status: "nonsense"');
+    expect(res.stderr).toContain("all, draft, review, rejected, published");
+  });
+
+  it("exits 2 on an unrecognized --substatus", async () => {
+    const res = await runCli([
+      "content",
+      "verification",
+      "--status",
+      "published",
+      "--substatus",
+      "nonsense",
+    ]);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stdout).toBe("");
+    expect(res.stderr).toContain('Invalid --substatus: "nonsense"');
+    expect(res.stderr).toContain("pending_draft");
+  });
+
+  it("accepts a documented --status regardless of case, forwarding the canonical form", async () => {
     let seen: Request | undefined;
     server.use(
       http.get(apiUrl("/org/content/verification"), ({ request }) => {
@@ -422,14 +450,10 @@ describe("content verification, on the wire", () => {
       }),
     );
 
-    const res = await runCli(["content", "verification", "--status", "nonsense"]);
+    const res = await runCli(["content", "verification", "--status", "Draft"]);
 
-    // BUG: --status documents a closed set (all, draft, review,
-    // rejected, published) but is not declared as a choice, so a typo costs a
-    // round trip and surfaces as an API error instead of exit 2. Asserted as it
-    // behaves today.
     expect(res.exitCode).toBe(0);
-    expect(new URL(seen?.url ?? "").searchParams.get("status")).toBe("nonsense");
+    expect(new URL(seen?.url ?? "").searchParams.get("status")).toBe("draft");
   });
 });
 

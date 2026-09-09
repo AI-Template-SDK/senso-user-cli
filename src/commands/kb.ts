@@ -5,12 +5,14 @@ import { Command } from "commander";
 import {
   apiRequest,
   handleUploadError,
+  isBatchRejection,
   printUploadSummary,
   uploadStatusToReason,
   type UploadResponse,
 } from "../lib/api-client.js";
 import { parseEnumFlag } from "../lib/enum-arg.js";
 import { CliError, EXIT } from "../lib/errors.js";
+import { assertFilesExist, assertFilesNotEmpty } from "../lib/file-args.js";
 import { parseJsonFlag } from "../lib/json-arg.js";
 import { emit, emitConfirmation } from "../lib/output.js";
 import { runAction } from "../lib/run-action.js";
@@ -207,12 +209,16 @@ export function registerKBCommands(program: Command): void {
 
   kb.command("get-content <id>")
     .description("Get the content detail for a KB content node.")
-    .option("--version <version>", "Specific version to retrieve")
+    // `--rev`, not the obvious `--version`: the root command owns `-v,
+    // --version` for the CLI's own version and Commander answers it wherever it
+    // appears, so a `--version` here was intercepted before the action ever ran.
+    // The API query parameter is still `version`; only the flag is renamed.
+    .option("--rev <n>", "Retrieve a specific stored version of this content, by version number")
     .action(
-      runAction(program, async (ctx, id: string, cmdOpts: { version?: string }) => {
+      runAction(program, async (ctx, id: string, cmdOpts: { rev?: string }) => {
         const data = await apiRequest({
           path: `/org/kb/nodes/${id}/content`,
-          params: { version: cmdOpts.version },
+          params: { version: cmdOpts.rev },
           apiKey: ctx.apiKey,
           baseUrl: ctx.baseUrl,
         });
@@ -222,12 +228,15 @@ export function registerKBCommands(program: Command): void {
 
   kb.command("download-url <id>")
     .description("Get a presigned S3 download URL for a KB file node.")
-    .option("--version <version>", "Specific version to download")
+    // `--rev` for the same reason as `kb get-content` above: the root's `-v,
+    // --version` shadows a `--version` on any subcommand. The wire parameter is
+    // unchanged.
+    .option("--rev <n>", "Download a specific stored version of this file, by version number")
     .action(
-      runAction(program, async (ctx, id: string, cmdOpts: { version?: string }) => {
+      runAction(program, async (ctx, id: string, cmdOpts: { rev?: string }) => {
         const data = await apiRequest({
           path: `/org/kb/nodes/${id}/download-url`,
-          params: { version: cmdOpts.version },
+          params: { version: cmdOpts.rev },
           apiKey: ctx.apiKey,
           baseUrl: ctx.baseUrl,
         });
@@ -405,7 +414,15 @@ export function registerKBCommands(program: Command): void {
           });
         }
 
+        // The same two pre-checks `ingest upload` makes, from the same place:
+        // a bad path or an unparseable empty file is the caller's mistake, so it
+        // costs a usage error naming the file rather than an ENOENT at exit 1 or
+        // an upload the ingestion worker will silently fail to process.
+        await assertFilesExist(files);
+
         const fileData = await Promise.all(files.map(getFileMetadata));
+        assertFilesNotEmpty(fileData.map((f) => f.meta));
+
         const body: Record<string, unknown> = { files: fileData.map((f) => f.meta) };
         if (cmdOpts.folderId) body.kb_folder_node_id = cmdOpts.folderId;
 
@@ -419,11 +436,16 @@ export function registerKBCommands(program: Command): void {
             baseUrl: ctx.baseUrl,
           });
         } catch (err) {
-          // A rejected upload carries a per-file reason for each file in the
-          // error body, and handleUploadError is the only thing that unpacks
-          // them. Print those, then rethrow so runAction owns the exit code.
-          handleUploadError(err);
-          throw new CliError("Upload failed.", EXIT.ERROR, { cause: err });
+          // Narrowed to the batch-rejection shape, as in `ingest upload`: only
+          // that body carries the per-file reasons handleUploadError unpacks.
+          // Everything else is rethrown untouched so runAction gives it its real
+          // exit code (401 → 3, 404 → 4, unreachable → 5) instead of flattening
+          // every upload failure to 1, which is what a script branches on.
+          if (isBatchRejection(err)) {
+            handleUploadError(err);
+            throw new CliError("Upload failed.", EXIT.ERROR, { cause: err });
+          }
+          throw err;
         }
 
         // `?? []` despite `results` being declared required: apiRequest casts,

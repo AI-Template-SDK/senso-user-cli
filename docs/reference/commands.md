@@ -1521,7 +1521,7 @@ senso kb get-content [options] <id>
 
 | Option | Description | Default |
 |---|---|---|
-| `--version <version>` | Specific version to retrieve |  |
+| `--rev <n>` | Retrieve a specific stored version of this content, by version number |  |
 
 ### senso kb download-url
 
@@ -1533,7 +1533,7 @@ senso kb download-url [options] <id>
 
 | Option | Description | Default |
 |---|---|---|
-| `--version <version>` | Specific version to download |  |
+| `--rev <n>` | Download a specific stored version of this file, by version number |  |
 
 ### senso kb create-folder
 

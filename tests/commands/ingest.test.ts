@@ -903,15 +903,16 @@ describe("ingest reprocess, on the wire", () => {
     expect(res.stderr).toContain("Not found");
   });
 
-  it("exits 1 with the file's own message when the path does not exist", async () => {
+  // The same pre-check `ingest upload` makes: one mistake, one exit code. No
+  // handler is registered, so a request here would fail the test — the path is
+  // checked before anything is sent.
+  it("exits 2 naming the file when the path does not exist", async () => {
     const res = await runCli(["ingest", "reprocess", "n-1", join(workDir, "absent.txt")]);
 
-    // BUG: `ingest upload` checks the paths first and exits 2 for a missing
-    // file; `reprocess` lets readFile throw, which lands on the generic runtime
-    // path and exits 1. Same mistake, two different exit codes.
-    expect(res.exitCode).toBe(1);
+    expect(res.exitCode).toBe(2);
     expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("ENOENT");
+    expect(res.stderr).toContain("File not found");
+    expect(res.stderr).toContain("absent.txt");
   });
 
   it("prints the item unmodified under --output json", async () => {

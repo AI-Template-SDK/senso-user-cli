@@ -280,6 +280,24 @@ export function printUploadSummary(
   }
 }
 
+/**
+ * A whole-batch rejection, as opposed to any other API failure.
+ *
+ * The upload endpoint refuses a batch by returning the same per-file `results`
+ * array it returns on success, with a reason on each entry. That is the only
+ * failure shape carrying detail worth unpacking; everything else is an ordinary
+ * API or transport error and must be rethrown so the caller's error mapping can
+ * give it its real exit code, rather than being flattened to a generic failure.
+ */
+export function isBatchRejection(err: unknown): boolean {
+  return (
+    err instanceof ApiError &&
+    typeof err.body === "object" &&
+    err.body !== null &&
+    "results" in err.body
+  );
+}
+
 export function handleUploadError(err: unknown): void {
   if (
     err instanceof ApiError &&

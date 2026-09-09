@@ -1,19 +1,20 @@
 import { createHash } from "node:crypto";
-import { access, readFile, stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import { Command } from "commander";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import {
-  ApiError,
   apiRequest,
   handleUploadError,
+  isBatchRejection,
   printUploadSummary,
   uploadStatusToReason,
   type UploadResponse,
   type UploadResultItem,
 } from "../lib/api-client.js";
 import { CliError, EXIT } from "../lib/errors.js";
+import { assertFilesExist, assertFilesNotEmpty } from "../lib/file-args.js";
 import { pickFolder } from "../lib/folder-picker.js";
 import { emit } from "../lib/output.js";
 import { spinner } from "../lib/progress.js";
@@ -77,23 +78,6 @@ async function uploadToS3(url: string, buffer: Buffer, contentType: string): Pro
   }
 }
 
-/**
- * A whole-batch rejection, as opposed to any other API failure.
- *
- * The upload endpoint refuses a batch by returning the same per-file `results`
- * array it returns on success, with a reason on each entry. That is the only
- * failure shape carrying detail worth unpacking; everything else is an ordinary
- * API or transport error and is handled as one.
- */
-function isBatchRejection(err: unknown): boolean {
-  return (
-    err instanceof ApiError &&
-    typeof err.body === "object" &&
-    err.body !== null &&
-    "results" in err.body
-  );
-}
-
 export function registerIngestCommands(program: Command): void {
   const ingest = program
     .command("ingest")
@@ -116,18 +100,10 @@ export function registerIngestCommands(program: Command): void {
           });
         }
 
-        // Validate all files exist before doing anything else
-        for (const file of files) {
-          try {
-            await access(resolve(file));
-          } catch (err) {
-            throw new CliError(
-              `File not found: "${file}". Please check the file name and try again.`,
-              EXIT.USAGE,
-              { code: "usage", cause: err },
-            );
-          }
-        }
+        // Validate all files exist before doing anything else — shared with
+        // `kb upload` and `ingest reprocess` so the three cannot disagree about
+        // what a bad path costs.
+        await assertFilesExist(files);
 
         // 0. Resolve destination folder
         let kbFolderNodeId: string | undefined;
@@ -159,16 +135,7 @@ export function registerIngestCommands(program: Command): void {
         // 1. Read files and compute metadata
         const fileData = await Promise.all(files.map(getFileMetadata));
 
-        const emptyFiles = fileData.filter((f) => f.meta.file_size_bytes < 1);
-        if (emptyFiles.length > 0) {
-          // One message rather than a line per file: runAction reports what is
-          // thrown, so listing the names here keeps the whole failure in it.
-          throw new CliError(
-            `Empty file(s): ${emptyFiles.map((f) => f.meta.filename).join(", ")}.`,
-            EXIT.USAGE,
-            { code: "usage", hint: "Please select valid files with content." },
-          );
-        }
+        assertFilesNotEmpty(fileData.map((f) => f.meta));
 
         // 2. Request presigned upload URLs
         const body: Record<string, unknown> = { files: fileData.map((f) => f.meta) };
@@ -281,6 +248,10 @@ export function registerIngestCommands(program: Command): void {
     )
     .action(
       runAction(program, async (ctx, nodeId: string, file: string) => {
+        // Checked before the request rather than left to readFile: a mistyped
+        // path is the user's mistake, so it exits 2 naming the file here, the
+        // same as `ingest upload`, instead of surfacing as a runtime ENOENT.
+        await assertFilesExist([file]);
         const { meta, buffer } = await getFileMetadata(file);
 
         const item = await apiRequest<UploadResultItem>({

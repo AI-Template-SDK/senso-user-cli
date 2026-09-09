@@ -1,12 +1,21 @@
 import { Command } from "commander";
 import pc from "picocolors";
 import { apiRequest } from "../lib/api-client.js";
+import { parseEnumFlag } from "../lib/enum-arg.js";
 import { CliError, EXIT } from "../lib/errors.js";
 import { parseJsonFlag } from "../lib/json-arg.js";
 import { emit, emitConfirmation } from "../lib/output.js";
 import { runAction } from "../lib/run-action.js";
 import { buildSetTagsBody, buildAttachTagBody } from "../lib/tag-args.js";
 import * as log from "../utils/logger.js";
+
+/**
+ * The editorial statuses `content verification` filters by, and the one
+ * substatus that narrows `published` further. Declared here so the help text
+ * and the validation cannot say different things.
+ */
+const VERIFICATION_STATUSES = ["all", "draft", "review", "rejected", "published"] as const;
+const VERIFICATION_SUBSTATUSES = ["pending_draft"] as const;
 
 /**
  * The edit-telemetry batch, checked before it is sent.
@@ -161,10 +170,10 @@ export function registerContentCommands(program: Command): void {
     .option("--limit <n>", "Maximum items to return")
     .option("--offset <n>", "Number of items to skip (for pagination)")
     .option("--search <query>", "Filter by title")
-    .option("--status <status>", "Filter by status: all, draft, review, rejected, published")
+    .option("--status <status>", `Filter by status: ${VERIFICATION_STATUSES.join(", ")}`)
     .option(
       "--substatus <substatus>",
-      "Narrow further (only valid with --status published): pending_draft",
+      `Narrow further (only valid with --status published): ${VERIFICATION_SUBSTATUSES.join(", ")}`,
     )
     .action(
       runAction(program, async (ctx, cmdOpts: Record<string, string>) => {
@@ -174,8 +183,12 @@ export function registerContentCommands(program: Command): void {
             limit: cmdOpts.limit,
             offset: cmdOpts.offset,
             search: cmdOpts.search,
-            status: cmdOpts.status,
-            substatus: cmdOpts.substatus,
+            // Both flags document a closed set in their own help text, so a typo
+            // is knowably wrong here: checking costs nothing and fails at exit 2
+            // naming the valid values, instead of a round trip that comes back
+            // as an opaque server-side validation error.
+            status: parseEnumFlag("--status", cmdOpts.status, VERIFICATION_STATUSES),
+            substatus: parseEnumFlag("--substatus", cmdOpts.substatus, VERIFICATION_SUBSTATUSES),
           },
           apiKey: ctx.apiKey,
           baseUrl: ctx.baseUrl,

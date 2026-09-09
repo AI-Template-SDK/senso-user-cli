@@ -44,6 +44,35 @@ mattered, and what you need to do differently.
 
 ### Fixed
 
+- **`senso kb get-content --version` and `senso kb download-url --version` were
+  unreachable, and are now `--rev`.** The root command declares `-v, --version`
+  for the CLI's own version and Commander answers it wherever it appears, so
+  `senso kb get-content <id> --version 3` printed the CLI version and exited 0
+  without making a request. Both flags were documented and neither ever worked.
+  Pass `--rev <n>` instead; the request is unchanged (still `?version=<n>`).
+  Renaming a documented flag would normally be breaking — this one is not, since
+  no invocation of it can ever have done what it said.
+
+- **`senso kb upload` flattened every failure to exit 1.** A rejected API key, a
+  missing destination folder and an unreachable API all arrived as 1, so a script
+  could not tell them apart. Only a whole-batch rejection is unpacked now (still
+  exit 1, with the per-file reasons); everything else keeps its own code — `3`
+  authentication, `4` not found, `5` network — as `senso ingest upload` already
+  did.
+
+- **`senso kb upload` accepted files `senso ingest upload` refuses.** A path that
+  does not exist was a raw `ENOENT` at exit 1, and a zero-byte file was uploaded
+  for an ingestion worker that cannot parse it. Both are now usage errors (exit 2) naming the file, before anything is sent.
+
+- **`senso ingest reprocess <node-id> <file>` exited 1 on a path that does not
+  exist,** where `senso ingest upload` exits 2. It now exits 2 and names the
+  file, so the same mistake has the same exit code in both commands.
+
+- **`senso content verification --status` and `--substatus` were not validated.**
+  Both document a closed set in their help text and forwarded anything, so a typo
+  cost a round trip and came back as a server-side validation error. They now
+  fail at exit 2 with the valid values named, like the other closed-set flags.
+
 - **`senso login` hung forever without a terminal.** It waited on a keypress
   that could never arrive, so it stalled CI and agent shells indefinitely. It now
   exits 2 immediately and names the two ways to authenticate that need no

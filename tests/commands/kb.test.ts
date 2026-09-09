@@ -423,23 +423,44 @@ describe("kb browsing, on the wire", () => {
     expect(new URL(seen!.url).search).toBe("");
   });
 
-  // BUG: `--version` is unreachable on any subcommand. The root command declares
-  // `-v, --version` for the CLI's own version, and Commander answers it wherever
-  // it appears — so `senso kb get-content n-doc --version 3` prints "0.12.0" and
-  // exits 0 without making a request. `kb download-url --version` has the same
-  // problem. Both flags are documented and neither can be used; the fix is to
-  // rename them (`--rev`, say) or to scope the root's version option. Asserting
-  // the CURRENT behavior. No handler is registered below, so a request would
-  // fail this test.
-  it("prints the CLI's own version instead of pinning get-content to one", async () => {
-    const res = await runCli(["kb", "get-content", "n-doc", "--version", "3"]);
+  // `--rev`, not `--version`: the root declares `-v, --version` for the CLI's
+  // own version and Commander answers it wherever it appears, so a `--version`
+  // here never reached the action. The wire parameter is still `version`.
+  it("sends --rev as the version query parameter on get-content", async () => {
+    let seen: Request | undefined;
+    server.use(
+      http.get(apiUrl("/org/kb/nodes/:nodeId/content"), ({ request }) => {
+        seen = request;
+        return HttpResponse.json({ kb_node_id: "n-doc", text: "# Onboarding" });
+      }),
+    );
+
+    const res = await runCli(["kb", "get-content", "n-doc", "--rev", "3"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.stdout).toMatch(/^\d+\.\d+\.\d+/);
+    expect(new URL(seen!.url).pathname).toBe("/api/v1/org/kb/nodes/n-doc/content");
+    expect(new URL(seen!.url).searchParams.get("version")).toBe("3");
   });
 
-  it("prints the CLI's own version instead of pinning download-url to one", async () => {
-    const res = await runCli(["kb", "download-url", "n-doc", "--version", "2"]);
+  it("sends --rev as the version query parameter on download-url", async () => {
+    let seen: Request | undefined;
+    server.use(
+      http.get(apiUrl("/org/kb/nodes/:nodeId/download-url"), ({ request }) => {
+        seen = request;
+        return HttpResponse.json({ url: S3_URL, expires_in: 900 });
+      }),
+    );
+
+    const res = await runCli(["kb", "download-url", "n-doc", "--rev", "2"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(new URL(seen!.url).searchParams.get("version")).toBe("2");
+  });
+
+  // The old spelling is gone, and Commander still answers it as the root's own
+  // version flag — so it must not be documented on these subcommands again.
+  it("still answers --version with the CLI's own version, making the rename necessary", async () => {
+    const res = await runCli(["kb", "get-content", "n-doc", "--version", "3"]);
 
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toMatch(/^\d+\.\d+\.\d+/);
@@ -973,35 +994,33 @@ describe("kb upload, where it differs from ingest upload", () => {
     expect(res.stderr).toContain("You passed 11");
   });
 
-  // BUG: `ingest upload` checks that every path exists first and exits 2 with
-  // the file name; `kb upload` lets readFile throw, so the same mistake is a
-  // generic runtime error and exit 1. Asserting the CURRENT behavior.
-  it("exits 1, not 2, when a file does not exist", async () => {
+  // The same pre-checks `ingest upload` makes: a path the caller got wrong is a
+  // usage error naming the file, not an ENOENT off the runtime path.
+  it("exits 2 naming the file when a path does not exist", async () => {
     const res = await runCli(["kb", "upload", join(workDir, "absent.txt")]);
 
-    expect(res.exitCode).toBe(1);
+    expect(res.exitCode).toBe(2);
     expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("ENOENT");
+    expect(res.stderr).toContain("File not found");
+    expect(res.stderr).toContain("absent.txt");
   });
 
-  // BUG: `ingest upload` refuses a zero-byte file with exit 2 before sending
-  // anything. `kb upload` has no such check, so it POSTs metadata for a file the
-  // ingestion worker cannot parse. Asserting the CURRENT behavior.
-  it("uploads an empty file rather than refusing it", async () => {
-    const { prepBodies } = serveUpload([accepted("empty.txt")]);
-
+  // No handler is registered: a request here would be unmocked and fail the
+  // test, which is the assertion — nothing is sent for a zero-byte file.
+  it("exits 2 and sends nothing for an empty file", async () => {
     const res = await runCli(["kb", "upload", tempFile("empty.txt", "")]);
 
-    expect(res.exitCode).toBe(0);
-    expect(prepBodies[0]).toMatchObject({ files: [{ file_size_bytes: 0 }] });
+    expect(res.exitCode).toBe(2);
+    expect(res.stdout).toBe("");
+    expect(res.stderr).toContain("Empty file(s)");
+    expect(res.stderr).toContain("empty.txt");
   });
 
-  // BUG: this is the costly one. `kb upload` funnels every failure of the
-  // metadata POST through handleUploadError and then throws EXIT.ERROR, so a
-  // rejected key (3), a missing folder (4) and a rate limit (5) all arrive as 1.
-  // `ingest upload` narrows to the batch-rejection shape and rethrows everything
-  // else, which is the behavior this should have. Asserting the CURRENT one.
-  it("flattens a rejected API key to exit 1 instead of 3", async () => {
+  // Every failure of the metadata POST used to be funneled through
+  // handleUploadError and rethrown as EXIT.ERROR, so a rejected key, a missing
+  // folder and a missing credential all reached a script as 1. Only the
+  // batch-rejection body is unpacked now; the rest keep their own exit code.
+  it("exits 3 on a rejected API key", async () => {
     server.use(
       http.post(apiUrl("/org/kb/upload"), () =>
         HttpResponse.json({ error: "invalid key" }, { status: 401 }),
@@ -1010,27 +1029,45 @@ describe("kb upload, where it differs from ingest upload", () => {
 
     const res = await runCli(["kb", "upload", tempFile("a.txt", "alpha")]);
 
-    expect(res.exitCode).toBe(1);
+    expect(res.exitCode).toBe(3);
     expect(res.stdout).toBe("");
-    // The message is still right; only the code a script branches on is lost.
     expect(res.stderr).toContain("Authentication failed");
   });
 
-  it("flattens a missing destination folder to exit 1 instead of 4", async () => {
+  it("exits 4 on a missing destination folder", async () => {
     server.use(http.post(apiUrl("/org/kb/upload"), () => new HttpResponse(null, { status: 404 })));
 
     const res = await runCli(["kb", "upload", tempFile("a.txt", "alpha"), "--folder-id", "n-gone"]);
 
-    expect(res.exitCode).toBe(1);
-    expect(res.stderr).toContain("Resource not found");
+    expect(res.exitCode).toBe(4);
+    expect(res.stderr).toContain("Not found");
   });
 
-  it("flattens a missing API key to exit 1 instead of 3", async () => {
+  it("exits 3 when there is no API key at all", async () => {
     const res = await runCli(["kb", "upload", tempFile("a.txt", "alpha")], { withKey: false });
+
+    expect(res.exitCode).toBe(3);
+    expect(res.stdout).toBe("");
+    expect(res.stderr).toContain("no API key found");
+  });
+
+  // The one failure shape that still reports per-file reasons and exits 1: the
+  // endpoint refused the whole batch and said why for each file.
+  it("still unpacks a whole-batch rejection and exits 1", async () => {
+    server.use(
+      http.post(apiUrl("/org/kb/upload"), () =>
+        HttpResponse.json(uploadResponse([rejected("a.txt", "quota_exceeded", "Over quota.")]), {
+          status: 400,
+        }),
+      ),
+    );
+
+    const res = await runCli(["kb", "upload", tempFile("a.txt", "alpha")]);
 
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("no API key found");
+    expect(res.stderr).toContain("a.txt");
+    expect(res.stderr).toContain("Over quota.");
   });
 });
 
