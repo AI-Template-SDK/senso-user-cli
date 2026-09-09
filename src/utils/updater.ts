@@ -59,7 +59,10 @@ export async function getLatestVersion(): Promise<string | null> {
     });
     if (!res.ok) return null;
     const data = (await res.json()) as NpmPackageInfo;
-    return data["dist-tags"]?.latest ?? null;
+    // The cast above is an assertion about an untyped response body, so the
+    // optional chain is load-bearing even though the type says otherwise: a
+    // registry response without dist-tags would throw here without it.
+    return (data as Partial<NpmPackageInfo>)["dist-tags"]?.latest ?? null;
   } catch {
     return null;
   }

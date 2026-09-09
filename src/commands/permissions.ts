@@ -1,6 +1,7 @@
 import { Command } from "commander";
-import { apiRequest, formatApiError } from "../lib/api-client.js";
-import * as log from "../utils/logger.js";
+import { apiRequest } from "../lib/api-client.js";
+import { emit } from "../lib/output.js";
+import { runAction } from "../lib/run-action.js";
 
 export function registerPermissionsCommands(program: Command): void {
   const perms = program
@@ -12,18 +13,14 @@ export function registerPermissionsCommands(program: Command): void {
     .description(
       "List all available permission keys with their names, descriptions, and categories. Useful for building role management UIs.",
     )
-    .action(async () => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx) => {
         const data = await apiRequest({
           path: "/org/permissions",
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emit(ctx, data, { columns: ["key", "name", "category", "description"] });
+      }),
+    );
 }

@@ -5,15 +5,18 @@ import { Command } from "commander";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import {
+  ApiError,
   apiRequest,
-  formatApiError,
   handleUploadError,
   printUploadSummary,
   uploadStatusToReason,
   type UploadResponse,
   type UploadResultItem,
 } from "../lib/api-client.js";
+import { CliError, EXIT } from "../lib/errors.js";
 import { pickFolder } from "../lib/folder-picker.js";
+import { emit } from "../lib/output.js";
+import { runAction } from "../lib/run-action.js";
 import * as log from "../utils/logger.js";
 
 interface FileMetadata {
@@ -42,7 +45,7 @@ const MIME_TYPES: Record<string, string> = {
 
 function getMimeType(filename: string): string {
   const ext = filename.slice(filename.lastIndexOf(".")).toLowerCase();
-  return MIME_TYPES[ext] || "application/octet-stream";
+  return MIME_TYPES[ext] ?? "application/octet-stream";
 }
 
 async function getFileMetadata(filePath: string): Promise<{ meta: FileMetadata; buffer: Buffer }> {
@@ -73,6 +76,23 @@ async function uploadToS3(url: string, buffer: Buffer, contentType: string): Pro
   }
 }
 
+/**
+ * A whole-batch rejection, as opposed to any other API failure.
+ *
+ * The upload endpoint refuses a batch by returning the same per-file `results`
+ * array it returns on success, with a reason on each entry. That is the only
+ * failure shape carrying detail worth unpacking; everything else is an ordinary
+ * API or transport error and is handled as one.
+ */
+function isBatchRejection(err: unknown): boolean {
+  return (
+    err instanceof ApiError &&
+    typeof err.body === "object" &&
+    err.body !== null &&
+    "results" in err.body
+  );
+}
+
 export function registerIngestCommands(program: Command): void {
   const ingest = program
     .command("ingest")
@@ -86,32 +106,35 @@ export function registerIngestCommands(program: Command): void {
       "Upload files to the knowledge base. Accepts local file paths (up to 10). Files are hashed, uploaded to S3, then parsed and embedded by a background worker. Poll 'senso content get <content-id>' until processing_status is 'complete' before searching the uploaded content.",
     )
     .option("--folder-id <id>", "Destination folder ID (skip interactive prompt)")
-    .action(async (files: string[], cmdOpts: { folderId?: string }) => {
-      const opts = program.opts();
-      if (files.length > 10) {
-        log.error("Maximum 10 files per upload request.");
-        process.exit(1);
-      }
-
-      // Validate all files exist before doing anything else
-      for (const file of files) {
-        try {
-          await access(resolve(file));
-        } catch {
-          log.error(`File not found: "${file}". Please check the file name and try again.`);
-          process.exit(1);
+    .action(
+      runAction(program, async (ctx, files: string[], cmdOpts: { folderId?: string }) => {
+        if (files.length > 10) {
+          throw new CliError("Maximum 10 files per upload request.", EXIT.USAGE, {
+            code: "usage",
+            hint: "Split the upload into batches of 10 or fewer files.",
+          });
         }
-      }
 
-      const prepSpin = p.spinner();
-      try {
+        // Validate all files exist before doing anything else
+        for (const file of files) {
+          try {
+            await access(resolve(file));
+          } catch (err) {
+            throw new CliError(
+              `File not found: "${file}". Please check the file name and try again.`,
+              EXIT.USAGE,
+              { code: "usage", cause: err },
+            );
+          }
+        }
+
         // 0. Resolve destination folder
         let kbFolderNodeId: string | undefined;
 
         if (cmdOpts.folderId) {
           kbFolderNodeId = cmdOpts.folderId;
         } else if (process.stdin.isTTY) {
-          const folder = await pickFolder({ apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+          const folder = await pickFolder({ apiKey: ctx.apiKey, baseUrl: ctx.baseUrl });
 
           const fileList = files.map((f) => basename(f)).join(", ");
           const answer = await p.text({
@@ -126,7 +149,7 @@ export function registerIngestCommands(program: Command): void {
 
           if (p.isCancel(answer) || (answer as string).trim().toLowerCase() === "no") {
             p.cancel("Upload canceled.");
-            process.exit(0);
+            return;
           }
 
           kbFolderNodeId = folder.folderId;
@@ -137,28 +160,51 @@ export function registerIngestCommands(program: Command): void {
 
         const emptyFiles = fileData.filter((f) => f.meta.file_size_bytes < 1);
         if (emptyFiles.length > 0) {
-          for (const f of emptyFiles) {
-            log.error(
-              `File "${f.meta.filename}" is empty. Please select a valid file with content.`,
-            );
-          }
-          process.exit(1);
+          // One message rather than a line per file: runAction reports what is
+          // thrown, so listing the names here keeps the whole failure in it.
+          throw new CliError(
+            `Empty file(s): ${emptyFiles.map((f) => f.meta.filename).join(", ")}.`,
+            EXIT.USAGE,
+            { code: "usage", hint: "Please select valid files with content." },
+          );
         }
 
         // 2. Request presigned upload URLs
         const body: Record<string, unknown> = { files: fileData.map((f) => f.meta) };
         if (kbFolderNodeId) body.kb_folder_node_id = kbFolderNodeId;
 
+        const prepSpin = p.spinner();
         prepSpin.start("Preparing upload...");
 
-        const response = await apiRequest<UploadResponse>({
-          method: "POST",
-          path: "/org/kb/upload",
-          body,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
-        });
+        let response: UploadResponse;
+        try {
+          response = await apiRequest<UploadResponse>({
+            method: "POST",
+            path: "/org/kb/upload",
+            body,
+            apiKey: ctx.apiKey,
+            baseUrl: ctx.baseUrl,
+          });
+        } catch (err) {
+          // Narrow on purpose: the spinner has to be stopped or it keeps
+          // spinning over the error, and this is the only awaited call it is
+          // running across.
+          prepSpin.stop("Upload failed");
+          // handleUploadError is the only thing that knows how to unpack the
+          // per-file reasons, so it keeps that reporting and the throw supplies
+          // the exit code. Anything else is rethrown untouched so runAction maps
+          // it to its real code (401 → 3, 404 → 4, unreachable → 5) rather than
+          // flattening every upload failure to 1.
+          if (isBatchRejection(err)) {
+            handleUploadError(err);
+            throw new CliError("No files were uploaded.", EXIT.ERROR, { cause: err });
+          }
+          throw err;
+        }
 
+        // `?? []` although `results` reads as required: apiRequest casts the
+        // body rather than validating it, so a malformed response must produce
+        // an empty summary here, not a "not iterable" TypeError.
         const items = response.results ?? [];
         const pendingCount = items.filter(
           (i) => i.status === "upload_pending" && i.upload_url,
@@ -167,7 +213,7 @@ export function registerIngestCommands(program: Command): void {
 
         // 3. Upload accepted files to S3
         let uploaded = 0;
-        const failed: Array<{ filename: string; reason: string }> = [];
+        const failed: { filename: string; reason: string }[] = [];
 
         for (const item of items) {
           if (item.status === "upload_pending" && item.upload_url) {
@@ -183,6 +229,8 @@ export function registerIngestCommands(program: Command): void {
               uploaded++;
               uploadSpin.stop(`Uploaded ${item.filename}`);
             } catch (uploadErr) {
+              // Recovered from: one file failing is reported in the summary and
+              // the remaining files are still uploaded.
               uploadSpin.stop(`Failed to upload ${item.filename}`);
               failed.push({
                 filename: item.filename,
@@ -200,49 +248,52 @@ export function registerIngestCommands(program: Command): void {
         // 4. Summary
         printUploadSummary(uploaded, failed, items);
 
-        if (opts.output === "json") {
-          console.log(JSON.stringify(response, null, 2));
-        }
-      } catch (err) {
-        prepSpin.stop("Upload failed");
-        handleUploadError(err);
-        process.exit(1);
-      }
-    });
+        // The human summary above is already on stderr, so `plain` adds nothing;
+        // json and table callers still get the payload.
+        emit(ctx, response, {
+          table: {
+            rows: items.map((i) => ({
+              filename: i.filename,
+              status: i.status,
+              content_id: i.content_id,
+            })),
+            columns: ["filename", "status", "content_id"],
+          },
+          plain: [],
+        });
+      }),
+    );
 
   ingest
     .command("reprocess <nodeId> <file>")
     .description(
       "Re-ingest an existing document with a new file version. Provide the KB node ID (kb_node_id) and the path to the replacement file.",
     )
-    .action(async (nodeId: string, file: string) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, nodeId: string, file: string) => {
         const { meta, buffer } = await getFileMetadata(file);
 
         const item = await apiRequest<UploadResultItem>({
           method: "PUT",
           path: `/org/kb/nodes/${nodeId}/file`,
           body: { file: meta },
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
 
         if (item.status === "upload_pending" && item.upload_url) {
           await uploadToS3(item.upload_url, buffer, meta.content_type);
-          log.success(
-            `Uploaded ${meta.filename} for node ${nodeId}. Background re-processing started.`,
-          );
-        } else {
+          if (!ctx.quiet) {
+            log.success(
+              `Uploaded ${meta.filename} for node ${nodeId}. Background re-processing started.`,
+            );
+          }
+        } else if (!ctx.quiet) {
           log.warn(`Skipped: ${item.status}${item.error ? ` — ${item.error}` : ""}`);
         }
 
-        if (opts.output === "json") {
-          console.log(JSON.stringify(item, null, 2));
-        }
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        // As above: the ✓/! line is the human rendering, so `plain` stays empty.
+        emit(ctx, item, { plain: [] });
+      }),
+    );
 }

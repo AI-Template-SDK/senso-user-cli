@@ -268,10 +268,10 @@ Everything the test suite and contributors need before the first test is written
 
 **Prerequisite refactor** (tests cannot be written against the current shape):
 
-- [ ] `src/lib/errors.ts`: `class CliError extends Error { exitCode }`; replace all 174 `process.exit()` in commands with `throw new CliError(...)` or a return; `cli.ts` catches once, formats, exits
-- [ ] `src/lib/run-action.ts`: `runAction(program, async (ctx) => ...)` that resolves global opts (apiKey, baseUrl, output, quiet) into a typed `ctx`, wraps the handler, maps `ApiError`/`CliError`/unknown to stderr + exit code. Every action goes through it.
-- [ ] `src/program.ts` exporting `createProgram(): Command` with zero side effects; `src/cli.ts` becomes the 10-line bin that calls it (tsup entry unchanged)
-- [ ] `SENSO_CONFIG_DIR` env override in `config.ts` (documented; used by tests and CI)
+- [x] `src/lib/errors.ts`: `class CliError extends Error { exitCode }`; replace all 174 `process.exit()` in commands with `throw new CliError(...)` or a return; `cli.ts` catches once, formats, exits
+- [x] `src/lib/run-action.ts`: `runAction(program, async (ctx) => ...)` that resolves global opts (apiKey, baseUrl, output, quiet) into a typed `ctx`, wraps the handler, maps `ApiError`/`CliError`/unknown to stderr + exit code. Every action goes through it.
+- [x] `src/program.ts` exporting `createProgram(): Command` with zero side effects; `src/cli.ts` becomes the 10-line bin that calls it (tsup entry unchanged)
+- [x] `SENSO_CONFIG_DIR` env override in `config.ts` (documented; used by tests and CI)
 - [ ] Inject `fetch` (or accept a base URL) so tests never need real DNS — MSW handles this without injection, but a `SENSO_BASE_URL` override already exists and e2e uses it
 
 **Layer 1 — unit (`tests/unit/`)**, no network, `@vitest-environment node`:
@@ -329,14 +329,14 @@ Everything the test suite and contributors need before the first test is written
 The tests in Phase 2 pin current behavior; this phase changes it deliberately, updating
 tests alongside. Document the result in README under "Using with AI agents".
 
-- [ ] **stdout is the payload, stderr is everything else.** Banner, spinners, `log.info`, update box, success lines all go to stderr. `--quiet` silences stderr chatter; it never changes stdout.
-- [ ] **`--output json` on every command**, including the 27 files that ignore it today. In json mode, errors are also JSON, on stderr: `{"error":{"code":"unauthorized","status":401,"message":"..."}}`
-- [ ] **`--output table` works or is refused.** Commands that return a list get `rows`/`columns`; commands that return a single object render a two-column key/value table; no more silent JSON fallback
-- [ ] **Exit codes:** `0` success · `1` API or runtime error · `2` usage (Commander default) · `3` authentication (missing/invalid key, 401/403) · `4` not found (404) · `5` network/timeout. Put the table in README and in `--help` epilog
-- [ ] `--output=json` (equals form) works; global options are resolved once via Commander, not by scanning `argv`
+- [x] **stdout is the payload, stderr is everything else.** Banner, spinners, `log.info`, update box, success lines all go to stderr. `--quiet` silences stderr chatter; it never changes stdout.
+- [x] **`--output json` on every command**, including the 27 files that ignore it today. In json mode, errors are also JSON, on stderr: `{"error":{"code":"unauthorized","status":401,"message":"..."}}`
+- [x] **`--output table` works or is refused.** Commands that return a list get `rows`/`columns`; commands that return a single object render a two-column key/value table; no more silent JSON fallback
+- [x] **Exit codes:** `0` success · `1` API or runtime error · `2` usage (Commander default) · `3` authentication (missing/invalid key, 401/403) · `4` not found (404) · `5` network/timeout. Put the table in README and in `--help` epilog
+- [x] `--output=json` (equals form) works; global options are resolved once via Commander, not by scanning `argv`
 - [ ] `NO_COLOR` and `FORCE_COLOR` honored (picocolors does this; add a test so it stays true)
-- [ ] `SENSO_DEBUG=1` prints each request (method, URL, status, elapsed) to stderr with the key redacted — the first thing anyone asks for when a command fails in an agent
-- [ ] Non-TTY `login` fails fast with "stdin is not a terminal; set SENSO_API_KEY" instead of waiting on a prompt
+- [x] `SENSO_DEBUG=1` prints each request (method, URL, status, elapsed) to stderr with the key redacted — the first thing anyone asks for when a command fails in an agent
+- [x] Non-TTY `login` fails fast with "stdin is not a terminal; set SENSO_API_KEY" instead of waiting on a prompt
 - [ ] Split `analytics.ts` (1,341 lines) into `analytics/` with one file per subcommand and a shared `render.ts`; no behavior change
 
 ### Phase 4 — Documentation (size: M)

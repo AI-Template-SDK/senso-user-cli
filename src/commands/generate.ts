@@ -1,5 +1,9 @@
 import { Command } from "commander";
-import { apiRequest, formatApiError } from "../lib/api-client.js";
+import { apiRequest } from "../lib/api-client.js";
+import { CliError, EXIT } from "../lib/errors.js";
+import { parseJsonFlag } from "../lib/json-arg.js";
+import { emit } from "../lib/output.js";
+import { runAction } from "../lib/run-action.js";
 import * as log from "../utils/logger.js";
 
 interface ContentGenerationSampleJobSubmitResponse {
@@ -35,20 +39,16 @@ export function registerGenerateCommands(program: Command): void {
     .description(
       "Get content generation settings. Shows whether generation and auto-publish are enabled, the content schedule, and configured publishers.",
     )
-    .action(async () => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx) => {
         const data = await apiRequest({
           path: "/org/content-generation",
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emit(ctx, data);
+      }),
+    );
 
   gen
     .command("update-settings")
@@ -59,24 +59,20 @@ export function registerGenerateCommands(program: Command): void {
       "--data <json>",
       'JSON settings: { "enable_content_generation": bool, "content_auto_publish": bool, "content_schedule": [0-6], "selected_content_type_id": "<uuid>" }',
     )
-    .action(async (cmdOpts: { data: string }) => {
-      const opts = program.opts();
-      try {
-        const body = JSON.parse(cmdOpts.data);
+    .action(
+      runAction(program, async (ctx, cmdOpts: { data: string }) => {
+        const body = parseJsonFlag(cmdOpts.data);
         const data = await apiRequest({
           method: "PATCH",
           path: "/org/content-generation",
           body,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success("Content generation settings updated.");
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(err instanceof SyntaxError ? "Invalid JSON in --data" : formatApiError(err));
-        process.exit(1);
-      }
-    });
+        if (!ctx.quiet) log.success("Content generation settings updated.");
+        emit(ctx, data);
+      }),
+    );
 
   gen
     .command("sample")
@@ -97,14 +93,17 @@ export function registerGenerateCommands(program: Command): void {
       "Return the accepted sample job immediately instead of polling for the generated content.",
     )
     .action(
-      async (cmdOpts: {
-        promptId: string;
-        contentTypeId: string;
-        destination?: string;
-        wait?: boolean;
-      }) => {
-        const opts = program.opts();
-        try {
+      runAction(
+        program,
+        async (
+          ctx,
+          cmdOpts: {
+            promptId: string;
+            contentTypeId: string;
+            destination?: string;
+            wait?: boolean;
+          },
+        ) => {
           const body: Record<string, unknown> = {
             geo_question_id: cmdOpts.promptId,
             content_type_id: cmdOpts.contentTypeId,
@@ -112,42 +111,49 @@ export function registerGenerateCommands(program: Command): void {
           if (cmdOpts.destination) {
             body.publish_destination = cmdOpts.destination;
           }
-          const data = (await apiRequest({
+          const data = await apiRequest<ContentGenerationSampleJobSubmitResponse>({
             method: "POST",
             path: "/org/content-generation/sample",
             body,
-            apiKey: opts.apiKey,
-            baseUrl: opts.baseUrl,
-          })) as ContentGenerationSampleJobSubmitResponse;
+            apiKey: ctx.apiKey,
+            baseUrl: ctx.baseUrl,
+          });
 
           if (cmdOpts.wait === false) {
-            console.log(JSON.stringify(data, null, 2));
+            emit(ctx, data);
             return;
           }
 
-          const quiet = opts.quiet || opts.output === "json";
-          if (!quiet) {
+          if (!ctx.quiet) {
             log.info(`Sample job accepted: ${data.sample_job_id}`);
           }
 
           const job = await waitForSampleJob(data.sample_job_id, {
-            apiKey: opts.apiKey,
-            baseUrl: opts.baseUrl,
-            quiet,
+            apiKey: ctx.apiKey,
+            baseUrl: ctx.baseUrl,
+            quiet: ctx.quiet,
           });
 
           if (job.status === "completed") {
-            console.log(JSON.stringify(job.result ?? job, null, 2));
+            emit(ctx, job.result ?? job);
             return;
           }
 
-          const message = job.error?.message || `Sample job ended with status: ${job.status}`;
-          throw new Error(job.error?.code ? `${message} (${job.error.code})` : message);
-        } catch (err) {
-          log.error(formatApiError(err));
-          process.exit(1);
-        }
-      },
+          // An empty message is as useless as a missing one, so both fall back
+          // to the status line rather than reporting a blank failure.
+          const reported = job.error?.message;
+          const message =
+            reported === undefined || reported === ""
+              ? `Sample job ended with status: ${job.status}`
+              : reported;
+          // A job that ran and failed is a server-side outcome, not a bad
+          // command line: exit 1, with the job's own code kept in the message.
+          throw new CliError(
+            job.error?.code ? `${message} (${job.error.code})` : message,
+            EXIT.ERROR,
+          );
+        },
+      ),
     );
 
   gen
@@ -159,13 +165,16 @@ export function registerGenerateCommands(program: Command): void {
     .option("--content-type-id <id>", "Override the org's default content type for this run")
     .option("--publisher-ids <ids...>", "Restrict publishing to specific publisher IDs")
     .action(
-      async (cmdOpts: {
-        promptIds?: string[];
-        contentTypeId?: string;
-        publisherIds?: string[];
-      }) => {
-        const opts = program.opts();
-        try {
+      runAction(
+        program,
+        async (
+          ctx,
+          cmdOpts: {
+            promptIds?: string[];
+            contentTypeId?: string;
+            publisherIds?: string[];
+          },
+        ) => {
           const body: Record<string, unknown> = {};
           if (cmdOpts.promptIds) body.prompt_ids = cmdOpts.promptIds;
           if (cmdOpts.contentTypeId) body.content_type_id = cmdOpts.contentTypeId;
@@ -174,16 +183,13 @@ export function registerGenerateCommands(program: Command): void {
             method: "POST",
             path: "/org/content-generation/run",
             body: Object.keys(body).length > 0 ? body : {},
-            apiKey: opts.apiKey,
-            baseUrl: opts.baseUrl,
+            apiKey: ctx.apiKey,
+            baseUrl: ctx.baseUrl,
           });
-          log.success("Content generation run triggered.");
-          console.log(JSON.stringify(data, null, 2));
-        } catch (err) {
-          log.error(formatApiError(err));
-          process.exit(1);
-        }
-      },
+          if (!ctx.quiet) log.success("Content generation run triggered.");
+          emit(ctx, data);
+        },
+      ),
     );
 
   gen
@@ -191,20 +197,16 @@ export function registerGenerateCommands(program: Command): void {
     .description(
       "Get the full content generation job context — all prompts with queue status (create vs update), content state, and a summary of queue counts.",
     )
-    .action(async () => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx) => {
         const data = await apiRequest({
           path: "/org/content-generation/job-context",
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emit(ctx, data);
+      }),
+    );
 
   gen
     .command("runs-list")
@@ -217,9 +219,8 @@ export function registerGenerateCommands(program: Command): void {
     .option("--active-only", "Only return active (in-progress) runs")
     .option("--start-date <date>", "Filter runs on or after this date (YYYY-MM-DD)")
     .option("--end-date <date>", "Filter runs on or before this date (YYYY-MM-DD)")
-    .action(async (cmdOpts: Record<string, string | boolean>) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, cmdOpts: Record<string, string | boolean>) => {
         const data = await apiRequest({
           path: "/org/content-generation/runs",
           params: {
@@ -230,33 +231,26 @@ export function registerGenerateCommands(program: Command): void {
             start_date: cmdOpts.startDate as string | undefined,
             end_date: cmdOpts.endDate as string | undefined,
           },
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emit(ctx, data);
+      }),
+    );
 
   gen
     .command("runs-get <runId>")
     .description("Get details for a specific content generation run.")
-    .action(async (runId: string) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, runId: string) => {
         const data = await apiRequest({
           path: `/org/content-generation/runs/${runId}`,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emit(ctx, data);
+      }),
+    );
 
   gen
     .command("runs-items <runId>")
@@ -269,42 +263,34 @@ export function registerGenerateCommands(program: Command): void {
       "--status <status>",
       "Filter by item status: pending, running, succeeded, failed, skipped, stopped",
     )
-    .action(async (runId: string, cmdOpts: Record<string, string>) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, runId: string, cmdOpts: Record<string, string>) => {
         const data = await apiRequest({
           path: `/org/content-generation/runs/${runId}/items`,
           params: { limit: cmdOpts.limit, offset: cmdOpts.offset, status: cmdOpts.status },
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emit(ctx, data);
+      }),
+    );
 
   gen
     .command("runs-logs <runId>")
     .description("List log entries for a content generation run.")
     .option("--limit <n>", "Items per page", "100")
     .option("--offset <n>", "Pagination offset", "0")
-    .action(async (runId: string, cmdOpts: Record<string, string>) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, runId: string, cmdOpts: Record<string, string>) => {
         const data = await apiRequest({
           path: `/org/content-generation/runs/${runId}/logs`,
           params: { limit: cmdOpts.limit, offset: cmdOpts.offset },
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emit(ctx, data);
+      }),
+    );
 }
 
 async function waitForSampleJob(
@@ -333,9 +319,12 @@ async function waitForSampleJob(
     await sleep(SAMPLE_JOB_POLL_INTERVAL_MS);
   }
 
-  throw new Error(
-    `Timed out waiting for sample job ${sampleJobId}. Poll /org/content-generation/sample-jobs/${sampleJobId} for status.`,
-  );
+  // NETWORK, not ERROR: the job may still be running server-side, so this is a
+  // "we stopped waiting" outcome that a caller can reasonably retry or poll.
+  throw new CliError(`Timed out waiting for sample job ${sampleJobId}.`, EXIT.NETWORK, {
+    code: "timeout",
+    hint: `Poll /org/content-generation/sample-jobs/${sampleJobId} for status.`,
+  });
 }
 
 function sleep(ms: number): Promise<void> {

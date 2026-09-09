@@ -1,5 +1,7 @@
 import { Command } from "commander";
-import { apiRequest, formatApiError } from "../lib/api-client.js";
+import { apiRequest } from "../lib/api-client.js";
+import { emit, emitConfirmation } from "../lib/output.js";
+import { runAction } from "../lib/run-action.js";
 import * as log from "../utils/logger.js";
 
 export function registerTagsCommands(program: Command): void {
@@ -15,61 +17,53 @@ export function registerTagsCommands(program: Command): void {
       "List all tags for the organization. Pass --counts to include per-tag usage counts.",
     )
     .option("--counts", "Include prompt/content usage counts")
-    .action(async (cmdOpts: { counts?: boolean }) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, cmdOpts: { counts?: boolean }) => {
         const data = await apiRequest({
           path: "/org/tags",
           params: cmdOpts.counts ? { counts: "true" } : {},
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        // The count columns only exist when --counts was passed; a column with
+        // no matching field renders empty rather than failing.
+        emit(ctx, data, {
+          columns: ["tag_id", "name", "prompt_count", "content_count", "created_at"],
+        });
+      }),
+    );
 
   tags
     .command("create")
     .description("Create a new tag. Tag names are unique per org (case-insensitive).")
     .requiredOption("--name <name>", "Tag name")
-    .action(async (cmdOpts: { name: string }) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, cmdOpts: { name: string }) => {
         const data = await apiRequest({
           method: "POST",
           path: "/org/tags",
           body: { name: cmdOpts.name },
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success(`Tag "${cmdOpts.name}" created.`);
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        if (!ctx.quiet) log.success(`Tag "${cmdOpts.name}" created.`);
+        emit(ctx, data);
+      }),
+    );
 
   tags
     .command("get <id>")
     .description("Get a tag by ID, including usage counts.")
-    .action(async (id: string) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, id: string) => {
         const data = await apiRequest({
           path: `/org/tags/${id}`,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emit(ctx, data);
+      }),
+    );
 
   tags
     .command("update <id>")
@@ -77,42 +71,34 @@ export function registerTagsCommands(program: Command): void {
       "Rename a tag. Existing attachments on prompts, content, and KB nodes are preserved.",
     )
     .requiredOption("--name <name>", "New tag name")
-    .action(async (id: string, cmdOpts: { name: string }) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, id: string, cmdOpts: { name: string }) => {
         const data = await apiRequest({
           method: "PATCH",
           path: `/org/tags/${id}`,
           body: { name: cmdOpts.name },
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success(`Tag ${id} renamed to "${cmdOpts.name}".`);
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        if (!ctx.quiet) log.success(`Tag ${id} renamed to "${cmdOpts.name}".`);
+        emit(ctx, data);
+      }),
+    );
 
   tags
     .command("delete <id>")
     .description(
       "Delete a tag and detach it from every prompt, content item, and KB node it was applied to. This cannot be undone.",
     )
-    .action(async (id: string) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, id: string) => {
         await apiRequest({
           method: "DELETE",
           path: `/org/tags/${id}`,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success(`Tag ${id} deleted.`);
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emitConfirmation(ctx, `Tag ${id} deleted.`);
+      }),
+    );
 }

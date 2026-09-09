@@ -1,5 +1,8 @@
 import { Command } from "commander";
-import { apiRequest, formatApiError } from "../lib/api-client.js";
+import { apiRequest } from "../lib/api-client.js";
+import { parseJsonFlag } from "../lib/json-arg.js";
+import { emit, emitConfirmation } from "../lib/output.js";
+import { runAction } from "../lib/run-action.js";
 import * as log from "../utils/logger.js";
 
 export function registerContentTypeCommands(program: Command): void {
@@ -13,21 +16,18 @@ export function registerContentTypeCommands(program: Command): void {
     .description("List all content types configured for the organization.")
     .option("--limit <n>", "Maximum number of content types to return (default: 50)")
     .option("--offset <n>", "Number of items to skip (for pagination)")
-    .action(async (cmdOpts: Record<string, string>) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, cmdOpts: Record<string, string>) => {
         const data = await apiRequest({
           path: "/org/content-types",
           params: { limit: cmdOpts.limit, offset: cmdOpts.offset },
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        // 'config' is nested and long; `get <id>` is where you read it.
+        emit(ctx, data, { columns: ["content_type_id", "name", "created_at", "updated_at"] });
+      }),
+    );
 
   ct.command("create")
     .description(
@@ -37,41 +37,33 @@ export function registerContentTypeCommands(program: Command): void {
       "--data <json>",
       'JSON: { "name": "Blog Post", "config": { "template": "...", "cta_text": "...", "cta_destination": "...", "writing_rules": [] } }',
     )
-    .action(async (cmdOpts: { data: string }) => {
-      const opts = program.opts();
-      try {
-        const body = JSON.parse(cmdOpts.data);
+    .action(
+      runAction(program, async (ctx, cmdOpts: { data: string }) => {
+        const body = parseJsonFlag(cmdOpts.data);
         const data = await apiRequest({
           method: "POST",
           path: "/org/content-types",
           body,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success("Content type created.");
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(err instanceof SyntaxError ? "Invalid JSON in --data" : formatApiError(err));
-        process.exit(1);
-      }
-    });
+        if (!ctx.quiet) log.success("Content type created.");
+        emit(ctx, data);
+      }),
+    );
 
   ct.command("get <id>")
     .description("Get a content type by ID, including its full configuration.")
-    .action(async (id: string) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, id: string) => {
         const data = await apiRequest({
           path: `/org/content-types/${id}`,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emit(ctx, data);
+      }),
+    );
 
   ct.command("update <id>")
     .description(
@@ -81,24 +73,20 @@ export function registerContentTypeCommands(program: Command): void {
       "--data <json>",
       'JSON: { "name": "Updated Name", "config": { "template": "...", "cta_text": "...", "cta_destination": "...", "writing_rules": [] } }',
     )
-    .action(async (id: string, cmdOpts: { data: string }) => {
-      const opts = program.opts();
-      try {
-        const body = JSON.parse(cmdOpts.data);
+    .action(
+      runAction(program, async (ctx, id: string, cmdOpts: { data: string }) => {
+        const body = parseJsonFlag(cmdOpts.data);
         const data = await apiRequest({
           method: "PUT",
           path: `/org/content-types/${id}`,
           body,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success(`Content type ${id} updated.`);
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(err instanceof SyntaxError ? "Invalid JSON in --data" : formatApiError(err));
-        process.exit(1);
-      }
-    });
+        if (!ctx.quiet) log.success(`Content type ${id} updated.`);
+        emit(ctx, data);
+      }),
+    );
 
   ct.command("patch <id>")
     .description(
@@ -108,40 +96,32 @@ export function registerContentTypeCommands(program: Command): void {
       "--data <json>",
       'JSON: { "config": { "template": "Updated template instruction" } }',
     )
-    .action(async (id: string, cmdOpts: { data: string }) => {
-      const opts = program.opts();
-      try {
-        const body = JSON.parse(cmdOpts.data);
+    .action(
+      runAction(program, async (ctx, id: string, cmdOpts: { data: string }) => {
+        const body = parseJsonFlag(cmdOpts.data);
         const data = await apiRequest({
           method: "PATCH",
           path: `/org/content-types/${id}`,
           body,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success(`Content type ${id} updated.`);
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(err instanceof SyntaxError ? "Invalid JSON in --data" : formatApiError(err));
-        process.exit(1);
-      }
-    });
+        if (!ctx.quiet) log.success(`Content type ${id} updated.`);
+        emit(ctx, data);
+      }),
+    );
 
   ct.command("delete <id>")
     .description("Delete a content type. This cannot be undone.")
-    .action(async (id: string) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, id: string) => {
         await apiRequest({
           method: "DELETE",
           path: `/org/content-types/${id}`,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success(`Content type ${id} deleted.`);
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emitConfirmation(ctx, `Content type ${id} deleted.`);
+      }),
+    );
 }

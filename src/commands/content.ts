@@ -1,7 +1,9 @@
 import { Command } from "commander";
 import pc from "picocolors";
-import { apiRequest, formatApiError } from "../lib/api-client.js";
-import { output, type OutputFormat } from "../lib/output.js";
+import { apiRequest } from "../lib/api-client.js";
+import { CliError, EXIT } from "../lib/errors.js";
+import { emit, emitConfirmation } from "../lib/output.js";
+import { runAction } from "../lib/run-action.js";
 import { buildSetTagsBody, buildAttachTagBody } from "../lib/tag-args.js";
 import * as log from "../utils/logger.js";
 
@@ -12,6 +14,18 @@ export function registerContentCommands(program: Command): void {
       "Manage content items in the knowledge base. List, inspect, delete, unpublish, and manage the verification workflow and ownership of content.",
     );
 
+  /**
+   * The subset of a KB node this command renders. Typed here rather than read
+   * off `Record<string, unknown>` so the table and plain renderings below are
+   * checked against something.
+   */
+  interface KbFileNode {
+    kb_node_id?: string;
+    name?: string;
+    type?: string;
+    processing_status?: string;
+  }
+
   content
     .command("list")
     .description(
@@ -19,21 +33,20 @@ export function registerContentCommands(program: Command): void {
     )
     .option("--limit <n>", "Items per page", "10")
     .option("--offset <n>", "Pagination offset", "0")
-    .action(async (cmdOpts: Record<string, string>) => {
-      const opts = program.opts();
-      try {
-        const data = await apiRequest<Record<string, unknown>[]>({
+    .action(
+      runAction(program, async (ctx, cmdOpts: Record<string, string>) => {
+        // The endpoint returns a bare array on some deployments and a wrapper
+        // on others, which is why both shapes are handled here.
+        const data = await apiRequest<KbFileNode[] | { nodes?: KbFileNode[] }>({
           path: "/org/kb/my-files",
           params: { limit: cmdOpts.limit, offset: cmdOpts.offset },
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        const format: OutputFormat = opts.output || "plain";
-        const rows = Array.isArray(data) ? data : ((data as Record<string, unknown[]>).nodes ?? []);
-        output(format, {
-          json: data,
+        const rows = Array.isArray(data) ? data : (data.nodes ?? []);
+        emit(ctx, data, {
           table: {
-            rows: (rows as Record<string, unknown>[]).map((r) => ({
+            rows: rows.map((r) => ({
               id: r.kb_node_id,
               name: r.name,
               type: r.type,
@@ -41,59 +54,50 @@ export function registerContentCommands(program: Command): void {
             })),
             columns: ["id", "name", "type", "status"],
           },
-          plain: (rows as Record<string, unknown>[]).length
-            ? (rows as Record<string, unknown>[]).map(
-                (r) =>
-                  `  ${pc.bold(String(r.name || "Untitled"))} ${pc.dim(`(${r.kb_node_id})`)} ${r.type ? pc.dim(`[${r.type}]`) : ""}`,
-              )
+          plain: rows.length
+            ? rows.map((r) => {
+                // A missing name and an empty one both read as "Untitled",
+                // which `??` alone would not cover.
+                const name = r.name === undefined || r.name === "" ? "Untitled" : r.name;
+                return `  ${pc.bold(name)} ${pc.dim(`(${r.kb_node_id})`)} ${r.type ? pc.dim(`[${r.type}]`) : ""}`;
+              })
             : ["  No content found."],
         });
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+      }),
+    );
 
   content
     .command("get <id>")
     .description(
       "Get a content item by ID. Returns the full content detail including versions, metadata, and publish status.",
     )
-    .action(async (id: string) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, id: string) => {
         const data = await apiRequest({
           path: `/org/content/${id}`,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emit(ctx, data);
+      }),
+    );
 
   content
     .command("delete <id>")
     .description(
       "Delete a content item from the knowledge base and any external publish destinations. This cannot be undone.",
     )
-    .action(async (id: string) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, id: string) => {
         await apiRequest({
           method: "DELETE",
           path: `/org/content/${id}`,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success(`Content ${id} deleted.`);
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emitConfirmation(ctx, `Content ${id} deleted.`);
+      }),
+    );
 
   content
     .command("unpublish <id>")
@@ -104,9 +108,8 @@ export function registerContentCommands(program: Command): void {
       "--publish-record-ids <ids...>",
       "Restrict unpublish to specific publish_record UUIDs. Use 'content get <id>' to find publish record IDs for a content item.",
     )
-    .action(async (id: string, cmdOpts: { publishRecordIds?: string[] }) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, id: string, cmdOpts: { publishRecordIds?: string[] }) => {
         const body: Record<string, unknown> | undefined =
           cmdOpts.publishRecordIds && cmdOpts.publishRecordIds.length > 0
             ? { publish_record_ids: cmdOpts.publishRecordIds }
@@ -115,22 +118,23 @@ export function registerContentCommands(program: Command): void {
           method: "POST",
           path: `/org/content/${id}/unpublish`,
           body,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success(
+        const message =
           cmdOpts.publishRecordIds && cmdOpts.publishRecordIds.length > 0
             ? `Unpublished ${cmdOpts.publishRecordIds.length} record(s) from content ${id}.`
-            : `Content ${id} unpublished.`,
-        );
+            : `Content ${id} unpublished.`;
+        // The endpoint returns a body only sometimes; without one a JSON caller
+        // would otherwise get an empty stdout, so fall back to a confirmation.
         if (data) {
-          console.log(JSON.stringify(data, null, 2));
+          if (!ctx.quiet) log.success(message);
+          emit(ctx, data);
+        } else {
+          emitConfirmation(ctx, message);
         }
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+      }),
+    );
 
   content
     .command("verification")
@@ -145,9 +149,8 @@ export function registerContentCommands(program: Command): void {
       "--substatus <substatus>",
       "Narrow further (only valid with --status published): pending_draft",
     )
-    .action(async (cmdOpts: Record<string, string>) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, cmdOpts: Record<string, string>) => {
         const data = await apiRequest({
           path: "/org/content/verification",
           params: {
@@ -157,55 +160,44 @@ export function registerContentCommands(program: Command): void {
             status: cmdOpts.status,
             substatus: cmdOpts.substatus,
           },
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emit(ctx, data);
+      }),
+    );
 
   content
     .command("verification-counts")
     .description(
       "Get counts of content by editorial status (draft, published, rejected, pending published-draft) plus per-destination published-domain summaries. A lightweight alternative to paging through 'content verification'.",
     )
-    .action(async () => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx) => {
         const data = await apiRequest({
           path: "/org/content/verification/counts",
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emit(ctx, data);
+      }),
+    );
 
   content
     .command("versions <id>")
     .description(
       "List the version history for a content item, newest first. The current version is flagged with is_current.",
     )
-    .action(async (id: string) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, id: string) => {
         const data = await apiRequest({
           path: `/org/content/${id}/versions`,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emit(ctx, data);
+      }),
+    );
 
   content
     .command("reject <versionId>")
@@ -213,102 +205,82 @@ export function registerContentCommands(program: Command): void {
       "Reject a content version in the verification workflow. Optionally provide a reason for the rejection.",
     )
     .option("--reason <text>", "Reason for rejection")
-    .action(async (versionId: string, cmdOpts: { reason?: string }) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, versionId: string, cmdOpts: { reason?: string }) => {
         const body = cmdOpts.reason ? { reason: cmdOpts.reason } : undefined;
         await apiRequest({
           method: "POST",
           path: `/org/content/versions/${versionId}/reject`,
           body,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success(`Version ${versionId} rejected.`);
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emitConfirmation(ctx, `Version ${versionId} rejected.`);
+      }),
+    );
 
   content
     .command("restore <versionId>")
     .description("Restore a rejected content version back to draft status for further editing.")
-    .action(async (versionId: string) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, versionId: string) => {
         await apiRequest({
           method: "POST",
           path: `/org/content/versions/${versionId}/restore`,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success(`Version ${versionId} restored to draft.`);
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emitConfirmation(ctx, `Version ${versionId} restored to draft.`);
+      }),
+    );
 
   content
     .command("owners <id>")
     .description(
       "List the owners assigned to a content item. Owners are responsible for reviewing and approving content.",
     )
-    .action(async (id: string) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, id: string) => {
         const data = await apiRequest({
           path: `/org/content/${id}/owners`,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emit(ctx, data);
+      }),
+    );
 
   content
     .command("set-owners <id>")
     .description("Replace all owners of a content item with a new set of user IDs.")
     .requiredOption("--user-ids <ids...>", "User IDs to set as owners")
-    .action(async (id: string, cmdOpts: { userIds: string[] }) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, id: string, cmdOpts: { userIds: string[] }) => {
         await apiRequest({
           method: "PUT",
           path: `/org/content/${id}/owners`,
           body: { user_ids: cmdOpts.userIds },
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success(`Owners updated for content ${id}.`);
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emitConfirmation(ctx, `Owners updated for content ${id}.`);
+      }),
+    );
 
   content
     .command("remove-owner <id> <userId>")
     .description("Remove a single owner from a content item.")
-    .action(async (id: string, userId: string) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, id: string, userId: string) => {
         await apiRequest({
           method: "DELETE",
           path: `/org/content/${id}/owners/${userId}`,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success(`Owner ${userId} removed from content ${id}.`);
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emitConfirmation(ctx, `Owner ${userId} removed from content ${id}.`);
+      }),
+    );
 
   const tags = content
     .command("tags")
@@ -319,20 +291,16 @@ export function registerContentCommands(program: Command): void {
   tags
     .command("list <id>")
     .description("List tags attached to a content item.")
-    .action(async (id: string) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, id: string) => {
         const data = await apiRequest({
           path: `/org/content/${id}/tags`,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emit(ctx, data);
+      }),
+    );
 
   tags
     .command("set <id>")
@@ -341,84 +309,77 @@ export function registerContentCommands(program: Command): void {
     )
     .option("--names <list>", "Comma-separated tag names (created if missing)")
     .option("--ids <list>", "Comma-separated existing tag UUIDs")
-    .action(async (id: string, cmdOpts: { names?: string; ids?: string }) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, id: string, cmdOpts: { names?: string; ids?: string }) => {
         const body = buildSetTagsBody(cmdOpts);
         const data = await apiRequest({
           method: "PUT",
           path: `/org/content/${id}/tags`,
           body,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success(`Content ${id} tags updated.`);
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        if (!ctx.quiet) log.success(`Content ${id} tags updated.`);
+        emit(ctx, data);
+      }),
+    );
 
   tags
     .command("add <id>")
     .description("Attach a single tag by --name (created if missing) or --id.")
     .option("--name <name>", "Tag name (created if missing)")
     .option("--id <tagId>", "Existing tag UUID")
-    .action(async (id: string, cmdOpts: { name?: string; id?: string }) => {
-      const opts = program.opts();
-      const body = buildAttachTagBody(cmdOpts);
-      if (!body) {
-        log.error("Provide --name or --id.");
-        process.exit(1);
-      }
-      try {
+    .action(
+      runAction(program, async (ctx, id: string, cmdOpts: { name?: string; id?: string }) => {
+        const body = buildAttachTagBody(cmdOpts);
+        if (!body) {
+          throw new CliError("Provide --name or --id.", EXIT.USAGE, {
+            code: "usage",
+            hint: "Pass --name <name> to create or reuse a tag by name, or --id <tagId> for an existing tag UUID.",
+          });
+        }
         await apiRequest({
           method: "POST",
           path: `/org/content/${id}/tags`,
           body,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success(`Tag attached to content ${id}.`);
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emitConfirmation(ctx, `Tag attached to content ${id}.`);
+      }),
+    );
 
   tags
     .command("remove <id>")
     .description("Detach a single tag by --name or --id. Idempotent.")
     .option("--name <name>", "Tag name to detach")
     .option("--id <tagId>", "Existing tag UUID to detach")
-    .action(async (id: string, cmdOpts: { name?: string; id?: string }) => {
-      const opts = program.opts();
-      if (!cmdOpts.name && !cmdOpts.id) {
-        log.error("Provide --name or --id.");
-        process.exit(1);
-      }
-      try {
+    .action(
+      runAction(program, async (ctx, id: string, cmdOpts: { name?: string; id?: string }) => {
+        // The missing-flag case is the final branch so that `--name` narrows to
+        // a string here, without a non-null assertion.
         if (cmdOpts.id) {
           await apiRequest({
             method: "DELETE",
             path: `/org/content/${id}/tags/${cmdOpts.id}`,
-            apiKey: opts.apiKey,
-            baseUrl: opts.baseUrl,
+            apiKey: ctx.apiKey,
+            baseUrl: ctx.baseUrl,
           });
-        } else {
+        } else if (cmdOpts.name) {
           await apiRequest({
             method: "DELETE",
             path: `/org/content/${id}/tags`,
-            params: { name: cmdOpts.name! },
-            apiKey: opts.apiKey,
-            baseUrl: opts.baseUrl,
+            params: { name: cmdOpts.name },
+            apiKey: ctx.apiKey,
+            baseUrl: ctx.baseUrl,
+          });
+        } else {
+          throw new CliError("Provide --name or --id.", EXIT.USAGE, {
+            code: "usage",
+            hint: "Pass --name <name> or --id <tagId> naming the tag to detach.",
           });
         }
-        log.success(`Tag detached from content ${id}.`);
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emitConfirmation(ctx, `Tag detached from content ${id}.`);
+      }),
+    );
 }

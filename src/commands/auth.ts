@@ -1,8 +1,11 @@
 import { Command } from "commander";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import { apiRequest, formatApiError } from "../lib/api-client.js";
+import { apiRequest } from "../lib/api-client.js";
 import { readConfig, writeConfig, clearConfig, getApiKey, getConfigPath } from "../lib/config.js";
+import { CliError, EXIT } from "../lib/errors.js";
+import { emit, emitConfirmation } from "../lib/output.js";
+import { runAction } from "../lib/run-action.js";
 import { banner } from "../utils/branding.js";
 import * as log from "../utils/logger.js";
 
@@ -28,41 +31,62 @@ export function registerAuthCommands(program: Command): void {
     .description(
       "Authenticate with Senso. Paste your API key and it will be validated against your organization, then stored locally.",
     )
-    .action(async () => {
-      const opts = program.opts();
+    .action(
+      runAction(program, async (ctx) => {
+        // Without a terminal there is nobody to answer the prompt, and clack
+        // waits on a keypress that will never arrive — the command used to hang
+        // forever in CI and in an agent's shell. Fail immediately instead, and
+        // name the two ways to authenticate that do not need a terminal.
+        if (!process.stdin.isTTY) {
+          throw new CliError("`senso login` needs an interactive terminal.", EXIT.USAGE, {
+            code: "usage",
+            hint: "Set SENSO_API_KEY in the environment, or pass --api-key, instead of logging in.",
+          });
+        }
 
-      banner();
+        banner();
 
-      console.log(`  ${pc.bold("Welcome to Senso CLI!")}\n`);
-      console.log(
-        `  ${pc.dim("1.")} Go to ${pc.cyan("https://docs.senso.ai")} to create an account`,
-      );
-      console.log(`  ${pc.dim("2.")} Generate an API key from your dashboard\n`);
+        log.raw(`  ${pc.bold("Welcome to Senso CLI!")}\n`);
+        log.raw(`  ${pc.dim("1.")} Go to ${pc.cyan("https://docs.senso.ai")} to create an account`);
+        log.raw(`  ${pc.dim("2.")} Generate an API key from your dashboard\n`);
 
-      const result = await p.text({
-        message: "Paste your API key:",
-        placeholder: "tgr_...",
-        validate: (val) => {
-          if (!val || val.trim().length < 4) return "API key is required";
-        },
-      });
+        const result = await p.text({
+          message: "Paste your API key:",
+          placeholder: "tgr_...",
+          validate: (val) => {
+            if (!val || val.trim().length < 4) return "API key is required";
+          },
+        });
 
-      if (p.isCancel(result)) {
-        p.cancel("Login canceled.");
-        process.exit(0);
-      }
+        // `isCancel` narrows to clack's unique cancel symbol, which does not
+        // remove `symbol` from the union — hence the explicit typeof, which both
+        // satisfies the compiler and is true rather than an `as string` cast.
+        if (p.isCancel(result) || typeof result !== "string") {
+          p.cancel("Login canceled.");
+          return;
+        }
 
-      const apiKey = (result as string).trim();
-      const spin = p.spinner();
-      spin.start("Verifying API key...");
+        const apiKey = result.trim();
+        const spin = p.spinner();
+        spin.start("Verifying API key...");
 
-      try {
-        const org = await verifyApiKey(apiKey, opts.baseUrl);
+        let org: OrgMeResponse;
+        try {
+          org = await verifyApiKey(apiKey, ctx.baseUrl);
+        } catch (err) {
+          // Stop the spinner before the error surfaces, or the terminal is left
+          // with a spinning frame and a hidden cursor.
+          spin.stop("Verification failed");
+          throw err;
+        }
         spin.stop("API key verified");
 
+        // Written only after the key has been proven to work. Storing first and
+        // verifying after would leave a bad key on disk for the next command to
+        // fail with.
         writeConfig({
           apiKey,
-          ...(opts.baseUrl ? { baseUrl: opts.baseUrl } : {}),
+          ...(ctx.baseUrl ? { baseUrl: ctx.baseUrl } : {}),
           orgName: org.name,
           orgId: org.org_id,
           orgSlug: org.slug,
@@ -71,76 +95,93 @@ export function registerAuthCommands(program: Command): void {
 
         log.success(`Authenticated as ${pc.bold(`"${org.name}"`)} (${pc.dim(org.org_id)})`);
         log.success(`Config saved to ${pc.dim(getConfigPath())}`);
-        console.log();
-      } catch (err) {
-        spin.stop("Verification failed");
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+      }),
+    );
 
   program
     .command("logout")
     .description("Remove stored API key and organization info from local config.")
-    .action(() => {
-      clearConfig();
-      log.success("Credentials removed.");
-    });
+    .action(
+      runAction(program, (ctx) => {
+        clearConfig();
+        emitConfirmation(ctx, "Credentials removed.");
+      }),
+    );
 
   program
     .command("whoami")
     .description(
       "Show which organization you are authenticated as, including org ID, slug, tier, and API key prefix.",
     )
-    .action(async () => {
-      const opts = program.opts();
-      const apiKey = getApiKey({ apiKey: opts.apiKey });
+    .action(
+      runAction(program, async (ctx) => {
+        const apiKey = getApiKey({ apiKey: ctx.apiKey });
 
-      if (!apiKey) {
-        log.error("Not logged in. Run `senso login` to authenticate.");
-        process.exit(1);
-      }
+        if (!apiKey) {
+          throw new CliError("Not authenticated: no API key found.", EXIT.AUTH, {
+            code: "unauthorized",
+            hint: "Run `senso login`, set SENSO_API_KEY, or pass --api-key.",
+          });
+        }
 
-      const config = readConfig();
+        const config = readConfig();
 
-      // Try to refresh org info from API
-      try {
-        const org = await verifyApiKey(apiKey, opts.baseUrl);
-        const format = opts.output || "plain";
-
-        if (format === "json") {
-          console.log(
-            JSON.stringify(
-              {
-                orgId: org.org_id,
-                orgName: org.name,
-                orgSlug: org.slug,
-                isFreeTier: org.is_free_tier,
-                apiKeyPrefix: apiKey.slice(0, 8) + "...",
-              },
-              null,
-              2,
-            ),
+        try {
+          const org = await verifyApiKey(apiKey, ctx.baseUrl);
+          emit(
+            ctx,
+            {
+              orgId: org.org_id,
+              orgName: org.name,
+              orgSlug: org.slug,
+              isFreeTier: org.is_free_tier,
+              // A prefix, never the key. `whoami` is the command people paste
+              // into a support thread.
+              apiKeyPrefix: apiKey.slice(0, 8) + "...",
+              configPath: getConfigPath(),
+            },
+            {
+              plain: [
+                "",
+                `  ${pc.bold("Organization:")}  ${org.name}`,
+                `  ${pc.bold("Org ID:")}        ${org.org_id}`,
+                `  ${pc.bold("Slug:")}          ${org.slug}`,
+                `  ${pc.bold("Tier:")}          ${org.is_free_tier ? "Free" : "Paid"}`,
+                `  ${pc.bold("API Key:")}       ${apiKey.slice(0, 8)}...`,
+                `  ${pc.bold("Config:")}        ${getConfigPath()}`,
+                "",
+              ],
+            },
           );
-        } else {
-          console.log();
-          console.log(`  ${pc.bold("Organization:")}  ${org.name}`);
-          console.log(`  ${pc.bold("Org ID:")}        ${org.org_id}`);
-          console.log(`  ${pc.bold("Slug:")}          ${org.slug}`);
-          console.log(`  ${pc.bold("Tier:")}          ${org.is_free_tier ? "Free" : "Paid"}`);
-          console.log(`  ${pc.bold("API Key:")}       ${apiKey.slice(0, 8)}...`);
-          console.log(`  ${pc.bold("Config:")}        ${getConfigPath()}`);
-          console.log();
+        } catch (err) {
+          // Offline, or the API is down. If a previous login cached the org
+          // there is still something true to say, and saying it beats failing —
+          // "which org am I pointed at" is answerable without the network.
+          if (!config.orgName) throw err;
+
+          log.warn("Could not reach the Senso API. Showing the last known values.");
+          emit(
+            ctx,
+            {
+              orgId: config.orgId,
+              orgName: config.orgName,
+              orgSlug: config.orgSlug,
+              isFreeTier: config.isFreeTier,
+              apiKeyPrefix: apiKey.slice(0, 8) + "...",
+              configPath: getConfigPath(),
+              cached: true,
+            },
+            {
+              plain: [
+                "",
+                `  ${pc.bold("Organization:")}  ${config.orgName} ${pc.dim("(cached)")}`,
+                `  ${pc.bold("Org ID:")}        ${config.orgId ?? pc.dim("unknown")}`,
+                `  ${pc.bold("Config:")}        ${getConfigPath()}`,
+                "",
+              ],
+            },
+          );
         }
-      } catch (err) {
-        if (config.orgName) {
-          log.warn(`Could not reach API: ${formatApiError(err)}`);
-          console.log(`  ${pc.bold("Organization:")}  ${config.orgName} ${pc.dim("(cached)")}`);
-          console.log(`  ${pc.bold("Org ID:")}        ${config.orgId}`);
-        } else {
-          log.error(formatApiError(err));
-          process.exit(1);
-        }
-      }
-    });
+      }),
+    );
 }

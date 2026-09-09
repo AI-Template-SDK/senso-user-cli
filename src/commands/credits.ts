@@ -1,6 +1,7 @@
 import { Command } from "commander";
-import { apiRequest, formatApiError } from "../lib/api-client.js";
-import * as log from "../utils/logger.js";
+import { apiRequest } from "../lib/api-client.js";
+import { emit } from "../lib/output.js";
+import { runAction } from "../lib/run-action.js";
 
 export function registerCreditsCommands(program: Command): void {
   const credits = program
@@ -14,18 +15,15 @@ export function registerCreditsCommands(program: Command): void {
     .description(
       "Get the current credit balance for the organization. Returns available credits and any spend limit configured.",
     )
-    .action(async () => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx) => {
         const data = await apiRequest({
           path: "/org/credits/balance",
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        // A single balance object, not a list: the generic key/value renderer.
+        emit(ctx, data);
+      }),
+    );
 }

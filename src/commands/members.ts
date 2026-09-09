@@ -1,6 +1,7 @@
 import { Command } from "commander";
-import { apiRequest, formatApiError } from "../lib/api-client.js";
-import * as log from "../utils/logger.js";
+import { apiRequest } from "../lib/api-client.js";
+import { emit } from "../lib/output.js";
+import { runAction } from "../lib/run-action.js";
 
 export function registerMemberCommands(program: Command): void {
   const members = program
@@ -21,9 +22,8 @@ export function registerMemberCommands(program: Command): void {
       "--sort <order>",
       "Sort order: name_asc, name_desc, email_asc, email_desc, created_asc, created_desc",
     )
-    .action(async (cmdOpts: Record<string, string>) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, cmdOpts: Record<string, string>) => {
         const data = await apiRequest({
           path: "/org/members",
           params: {
@@ -32,13 +32,11 @@ export function registerMemberCommands(program: Command): void {
             search: cmdOpts.search,
             sort: cmdOpts.sort,
           },
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        // Columns taken from what the endpoint sorts on (name, email, created).
+        emit(ctx, data, { columns: ["user_id", "name", "email", "created_at"] });
+      }),
+    );
 }

@@ -1,5 +1,8 @@
 import { Command } from "commander";
-import { apiRequest, formatApiError } from "../lib/api-client.js";
+import { apiRequest } from "../lib/api-client.js";
+import { parseJsonFlag } from "../lib/json-arg.js";
+import { emit } from "../lib/output.js";
+import { runAction } from "../lib/run-action.js";
 import * as log from "../utils/logger.js";
 
 export function registerEngineCommands(program: Command): void {
@@ -22,10 +25,9 @@ export function registerEngineCommands(program: Command): void {
       "--publisher-ids <ids...>",
       "Restrict publishing to specific publisher IDs. Overrides any publisher_ids present in --data. Omit to publish to all configured destinations (citeables by default).",
     )
-    .action(async (cmdOpts: { data: string; publisherIds?: string[] }) => {
-      const opts = program.opts();
-      try {
-        const body = JSON.parse(cmdOpts.data);
+    .action(
+      runAction(program, async (ctx, cmdOpts: { data: string; publisherIds?: string[] }) => {
+        const body = parseJsonFlag(cmdOpts.data);
         if (cmdOpts.publisherIds && cmdOpts.publisherIds.length > 0) {
           body.publisher_ids = cmdOpts.publisherIds;
         }
@@ -33,16 +35,13 @@ export function registerEngineCommands(program: Command): void {
           method: "POST",
           path: "/org/content-engine/publish",
           body,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success("Content published.");
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(err instanceof SyntaxError ? "Invalid JSON in --data" : formatApiError(err));
-        process.exit(1);
-      }
-    });
+        if (!ctx.quiet) log.success("Content published.");
+        emit(ctx, data);
+      }),
+    );
 
   engine
     .command("draft")
@@ -53,22 +52,18 @@ export function registerEngineCommands(program: Command): void {
       "--data <json>",
       'JSON: { "geo_question_id": "uuid", "raw_markdown": "...", "seo_title": "...", "summary": "..." }',
     )
-    .action(async (cmdOpts: { data: string }) => {
-      const opts = program.opts();
-      try {
-        const body = JSON.parse(cmdOpts.data);
+    .action(
+      runAction(program, async (ctx, cmdOpts: { data: string }) => {
+        const body = parseJsonFlag(cmdOpts.data);
         const data = await apiRequest({
           method: "POST",
           path: "/org/content-engine/draft",
           body,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success("Content saved as draft.");
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(err instanceof SyntaxError ? "Invalid JSON in --data" : formatApiError(err));
-        process.exit(1);
-      }
-    });
+        if (!ctx.quiet) log.success("Content saved as draft.");
+        emit(ctx, data);
+      }),
+    );
 }

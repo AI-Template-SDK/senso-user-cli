@@ -1,7 +1,23 @@
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import { apiRequest, ApiError, formatApiError } from "./api-client.js";
+import { apiRequest, ApiError } from "./api-client.js";
+import { CliError, EXIT } from "./errors.js";
 import * as log from "../utils/logger.js";
+
+/**
+ * Thrown when the user cancels the picker with Ctrl-C or Escape.
+ *
+ * Cancelling is not a failure, but the picker is several frames deep in an
+ * interactive loop and cannot simply return "no folder" — its caller has files
+ * to upload and nowhere to put them. The caller catches this and returns
+ * cleanly, so the process exits 0 with no error printed.
+ */
+export class PickerCanceled extends Error {
+  constructor() {
+    super("Folder selection canceled.");
+    this.name = "PickerCanceled";
+  }
+}
 
 interface KBNode {
   kb_node_id: string;
@@ -68,11 +84,15 @@ async function createFolder(
     log.success(`Folder "${name}" created.`);
     return { folderId: data.kb_node_id, folderName: name };
   } catch (err) {
+    // Re-raised with the hint that actually resolves it: at the root, this is
+    // almost always a key without folder-creation scope rather than a wrong id.
     if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
-      log.error(
-        "Verify with the org admin that you have the proper scope to create under the org's root folder.",
-      );
-      process.exit(1);
+      throw new CliError("Not allowed to create a folder here.", EXIT.AUTH, {
+        code: err.status === 401 ? "unauthorized" : "forbidden",
+        status: err.status,
+        hint: "Ask an org admin to confirm this key has scope to create under the organization's root folder.",
+        cause: err,
+      });
     }
     throw err;
   }
@@ -91,7 +111,7 @@ async function promptCreateFolder(
 
   if (p.isCancel(name)) {
     p.cancel("Upload canceled.");
-    process.exit(0);
+    throw new PickerCanceled();
   }
 
   return createFolder((name as string).trim(), parentId, opts);
@@ -101,7 +121,7 @@ export async function pickFolder(opts: FolderPickerOptions): Promise<FolderPicke
   // The folders drilled into, deepest last. `.at(-1)` returning undefined *is*
   // the "we are at the root" case, so every read goes through this one accessor
   // rather than indexing by length-1 and assuming a hit.
-  const navigationStack: Array<{ id: string; name: string }> = [];
+  const navigationStack: { id: string; name: string }[] = [];
   const currentFolder = (): { id: string; name: string } | undefined => navigationStack.at(-1);
   let currentParentId: string | null = null;
   let currentOffset = 0;
@@ -109,7 +129,9 @@ export async function pickFolder(opts: FolderPickerOptions): Promise<FolderPicke
   let totalCount = 0;
   let needsFetch = true;
 
-  while (true) {
+  // The loop exits by returning a folder or by throwing PickerCanceled; there is
+  // no condition to test at the top, hence `for (;;)` rather than `while (true)`.
+  for (;;) {
     if (needsFetch) {
       const spin = p.spinner();
       spin.start("Loading folders...");
@@ -129,12 +151,13 @@ export async function pickFolder(opts: FolderPickerOptions): Promise<FolderPicke
         // Empty state at root
         if (loadedFolders.length === 0 && currentParentId === null) {
           log.info("No folders found. Let's create one.");
-          return promptCreateFolder(null, opts);
+          return await promptCreateFolder(null, opts);
         }
       } catch (err) {
+        // Stop the spinner before rethrowing: an abandoned spinner leaves the
+        // terminal with a spinning frame and a hidden cursor.
         spin.stop("Failed to load folders");
-        log.error(formatApiError(err));
-        process.exit(1);
+        throw err;
       }
     }
 
@@ -146,22 +169,22 @@ export async function pickFolder(opts: FolderPickerOptions): Promise<FolderPicke
 
     const currentFolderName = currentFolder()?.name ?? null;
 
-    // Show location and keyboard hints
-    console.log();
-    console.log(`  ${pc.bold("Location:")} ${breadcrumb}`);
-    console.log();
+    // Location and keyboard hints, on stderr like every other prompt: the picker
+    // is interactive chrome, and the command that opened it also prints an
+    // upload summary — the two must not interleave on stdout.
+    log.raw("");
+    log.raw(`  ${pc.bold("Location:")} ${breadcrumb}`);
+    log.raw("");
     if (currentFolderName) {
-      console.log(`  ${pc.dim("Use arrow keys to navigate, Enter to select.")}`);
-      console.log(`  ${pc.dim("Pick a folder to open it, or choose an action below the list.")}`);
+      log.dim("Use arrow keys to navigate, Enter to select.");
+      log.dim("Pick a folder to open it, or choose an action below the list.");
     } else {
-      console.log(
-        `  ${pc.dim("Use arrow keys to navigate, Enter to select a folder to open it.")}`,
-      );
+      log.dim("Use arrow keys to navigate, Enter to select a folder to open it.");
     }
-    console.log();
+    log.raw("");
 
     // Build select options — folders only
-    const options: Array<{ value: string; label: string }> = [];
+    const options: { value: string; label: string }[] = [];
 
     for (const folder of loadedFolders) {
       options.push({ value: folder.kb_node_id, label: `📁 ${folder.name}` });
@@ -190,7 +213,7 @@ export async function pickFolder(opts: FolderPickerOptions): Promise<FolderPicke
 
     if (p.isCancel(choice)) {
       p.cancel("Upload canceled.");
-      process.exit(0);
+      throw new PickerCanceled();
     }
 
     const selected = choice as string;

@@ -1,8 +1,9 @@
 import { Command } from "commander";
 import pc from "picocolors";
-import { apiRequest, formatApiError } from "../lib/api-client.js";
-import { output, outputPlain, type OutputFormat } from "../lib/output.js";
-import * as log from "../utils/logger.js";
+import { apiRequest } from "../lib/api-client.js";
+import { emit, outputPlain } from "../lib/output.js";
+import { runAction, type Ctx } from "../lib/run-action.js";
+import { CliError, EXIT } from "../lib/errors.js";
 
 // ---------------------------------------------------------------------------
 // Response shapes (mirror of senso-api internal/api/dto/org_analytics_dto.go)
@@ -276,8 +277,8 @@ function qualityLine(dq?: DataQuality): string {
  * Plain output builds these lines into its own payload, so this only fires for
  * `--output table`; `--output json` gets the payload untouched.
  */
-function emitContext(format: OutputFormat, lines: string[]): void {
-  if (format !== "table") return;
+function emitContext(ctx: Ctx, lines: string[]): void {
+  if (ctx.format !== "table") return;
   const visible = lines.filter(Boolean);
   if (visible.length === 0) return;
   outputPlain([...visible, ""]);
@@ -288,8 +289,8 @@ function emitContext(format: OutputFormat, lines: string[]): void {
  * the numbers (null denominators, truncated windows, tracking-set dependence).
  * Hidden only in `--output json`, where they are already in the payload.
  */
-function emitNotes(format: OutputFormat, notes?: string[]): void {
-  if (format === "json" || !notes || notes.length === 0) return;
+function emitNotes(ctx: Ctx, notes?: string[]): void {
+  if (ctx.format === "json" || !notes || notes.length === 0) return;
   outputPlain(["", `  ${pc.bold("Notes")}`, ...notes.map((note) => `  ${pc.dim("•")} ${note}`)]);
 }
 
@@ -358,8 +359,10 @@ function normalizeBool(flag: string, raw?: string): string | undefined {
   if (raw === undefined) return undefined;
   const value = raw.trim().toLowerCase();
   if (!BOOL_VALUES.has(value)) {
-    log.error(`Invalid --${flag}: expected true or false.`);
-    process.exit(1);
+    throw new CliError(`Invalid --${flag}: expected true or false.`, EXIT.USAGE, {
+      code: "usage",
+      hint: `Accepted values: ${[...BOOL_VALUES].join(", ")}.`,
+    });
   }
   return value;
 }
@@ -446,8 +449,8 @@ function metricPlainLines(rows: Record<string, unknown>[]): string[] {
   const width = rows.reduce((max, r) => Math.max(max, String(r.metric).length), 0);
   return rows.map(
     (r) =>
-      `  ${pc.bold(String(r.metric).padEnd(width))}  ${String(r.value)}  ${pc.dim(`(${r.counts})`)}` +
-      (r["vs prev"] !== NO_VALUE ? `  ${pc.dim(`vs prev: ${r["vs prev"]}`)}` : ""),
+      `  ${pc.bold(String(r.metric).padEnd(width))}  ${String(r.value)}  ${pc.dim(`(${String(r.counts)})`)}` +
+      (r["vs prev"] !== NO_VALUE ? `  ${pc.dim(`vs prev: ${String(r["vs prev"])}`)}` : ""),
   );
 }
 
@@ -469,10 +472,8 @@ export function registerAnalyticsCommands(program: Command): void {
       .description(
         "One-call dashboard: every headline metric with its raw counts, plus the preceding equal-length window and the deltas between them.",
       ),
-  ).action(async (cmdOpts: WindowFilters) => {
-    const opts = program.opts();
-    const format: OutputFormat = opts.output || "plain";
-    try {
+  ).action(
+    runAction(program, async (ctx, cmdOpts: WindowFilters) => {
       const data = await apiRequest<{
         window: AnalyticsWindow;
         totals: Totals;
@@ -483,19 +484,18 @@ export function registerAnalyticsCommands(program: Command): void {
       }>({
         path: "/org/analytics/summary",
         params: windowParams(cmdOpts),
-        apiKey: opts.apiKey,
-        baseUrl: opts.baseUrl,
+        apiKey: ctx.apiKey,
+        baseUrl: ctx.baseUrl,
       });
 
       const rows = metricRows(data.totals, data.metrics, data.deltas);
-      emitContext(format, [
+      emitContext(ctx, [
         "",
         `  ${pc.bold("Analytics summary")}`,
         windowLine(data.window),
         qualityLine(data.data_quality),
       ]);
-      output(format, {
-        json: data,
+      emit(ctx, data, {
         table: { rows, columns: METRIC_COLUMNS },
         plain: [
           "",
@@ -508,12 +508,9 @@ export function registerAnalyticsCommands(program: Command): void {
           `  ${pc.dim(`Monitoring ${count(data.totals.prompt_count)} prompts × ${count(data.totals.model_count)} models × ${count(data.totals.location_count)} locations — ${count(data.totals.answered_count)} of ${count(data.totals.run_count)} runs answered`)}`,
         ],
       });
-      emitNotes(format, data.notes);
-    } catch (err) {
-      log.error(formatApiError(err));
-      process.exit(1);
-    }
-  });
+      emitNotes(ctx, data.notes);
+    }),
+  );
 
   // ── mentions ─────────────────────────────────────────────────────────────
   addWindowOptions(
@@ -524,10 +521,8 @@ export function registerAnalyticsCommands(program: Command): void {
       ),
   )
     .option("--group-by <bucket>", "Time bucket: day | week (default: day)")
-    .action(async (cmdOpts: WindowFilters & { groupBy?: string }) => {
-      const opts = program.opts();
-      const format: OutputFormat = opts.output || "plain";
-      try {
+    .action(
+      runAction(program, async (ctx, cmdOpts: WindowFilters & { groupBy?: string }) => {
         const data = await apiRequest<{
           window: AnalyticsWindow;
           group_by: string;
@@ -539,8 +534,8 @@ export function registerAnalyticsCommands(program: Command): void {
         }>({
           path: "/org/analytics/mentions",
           params: { ...windowParams(cmdOpts), group_by: cmdOpts.groupBy },
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
 
         const series = data.series ?? [];
@@ -551,9 +546,8 @@ export function registerAnalyticsCommands(program: Command): void {
           qualityLine(data.data_quality),
           `  ${pc.dim(`Window totals — mention rate ${rate(data.metrics.mention_rate)}, share of voice ${rate(data.metrics.share_of_voice)}, avg rank ${rate(data.metrics.avg_rank)}`)}`,
         ];
-        emitContext(format, context);
-        output(format, {
-          json: data,
+        emitContext(ctx, context);
+        emit(ctx, data, {
           table: {
             rows: series.map((p) => ({
               period: p.period_start,
@@ -576,12 +570,9 @@ export function registerAnalyticsCommands(program: Command): void {
               : ["  No rollup days in this window."]),
           ],
         });
-        emitNotes(format, data.notes);
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emitNotes(ctx, data.notes);
+      }),
+    );
 
   // ── citations ────────────────────────────────────────────────────────────
   addWindowOptions(
@@ -592,10 +583,8 @@ export function registerAnalyticsCommands(program: Command): void {
       ),
   )
     .option("--group-by <bucket>", "Time bucket: day | week (default: day)")
-    .action(async (cmdOpts: WindowFilters & { groupBy?: string }) => {
-      const opts = program.opts();
-      const format: OutputFormat = opts.output || "plain";
-      try {
+    .action(
+      runAction(program, async (ctx, cmdOpts: WindowFilters & { groupBy?: string }) => {
         const data = await apiRequest<{
           window: AnalyticsWindow;
           group_by: string;
@@ -607,8 +596,8 @@ export function registerAnalyticsCommands(program: Command): void {
         }>({
           path: "/org/analytics/citations",
           params: { ...windowParams(cmdOpts), group_by: cmdOpts.groupBy },
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
 
         const series = data.series ?? [];
@@ -620,9 +609,8 @@ export function registerAnalyticsCommands(program: Command): void {
           `  ${pc.dim(`D = ${count(data.totals.cited_run_count)} cited answers, S = ${count(data.totals.cited_total)} citation instances`)}`,
           `  ${pc.dim(`Owned rate ${rate(data.metrics.primary_citation_rate)} (÷D) · Owned share ${rate(data.metrics.primary_citation_share)} (÷S) · ${rate(data.metrics.citations_per_answer)}`)}`,
         ];
-        emitContext(format, context);
-        output(format, {
-          json: data,
+        emitContext(ctx, context);
+        emit(ctx, data, {
           table: {
             rows: series.map((p) => ({
               period: p.period_start,
@@ -654,12 +642,9 @@ export function registerAnalyticsCommands(program: Command): void {
               : ["  No rollup days in this window."]),
           ],
         });
-        emitNotes(format, data.notes);
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emitNotes(ctx, data.notes);
+      }),
+    );
 
   // ── domains ──────────────────────────────────────────────────────────────
   addPagingOptions(
@@ -676,18 +661,18 @@ export function registerAnalyticsCommands(program: Command): void {
       .option("--sort <field>", "Sort by: citations | coverage (default: citations)"),
     50,
   ).action(
-    async (
-      cmdOpts: WindowFilters & {
-        tier?: string;
-        domainContains?: string;
-        sort?: string;
-        limit?: string;
-        offset?: string;
-      },
-    ) => {
-      const opts = program.opts();
-      const format: OutputFormat = opts.output || "plain";
-      try {
+    runAction(
+      program,
+      async (
+        ctx: Ctx,
+        cmdOpts: WindowFilters & {
+          tier?: string;
+          domainContains?: string;
+          sort?: string;
+          limit?: string;
+          offset?: string;
+        },
+      ) => {
         const data = await apiRequest<{
           window: AnalyticsWindow;
           denominators: Denominators;
@@ -707,8 +692,8 @@ export function registerAnalyticsCommands(program: Command): void {
             limit: cmdOpts.limit,
             offset: cmdOpts.offset,
           },
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
 
         const domains = data.domains ?? [];
@@ -719,9 +704,8 @@ export function registerAnalyticsCommands(program: Command): void {
           qualityLine(data.data_quality),
           `  ${pc.dim(`D = ${count(data.denominators?.cited_run_count)} cited answers, S = ${count(data.denominators?.cited_total)} citation instances`)}`,
         ];
-        emitContext(format, context);
-        output(format, {
-          json: data,
+        emitContext(ctx, context);
+        emit(ctx, data, {
           table: {
             rows: domains.map((d) => ({
               rank: d.rank_by_citations,
@@ -755,12 +739,9 @@ export function registerAnalyticsCommands(program: Command): void {
               : ["  No cited domains in this window."]),
           ],
         });
-        emitNotes(format, data.notes);
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    },
+        emitNotes(ctx, data.notes);
+      },
+    ),
   );
 
   // ── pages ────────────────────────────────────────────────────────────────
@@ -780,20 +761,20 @@ export function registerAnalyticsCommands(program: Command): void {
       .option("--sort <field>", "Sort by: citations | coverage (default: citations)"),
     50,
   ).action(
-    async (
-      cmdOpts: WindowFilters & {
-        tier?: string;
-        domain?: string;
-        domainContains?: string;
-        urlContains?: string;
-        sort?: string;
-        limit?: string;
-        offset?: string;
-      },
-    ) => {
-      const opts = program.opts();
-      const format: OutputFormat = opts.output || "plain";
-      try {
+    runAction(
+      program,
+      async (
+        ctx: Ctx,
+        cmdOpts: WindowFilters & {
+          tier?: string;
+          domain?: string;
+          domainContains?: string;
+          urlContains?: string;
+          sort?: string;
+          limit?: string;
+          offset?: string;
+        },
+      ) => {
         const data = await apiRequest<{
           window: AnalyticsWindow;
           denominators: Denominators;
@@ -815,8 +796,8 @@ export function registerAnalyticsCommands(program: Command): void {
             limit: cmdOpts.limit,
             offset: cmdOpts.offset,
           },
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
 
         const pages = data.pages ?? [];
@@ -827,9 +808,8 @@ export function registerAnalyticsCommands(program: Command): void {
           qualityLine(data.data_quality),
           `  ${pc.dim(`D = ${count(data.denominators?.cited_run_count)} cited answers, S = ${count(data.denominators?.cited_total)} citation instances`)}`,
         ];
-        emitContext(format, context);
-        output(format, {
-          json: data,
+        emitContext(ctx, context);
+        emit(ctx, data, {
           table: {
             rows: pages.map((p) => ({
               url: truncate(p.url, 70),
@@ -859,12 +839,9 @@ export function registerAnalyticsCommands(program: Command): void {
               : ["  No cited pages in this window."]),
           ],
         });
-        emitNotes(format, data.notes);
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    },
+        emitNotes(ctx, data.notes);
+      },
+    ),
   );
 
   // ── prompts ──────────────────────────────────────────────────────────────
@@ -884,18 +861,18 @@ export function registerAnalyticsCommands(program: Command): void {
       .option("--order <dir>", "Sort direction: asc | desc (default: desc)"),
     50,
   ).action(
-    async (
-      cmdOpts: WindowFilters & {
-        search?: string;
-        sort?: string;
-        order?: string;
-        limit?: string;
-        offset?: string;
-      },
-    ) => {
-      const opts = program.opts();
-      const format: OutputFormat = opts.output || "plain";
-      try {
+    runAction(
+      program,
+      async (
+        ctx: Ctx,
+        cmdOpts: WindowFilters & {
+          search?: string;
+          sort?: string;
+          order?: string;
+          limit?: string;
+          offset?: string;
+        },
+      ) => {
         const data = await apiRequest<{
           window: AnalyticsWindow;
           totals: Totals;
@@ -916,8 +893,8 @@ export function registerAnalyticsCommands(program: Command): void {
             limit: cmdOpts.limit,
             offset: cmdOpts.offset,
           },
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
 
         const prompts = data.prompts ?? [];
@@ -928,9 +905,8 @@ export function registerAnalyticsCommands(program: Command): void {
           qualityLine(data.data_quality),
           `  ${pc.dim(`Org-wide over the same window — mention rate ${rate(data.metrics.mention_rate)}, share of voice ${rate(data.metrics.share_of_voice)}`)}`,
         ];
-        emitContext(format, context);
-        output(format, {
-          json: data,
+        emitContext(ctx, context);
+        emit(ctx, data, {
           table: {
             rows: prompts.map((p) => ({
               prompt_id: p.prompt_id,
@@ -967,12 +943,9 @@ export function registerAnalyticsCommands(program: Command): void {
               : ["  No prompts matched this filter."]),
           ],
         });
-        emitNotes(format, data.notes);
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    },
+        emitNotes(ctx, data.notes);
+      },
+    ),
   );
 
   // ── prompt <promptId> ────────────────────────────────────────────────────
@@ -987,19 +960,19 @@ export function registerAnalyticsCommands(program: Command): void {
     .option("--location <list>", "Comma-separated location filter, case-sensitive")
     .option("--no-include-answers", "Omit the latest answer bodies (included by default)")
     .action(
-      async (
-        promptId: string,
-        cmdOpts: {
-          from?: string;
-          to?: string;
-          models?: string;
-          location?: string;
-          includeAnswers?: boolean;
-        },
-      ) => {
-        const opts = program.opts();
-        const format: OutputFormat = opts.output || "plain";
-        try {
+      runAction(
+        program,
+        async (
+          ctx: Ctx,
+          promptId: string,
+          cmdOpts: {
+            from?: string;
+            to?: string;
+            models?: string;
+            location?: string;
+            includeAnswers?: boolean;
+          },
+        ) => {
           const data = await apiRequest<{
             prompt_id: string;
             prompt_text: string;
@@ -1021,8 +994,8 @@ export function registerAnalyticsCommands(program: Command): void {
               location: cmdOpts.location,
               include_answers: cmdOpts.includeAnswers === false ? "false" : undefined,
             },
-            apiKey: opts.apiKey,
-            baseUrl: opts.baseUrl,
+            apiKey: ctx.apiKey,
+            baseUrl: ctx.baseUrl,
           });
 
           const series = data.series ?? [];
@@ -1035,9 +1008,8 @@ export function registerAnalyticsCommands(program: Command): void {
             windowLine(data.window),
             qualityLine(data.data_quality),
           ];
-          emitContext(format, context);
-          output(format, {
-            json: data,
+          emitContext(ctx, context);
+          emit(ctx, data, {
             table: {
               rows: series.map((p) => ({
                 period: p.period_start,
@@ -1076,12 +1048,9 @@ export function registerAnalyticsCommands(program: Command): void {
                 : []),
             ],
           });
-          emitNotes(format, data.notes);
-        } catch (err) {
-          log.error(formatApiError(err));
-          process.exit(1);
-        }
-      },
+          emitNotes(ctx, data.notes);
+        },
+      ),
     );
 
   // ── answers ──────────────────────────────────────────────────────────────
@@ -1117,24 +1086,26 @@ export function registerAnalyticsCommands(program: Command): void {
       ),
     25,
   ).action(
-    async (cmdOpts: {
-      from?: string;
-      to?: string;
-      models?: string;
-      location?: string;
-      promptType?: string;
-      tag?: string;
-      mentioned?: string;
-      cited?: string;
-      citationTier?: string;
-      limit?: string;
-      offset?: string;
-    }) => {
-      const opts = program.opts();
-      const format: OutputFormat = opts.output || "plain";
-      const mentioned = normalizeBool("mentioned", cmdOpts.mentioned);
-      const cited = normalizeBool("cited", cmdOpts.cited);
-      try {
+    runAction(
+      program,
+      async (
+        ctx: Ctx,
+        cmdOpts: {
+          from?: string;
+          to?: string;
+          models?: string;
+          location?: string;
+          promptType?: string;
+          tag?: string;
+          mentioned?: string;
+          cited?: string;
+          citationTier?: string;
+          limit?: string;
+          offset?: string;
+        },
+      ) => {
+        const mentioned = normalizeBool("mentioned", cmdOpts.mentioned);
+        const cited = normalizeBool("cited", cmdOpts.cited);
         const data = await apiRequest<{
           total: number;
           limit: number;
@@ -1156,8 +1127,8 @@ export function registerAnalyticsCommands(program: Command): void {
             limit: cmdOpts.limit,
             offset: cmdOpts.offset,
           },
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
 
         const answers = data.answers ?? [];
@@ -1171,9 +1142,8 @@ export function registerAnalyticsCommands(program: Command): void {
           `  ${pc.dim("Snapshot of the newest answer per prompt × model × location — not a sample of any window.")}`,
           ...(collectedLine ? [collectedLine] : []),
         ];
-        emitContext(format, context);
-        output(format, {
-          json: data,
+        emitContext(ctx, context);
+        emit(ctx, data, {
           table: {
             rows: answers.map((a) => ({
               run_at: (a.run_at || "").slice(0, 10),
@@ -1212,12 +1182,9 @@ export function registerAnalyticsCommands(program: Command): void {
               : ["  No answers matched this filter."]),
           ],
         });
-        emitNotes(format, data.notes);
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    },
+        emitNotes(ctx, data.notes);
+      },
+    ),
   );
 
   // ── glossary ─────────────────────────────────────────────────────────────
@@ -1226,26 +1193,26 @@ export function registerAnalyticsCommands(program: Command): void {
     .description(
       "Canonical definition, denominator and gotcha for every metric these endpoints emit. Read this before quoting a number — a Citation Rate divides by cited answers (D), a Citation Share divides by citation instances (S), and they are not interchangeable.",
     )
-    .action(async () => {
-      const opts = program.opts();
-      const format: OutputFormat = opts.output || "plain";
-      try {
+    .action(
+      runAction(program, async (ctx) => {
         const data = await apiRequest<{ entries: GlossaryEntry[] }>({
           path: "/org/analytics/glossary",
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
 
         const entries = data.entries ?? [];
-        emitContext(format, [
+        emitContext(ctx, [
           "",
           `  ${pc.bold("Metric glossary")} ${pc.dim(`${entries.length} metrics — gotchas shown in plain and json output`)}`,
         ]);
-        output(format, {
-          json: data,
+        emit(ctx, data, {
           table: {
             rows: entries.map((e) => ({
               metric: e.metric,
+              // `||` not `??`: an empty denominator string is as absent as a
+              // missing one, and should render as the placeholder.
+              // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
               denominator: e.denominator || NO_VALUE,
               definition: e.definition,
             })),
@@ -1265,11 +1232,8 @@ export function registerAnalyticsCommands(program: Command): void {
             ),
           ],
         });
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+      }),
+    );
 
   // ── filters ──────────────────────────────────────────────────────────────
   analytics
@@ -1277,10 +1241,8 @@ export function registerAnalyticsCommands(program: Command): void {
     .description(
       "The models, locations, prompt types, tags and tracked competitors that actually have data for this org, plus the span of rollup days available — so you never guess a model spelling or query an empty window.",
     )
-    .action(async () => {
-      const opts = program.opts();
-      const format: OutputFormat = opts.output || "plain";
-      try {
+    .action(
+      runAction(program, async (ctx) => {
         const data = await apiRequest<{
           models: FilterOption[];
           locations: string[];
@@ -1291,8 +1253,8 @@ export function registerAnalyticsCommands(program: Command): void {
           notes: string[];
         }>({
           path: "/org/analytics/filters",
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
 
         const models = (data.models ?? []).map((m) => m.display_name || m.id);
@@ -1305,9 +1267,8 @@ export function registerAnalyticsCommands(program: Command): void {
 
         const list = (values: string[]): string => (values.length ? values.join(", ") : NO_VALUE);
 
-        emitContext(format, ["", `  ${pc.bold("Available filters")}`]);
-        output(format, {
-          json: data,
+        emitContext(ctx, ["", `  ${pc.bold("Available filters")}`]);
+        emit(ctx, data, {
           table: {
             rows: [
               { filter: "--models", values: list(models) },
@@ -1332,10 +1293,7 @@ export function registerAnalyticsCommands(program: Command): void {
             `  ${pc.bold("Date range")}           ${rangeText}`,
           ],
         });
-        emitNotes(format, data.notes);
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emitNotes(ctx, data.notes);
+      }),
+    );
 }

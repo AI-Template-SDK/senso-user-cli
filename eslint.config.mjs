@@ -8,6 +8,7 @@
 // Type-aware linting is on (projectService), which is why tsconfig.json includes
 // tests/ and scripts/ as well as src/.
 
+import { defineConfig } from "eslint/config";
 import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 
@@ -33,7 +34,21 @@ const noConsoleRule = {
     "Commands must not write to the console directly. Print through lib/output.ts (payload) or utils/logger.ts (diagnostics) so --output and --quiet keep working, and stdout stays parseable. See eslint.config.mjs.",
 };
 
-export default tseslint.config(
+/**
+ * The same ban, one level down.
+ *
+ * Without this, `process.stdout.write(...)` is an unguarded way around the
+ * console rule that looks more deliberate than it is — and it was already being
+ * used to stream search tokens. lib/output.ts exports `writeStdout` for that
+ * case, which keeps the exception in the module that owns the stream.
+ */
+const noRawStreamRule = {
+  selector: "MemberExpression[object.name='process'][property.name=/^(stdout|stderr)$/]",
+  message:
+    "Do not write to process.stdout/stderr directly. Use writeStdout() from lib/output.ts for streamed payload, or utils/logger.ts for diagnostics. See eslint.config.mjs.",
+};
+
+export default defineConfig(
   {
     // Build output, coverage reports and dependencies are not ours to lint.
     ignores: ["dist/**", "coverage/**", "node_modules/**", "docs/reference/**"],
@@ -46,13 +61,19 @@ export default tseslint.config(
   {
     languageOptions: {
       parserOptions: {
-        projectService: true,
+        // `allowDefaultProject` covers the config files at the repository root.
+        // They are linted, but they are not part of the TypeScript program —
+        // putting them in tsconfig's `include` would drag a .mjs file into a
+        // build that has no reason to know about it.
+        projectService: {
+          allowDefaultProject: ["*.mjs", "*.js"],
+        },
         tsconfigRootDir: import.meta.dirname,
       },
     },
     rules: {
       // The output contract. See OUTPUT_MODULES above.
-      "no-restricted-syntax": ["error", noConsoleRule],
+      "no-restricted-syntax": ["error", noConsoleRule, noRawStreamRule],
 
       // process.exit in a command action is untestable in-process and skips the
       // single error path in lib/run-action.ts. Throw a CliError instead; the
@@ -114,6 +135,25 @@ export default tseslint.config(
       "no-restricted-properties": "off",
       "no-restricted-syntax": "off",
     },
+  },
+
+  {
+    /**
+     * Command files narrow untyped JSON, so "provably true" is not provable.
+     *
+     * `apiRequest<T>` is a cast, not a validator: the response interfaces in
+     * these files are assertions about what the server sends, and the compiler
+     * treats them as facts. That makes `no-unnecessary-condition` unsound here —
+     * it reads `results: UploadResultItem[]` as "always present" and flags the
+     * `?? []` that keeps a malformed response from throwing "not iterable".
+     * Removing those guards to satisfy the linter would trade a real runtime
+     * protection for a type-level tautology.
+     *
+     * The rule stays on for lib/ and utils/, where the types are ours and the
+     * reasoning holds — it found genuine dead conditionals in both.
+     */
+    files: ["src/commands/**/*.ts"],
+    rules: { "@typescript-eslint/no-unnecessary-condition": "off" },
   },
 
   {

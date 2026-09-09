@@ -1,5 +1,8 @@
 import { Command } from "commander";
-import { apiRequest, formatApiError } from "../lib/api-client.js";
+import { apiRequest } from "../lib/api-client.js";
+import { CliError, EXIT } from "../lib/errors.js";
+import { emit } from "../lib/output.js";
+import { runAction } from "../lib/run-action.js";
 import * as log from "../utils/logger.js";
 
 const SUPPORTED_TYPES = ["citeables", "codeables", "cucopilot"] as const;
@@ -20,20 +23,19 @@ export function registerDestinationsCommands(program: Command): void {
     .description(
       "List all destinations available to the organization. Includes shared destinations (citeables, codeables, cucopilot) and any custom domains you've added, with per-destination live article counts and last publish timestamps. 'selected_for_generation: true' means a destination is active in your generation pipeline.",
     )
-    .action(async () => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx) => {
         const data = await apiRequest({
           path: "/org/destinations",
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        // The id column is publisher_id because that is what `remove` takes.
+        emit(ctx, data, {
+          columns: ["publisher_id", "name", "domain", "type", "selected_for_generation"],
+        });
+      }),
+    );
 
   dest
     .command("add")
@@ -47,16 +49,15 @@ export function registerDestinationsCommands(program: Command): void {
       "Destination type. One of: citeables, codeables, cucopilot. Defaults to citeables.",
       "citeables",
     )
-    .action(async (cmdOpts: { domain: string; name: string; type: string }) => {
-      const opts = program.opts();
-      const type = cmdOpts.type.toLowerCase();
-      if (!(SUPPORTED_TYPES as readonly string[]).includes(type)) {
-        log.error(
-          `Invalid --type "${cmdOpts.type}". Must be one of: ${SUPPORTED_TYPES.join(", ")}.`,
-        );
-        process.exit(1);
-      }
-      try {
+    .action(
+      runAction(program, async (ctx, cmdOpts: { domain: string; name: string; type: string }) => {
+        const type = cmdOpts.type.toLowerCase();
+        if (!(SUPPORTED_TYPES as readonly string[]).includes(type)) {
+          throw new CliError(`Invalid --type "${cmdOpts.type}".`, EXIT.USAGE, {
+            code: "usage",
+            hint: `Must be one of: ${SUPPORTED_TYPES.join(", ")}.`,
+          });
+        }
         const data = await apiRequest({
           method: "POST",
           path: "/org/destinations",
@@ -65,16 +66,14 @@ export function registerDestinationsCommands(program: Command): void {
             name: cmdOpts.name,
             domain: cmdOpts.domain,
           },
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success(`Destination "${cmdOpts.name}" registered for ${cmdOpts.domain}.`);
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        if (!ctx.quiet)
+          log.success(`Destination "${cmdOpts.name}" registered for ${cmdOpts.domain}.`);
+        emit(ctx, data);
+      }),
+    );
 
   dest
     .command("remove <publisherId>")
@@ -96,19 +95,20 @@ export function registerDestinationsCommands(program: Command): void {
       false,
     )
     .action(
-      async (
-        publisherId: string,
-        cmdOpts: { action: string; alsoRemoveDestination?: boolean; keepDomain?: boolean },
-      ) => {
-        const opts = program.opts();
-        const action = cmdOpts.action.toLowerCase();
-        if (!(REMOVE_ACTIONS as readonly string[]).includes(action)) {
-          log.error(
-            `Invalid --action "${cmdOpts.action}". Must be one of: ${REMOVE_ACTIONS.join(", ")}.`,
-          );
-          process.exit(1);
-        }
-        try {
+      runAction(
+        program,
+        async (
+          ctx,
+          publisherId: string,
+          cmdOpts: { action: string; alsoRemoveDestination?: boolean; keepDomain?: boolean },
+        ) => {
+          const action = cmdOpts.action.toLowerCase();
+          if (!(REMOVE_ACTIONS as readonly string[]).includes(action)) {
+            throw new CliError(`Invalid --action "${cmdOpts.action}".`, EXIT.USAGE, {
+              code: "usage",
+              hint: `Must be one of: ${REMOVE_ACTIONS.join(", ")}.`,
+            });
+          }
           const data = await apiRequest({
             method: "POST",
             path: `/org/destinations/${publisherId}/remove`,
@@ -117,15 +117,12 @@ export function registerDestinationsCommands(program: Command): void {
               also_remove_destination: cmdOpts.alsoRemoveDestination ?? false,
               keep_domain: cmdOpts.keepDomain ?? false,
             },
-            apiKey: opts.apiKey,
-            baseUrl: opts.baseUrl,
+            apiKey: ctx.apiKey,
+            baseUrl: ctx.baseUrl,
           });
-          log.success(`Destination ${publisherId} removed (action: ${action}).`);
-          console.log(JSON.stringify(data, null, 2));
-        } catch (err) {
-          log.error(formatApiError(err));
-          process.exit(1);
-        }
-      },
+          if (!ctx.quiet) log.success(`Destination ${publisherId} removed (action: ${action}).`);
+          emit(ctx, data);
+        },
+      ),
     );
 }

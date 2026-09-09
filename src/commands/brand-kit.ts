@@ -1,5 +1,8 @@
 import { Command } from "commander";
-import { apiRequest, formatApiError } from "../lib/api-client.js";
+import { apiRequest } from "../lib/api-client.js";
+import { parseJsonFlag } from "../lib/json-arg.js";
+import { emit } from "../lib/output.js";
+import { runAction } from "../lib/run-action.js";
 import * as log from "../utils/logger.js";
 
 export function registerBrandKitCommands(program: Command): void {
@@ -11,20 +14,16 @@ export function registerBrandKitCommands(program: Command): void {
 
   bk.command("get")
     .description("Get the current brand kit guidelines.")
-    .action(async () => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx) => {
         const data = await apiRequest({
           path: "/org/brand-kit",
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emit(ctx, data);
+      }),
+    );
 
   bk.command("set")
     .description(
@@ -34,24 +33,20 @@ export function registerBrandKitCommands(program: Command): void {
       "--data <json>",
       'JSON: { "guidelines": { "brand_name": "Acme", "voice_and_tone": "...", "author_persona": "...", "global_writing_rules": [] } }',
     )
-    .action(async (cmdOpts: { data: string }) => {
-      const opts = program.opts();
-      try {
-        const body = JSON.parse(cmdOpts.data);
+    .action(
+      runAction(program, async (ctx, cmdOpts: { data: string }) => {
+        const body = parseJsonFlag(cmdOpts.data);
         const data = await apiRequest({
           method: "PUT",
           path: "/org/brand-kit",
           body,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success("Brand kit updated.");
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(err instanceof SyntaxError ? "Invalid JSON in --data" : formatApiError(err));
-        process.exit(1);
-      }
-    });
+        if (!ctx.quiet) log.success("Brand kit updated.");
+        emit(ctx, data);
+      }),
+    );
 
   bk.command("patch")
     .description(
@@ -61,22 +56,18 @@ export function registerBrandKitCommands(program: Command): void {
       "--data <json>",
       'JSON: { "guidelines": { "voice_and_tone": "Warm and approachable" } }',
     )
-    .action(async (cmdOpts: { data: string }) => {
-      const opts = program.opts();
-      try {
-        const body = JSON.parse(cmdOpts.data);
+    .action(
+      runAction(program, async (ctx, cmdOpts: { data: string }) => {
+        const body = parseJsonFlag(cmdOpts.data);
         const data = await apiRequest({
           method: "PATCH",
           path: "/org/brand-kit",
           body,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success("Brand kit updated.");
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(err instanceof SyntaxError ? "Invalid JSON in --data" : formatApiError(err));
-        process.exit(1);
-      }
-    });
+        if (!ctx.quiet) log.success("Brand kit updated.");
+        emit(ctx, data);
+      }),
+    );
 }

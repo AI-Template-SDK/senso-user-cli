@@ -1,5 +1,7 @@
 import { Command } from "commander";
-import { apiRequest, formatApiError } from "../lib/api-client.js";
+import { apiRequest } from "../lib/api-client.js";
+import { emit, emitConfirmation } from "../lib/output.js";
+import { runAction } from "../lib/run-action.js";
 import * as log from "../utils/logger.js";
 
 const MATCH_TYPES = "domain | host | path_prefix | exact_url";
@@ -38,20 +40,19 @@ export function registerTrackedSourcesCommands(program: Command): void {
   sources
     .command("list")
     .description("List every tracked source rule for the current organization.")
-    .action(async () => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx) => {
         const data = await apiRequest({
           path: "/org/tracked-sources",
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        // The columns are the rule fields the add/update flags write.
+        emit(ctx, data, {
+          columns: ["source_id", "pattern", "match_type", "tier", "category", "active"],
+        });
+      }),
+    );
 
   sources
     .command("add")
@@ -68,23 +69,19 @@ export function registerTrackedSourcesCommands(program: Command): void {
     )
     .option("--label <label>", "Optional human-readable label")
     .option("--priority <n>", "Optional ordering priority (integer)")
-    .action(async (cmdOpts: SourceFlags) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, cmdOpts: SourceFlags) => {
         const data = await apiRequest({
           method: "POST",
           path: "/org/tracked-sources",
           body: buildSourceBody(cmdOpts),
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success(`Tracked source "${cmdOpts.pattern}" added.`);
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        if (!ctx.quiet) log.success(`Tracked source "${cmdOpts.pattern}" added.`);
+        emit(ctx, data);
+      }),
+    );
 
   sources
     .command("update <sourceId>")
@@ -105,40 +102,32 @@ export function registerTrackedSourcesCommands(program: Command): void {
     .option("--priority <n>", "Optional ordering priority (integer)")
     .option("--active", "Mark the rule active")
     .option("--no-active", "Mark the rule inactive")
-    .action(async (sourceId: string, cmdOpts: SourceFlags) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, sourceId: string, cmdOpts: SourceFlags) => {
         const data = await apiRequest({
           method: "PUT",
           path: `/org/tracked-sources/${sourceId}`,
           body: buildSourceBody(cmdOpts),
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success(`Tracked source ${sourceId} updated.`);
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        if (!ctx.quiet) log.success(`Tracked source ${sourceId} updated.`);
+        emit(ctx, data);
+      }),
+    );
 
   sources
     .command("delete <sourceId>")
     .description("Remove a tracked source rule.")
-    .action(async (sourceId: string) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, sourceId: string) => {
         await apiRequest({
           method: "DELETE",
           path: `/org/tracked-sources/${sourceId}`,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success(`Tracked source ${sourceId} removed.`);
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emitConfirmation(ctx, `Tracked source ${sourceId} removed.`);
+      }),
+    );
 }
