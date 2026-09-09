@@ -9,12 +9,19 @@ import {
   uploadStatusToReason,
   type UploadResponse,
 } from "../lib/api-client.js";
+import { parseEnumFlag } from "../lib/enum-arg.js";
 import { CliError, EXIT } from "../lib/errors.js";
 import { parseJsonFlag } from "../lib/json-arg.js";
 import { emit, emitConfirmation } from "../lib/output.js";
 import { runAction } from "../lib/run-action.js";
 import { buildSetTagsBody, buildAttachTagBody } from "../lib/tag-args.js";
 import * as log from "../utils/logger.js";
+
+/** The roles a grant can confer. `owner` is reserved and rejected by the API. */
+const GRANTABLE_ROLES = ["viewer", "editor"] as const;
+
+/** What an access grant can be for. */
+const GRANTEE_TYPES = ["user", "group"] as const;
 
 /** The fields worth seeing when a KB endpoint returns `{ nodes: [...] }`. */
 const NODE_COLUMNS = ["kb_node_id", "name", "type"];
@@ -79,6 +86,21 @@ export function registerKBCommands(program: Command): void {
       runAction(program, async (ctx) => {
         const data = await apiRequest({
           path: "/org/kb/root",
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
+        });
+        emit(ctx, data);
+      }),
+    );
+
+  kb.command("stats")
+    .description(
+      "Get how many documents and folders the knowledge base holds, as total_files and total_folders (the root folder is not counted). A cheap way to check the size of the KB without paging through 'kb my-files'.",
+    )
+    .action(
+      runAction(program, async (ctx) => {
+        const data = await apiRequest({
+          path: "/org/kb/stats",
           apiKey: ctx.apiKey,
           baseUrl: ctx.baseUrl,
         });
@@ -281,6 +303,31 @@ export function registerKBCommands(program: Command): void {
       }),
     );
 
+  kb.command("bulk-delete <nodeIds...>")
+    .description(
+      "Delete up to 100 KB nodes in one call. Folders take their whole subtree with them. The batch is all-or-nothing: if any node is missing, not permitted, a root, or still ingesting, nothing is deleted. Node IDs come from 'kb my-files', 'kb children' or 'kb find'. This cannot be undone.",
+    )
+    .action(
+      runAction(program, async (ctx, nodeIds: string[]) => {
+        // The API caps the batch at 100 and rejects the whole request past it.
+        // Saying so here costs nothing and names the number the caller passed.
+        if (nodeIds.length > 100) {
+          throw new CliError("Maximum 100 nodes per bulk delete.", EXIT.USAGE, {
+            code: "usage",
+            hint: `You passed ${String(nodeIds.length)}. Split them across several calls.`,
+          });
+        }
+        await apiRequest({
+          method: "POST",
+          path: "/org/kb/nodes/bulk-delete",
+          body: { node_ids: nodeIds },
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
+        });
+        emitConfirmation(ctx, `Deleted ${String(nodeIds.length)} node(s).`);
+      }),
+    );
+
   kb.command("create-raw")
     .description("Create a raw (text/markdown) content item in the knowledge base.")
     .requiredOption(
@@ -410,7 +457,17 @@ export function registerKBCommands(program: Command): void {
           }
         }
 
-        printUploadSummary(uploaded, failed, items);
+        printUploadSummary(uploaded, failed, items, ctx.quiet);
+
+        // A batch where every file was rejected or every S3 PUT failed used to
+        // exit 0: nothing was stored, but a script branching on the exit code saw
+        // success and the only signal was English on stderr.
+        if (uploaded === 0 && items.length > 0) {
+          throw new CliError(`No files were uploaded (${items.length} attempted).`, EXIT.ERROR, {
+            hint: "Each file's reason is listed above. Re-run with --output json for the machine-readable detail.",
+          });
+        }
+
         // The summary above IS the human rendering of this payload, so `plain`
         // is already served and repeating it on stdout would only be noise.
         // json and table still get the payload, so the flag is honored.
@@ -552,6 +609,101 @@ export function registerKBCommands(program: Command): void {
           });
         }
         emitConfirmation(ctx, `Tag detached from KB node ${id}.`);
+      }),
+    );
+  const permissions = kb
+    .command("permissions")
+    .description(
+      "Manage who can see and edit a knowledge base node. A grant gives one user or group viewer or editor access to a node; owner is assigned by the platform and cannot be granted here. Node IDs come from 'kb my-files', 'kb children' or 'kb find'.",
+    );
+
+  permissions
+    .command("list <id>")
+    .description(
+      "List the access grants on a KB node — who holds what role, with the grantee's name and (for users) email. Group grants you cannot see are omitted. This is where the permission ID for 'kb permissions update' and 'kb permissions remove' comes from.",
+    )
+    .action(
+      runAction(program, async (ctx, id: string) => {
+        const data = await apiRequest({
+          path: `/org/kb/nodes/${id}/permissions`,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
+        });
+        emit(ctx, data, { columns: ["id", "role", "grantee", "granted_at"] });
+      }),
+    );
+
+  permissions
+    .command("add <id>")
+    .description(
+      "Grant a user or group viewer or editor access to a KB node, and return the new grant with its ID. Use 'kb permissions update' to change the role of a grant that already exists. User IDs come from 'users list'; group IDs from 'permissions groups'.",
+    )
+    .requiredOption("--grantee-type <type>", "Who the grant is for: user | group")
+    .requiredOption("--grantee-id <id>", "The user ID or group ID to grant access to")
+    .requiredOption("--role <role>", "Access level to grant: viewer | editor")
+    .action(
+      runAction(
+        program,
+        async (
+          ctx,
+          id: string,
+          cmdOpts: { granteeType: string; granteeId: string; role: string },
+        ) => {
+          const granteeType = parseEnumFlag("--grantee-type", cmdOpts.granteeType, GRANTEE_TYPES);
+          const role = parseEnumFlag("--role", cmdOpts.role, GRANTABLE_ROLES);
+          const data = await apiRequest({
+            method: "POST",
+            path: `/org/kb/nodes/${id}/permissions`,
+            body: { grantee_type: granteeType, grantee_id: cmdOpts.granteeId, role },
+            apiKey: ctx.apiKey,
+            baseUrl: ctx.baseUrl,
+          });
+          if (!ctx.quiet) log.success(`Granted ${String(role)} on node ${id}.`);
+          emit(ctx, data);
+        },
+      ),
+    );
+
+  permissions
+    .command("update <id> <permissionId>")
+    .description(
+      "Change an existing grant's role to viewer or editor. You cannot change your own grant. The permission ID comes from 'kb permissions list <id>'.",
+    )
+    .requiredOption("--role <role>", "The new role: viewer | editor")
+    .action(
+      runAction(
+        program,
+        async (ctx, id: string, permissionId: string, cmdOpts: { role: string }) => {
+          const role = parseEnumFlag("--role", cmdOpts.role, GRANTABLE_ROLES);
+          const data = await apiRequest({
+            method: "PATCH",
+            path: `/org/kb/nodes/${id}/permissions/${permissionId}`,
+            body: { role },
+            apiKey: ctx.apiKey,
+            baseUrl: ctx.baseUrl,
+          });
+          if (!ctx.quiet) log.success(`Grant ${permissionId} is now ${String(role)}.`);
+          emit(ctx, data);
+        },
+      ),
+    );
+
+  permissions
+    .command("remove <id> <permissionId>")
+    .description(
+      "Revoke an access grant on a KB node. You cannot revoke your own grant. The permission ID comes from 'kb permissions list <id>'.",
+    )
+    .action(
+      runAction(program, async (ctx, id: string, permissionId: string) => {
+        const data = await apiRequest({
+          method: "DELETE",
+          path: `/org/kb/nodes/${id}/permissions/${permissionId}`,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
+        });
+        // The endpoint answers with a message object rather than a 204, so
+        // there is a payload for a JSON caller to read.
+        emit(ctx, data);
       }),
     );
 }

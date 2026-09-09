@@ -48,6 +48,41 @@ interface SearchResponse {
 const RESULT_COLUMNS = ["content_id", "title", "chunk_text"];
 
 /**
+ * Reads an option that both the subcommand and its parent declare.
+ *
+ * `senso search <query>` has its own action and its own `--max-results`, and so
+ * does every subcommand under it. When a flag name exists on both, Commander
+ * binds the value to the parent — so `senso search context "q" --max-results 17
+ * --content-ids a b` reached the subcommand with the DEFAULTS, silently
+ * searching the whole knowledge base with 5 results instead of the two documents
+ * the caller named. The request went out looking perfectly well-formed, which is
+ * why nothing noticed.
+ *
+ * `getOptionValueSource` is what makes the fix exact rather than a guess: it
+ * distinguishes a value the user typed ("cli") from one that is merely the
+ * declared default, so the subcommand still wins when it was given something.
+ */
+function resolveOption<T>(command: Command, key: string): T | undefined {
+  if (command.getOptionValueSource(key) === "cli") {
+    return command.getOptionValue(key) as T;
+  }
+  const parent = command.parent;
+  if (parent?.getOptionValueSource(key) === "cli") {
+    return parent.getOptionValue(key) as T;
+  }
+  return command.getOptionValue(key) as T | undefined;
+}
+
+/** The shared options, resolved against both the subcommand and its parent. */
+function resolveSearchOptions(command: Command): SearchOptions {
+  return {
+    maxResults: resolveOption<string>(command, "maxResults"),
+    contentIds: resolveOption<string[]>(command, "contentIds"),
+    requireScopedIds: resolveOption<boolean>(command, "requireScopedIds"),
+  };
+}
+
+/**
  * Registers one of the non-streaming search variants.
  *
  * `context`, `content` and `full` differ only in their endpoint and their help
@@ -72,16 +107,19 @@ function addSearchVariant(
     )
     .option("--require-scoped-ids", "Only return results from the specified --content-ids")
     .action(
-      runAction(program, async (ctx: Ctx, query: string, cmdOpts: SearchOptions) => {
-        const data = await apiRequest<SearchResponse>({
-          method: "POST",
-          path,
-          body: buildSearchBody(query, cmdOpts),
-          apiKey: ctx.apiKey,
-          baseUrl: ctx.baseUrl,
-        });
-        emit(ctx, data, { columns: RESULT_COLUMNS });
-      }),
+      runAction(
+        program,
+        async (ctx: Ctx, query: string, _cmdOpts: SearchOptions, command: Command) => {
+          const data = await apiRequest<SearchResponse>({
+            method: "POST",
+            path,
+            body: buildSearchBody(query, resolveSearchOptions(command)),
+            apiKey: ctx.apiKey,
+            baseUrl: ctx.baseUrl,
+          });
+          emit(ctx, data, { columns: RESULT_COLUMNS });
+        },
+      ),
     );
 }
 
@@ -173,21 +211,24 @@ export function registerSearchCommands(program: Command): void {
     )
     .option("--require-scoped-ids", "Only return results from the specified --content-ids")
     .action(
-      runAction(program, async (ctx: Ctx, query: string, cmdOpts: SearchOptions) => {
-        const res = await apiStreamRequest({
-          method: "POST",
-          path: "/org/search/stream",
-          body: buildSearchBody(query, cmdOpts),
-          apiKey: ctx.apiKey,
-          baseUrl: ctx.baseUrl,
-        });
+      runAction(
+        program,
+        async (ctx: Ctx, query: string, _cmdOpts: SearchOptions, command: Command) => {
+          const res = await apiStreamRequest({
+            method: "POST",
+            path: "/org/search/stream",
+            body: buildSearchBody(query, resolveSearchOptions(command)),
+            apiKey: ctx.apiKey,
+            baseUrl: ctx.baseUrl,
+          });
 
-        if (!res.body) {
-          throw new CliError("The server returned no response body for the stream.", EXIT.ERROR);
-        }
+          if (!res.body) {
+            throw new CliError("The server returned no response body for the stream.", EXIT.ERROR);
+          }
 
-        await renderStream(ctx, res.body);
-      }),
+          await renderStream(ctx, res.body);
+        },
+      ),
     );
 }
 

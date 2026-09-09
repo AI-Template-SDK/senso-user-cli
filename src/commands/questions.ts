@@ -1,9 +1,12 @@
 import { Command } from "commander";
 import { apiRequest } from "../lib/api-client.js";
+import { parseEnumFlag } from "../lib/enum-arg.js";
 import { parseJsonFlag } from "../lib/json-arg.js";
 import { emit, emitConfirmation } from "../lib/output.js";
 import { runAction } from "../lib/run-action.js";
 import * as log from "../utils/logger.js";
+
+const QUESTION_TYPES = ["organization", "network"] as const;
 
 export function registerQuestionsCommands(program: Command): void {
   const questions = program
@@ -20,7 +23,7 @@ export function registerQuestionsCommands(program: Command): void {
       runAction(program, async (ctx, cmdOpts: Record<string, string>) => {
         const data = await apiRequest({
           path: "/org/questions",
-          params: { question_type: cmdOpts.type },
+          params: { question_type: parseEnumFlag("--type", cmdOpts.type, QUESTION_TYPES) },
           apiKey: ctx.apiKey,
           baseUrl: ctx.baseUrl,
         });

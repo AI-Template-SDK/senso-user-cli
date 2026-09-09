@@ -1,0 +1,86 @@
+name: Live canary
+
+# Read-only checks against a real Senso API with a real organization key.
+#
+# This is the one workflow in the repository that needs a secret, and everything
+# about how it is wired follows from that:
+#
+#   - It is NOT a pull request gate. It cannot run on a fork, and a check that
+#     skips when the secret is absent reports green without having run — which
+#     is worse than no check at all. Pull requests are gated on testing.yml,
+#     which needs nothing.
+#   - It guards explicitly on the secret being present, so a scheduled run on a
+#     fork fails quietly rather than paging someone every night.
+#   - Every command it runs is a read. Nothing here creates, updates, deletes,
+#     publishes, or spends generation credits. See scripts/live-canary.ts.
+#
+# What it catches that nothing else can: the API renaming a field, changing a
+# status code, or removing an endpoint. Every other suite runs against a mock,
+# which is what makes them fast and free — and blind to exactly that.
+
+on:
+  schedule:
+    - cron: "41 5 * * *" # daily
+  workflow_dispatch:
+  # Opt in per pull request by adding the `live-api` label, for a change that
+  # actually touches the API contract.
+  pull_request:
+    types: [labeled]
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  canary:
+    name: Read-only checks
+    if: github.event_name != 'pull_request' || github.event.label.name == 'live-api'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Verify the API key is configured
+        id: guard
+        env:
+          SENSO_API_KEY: ${{ secrets.SENSO_API_KEY }}
+        run: |
+          if [ -z "${SENSO_API_KEY}" ]; then
+            echo "::warning::SENSO_API_KEY is not set — skipping the live canary."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v6
+        if: steps.guard.outputs.present == 'true'
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+        if: steps.guard.outputs.present == 'true'
+
+      - run: npm run build
+        if: steps.guard.outputs.present == 'true'
+
+      - name: Run the canary
+        if: steps.guard.outputs.present == 'true'
+        env:
+          SENSO_API_KEY: ${{ secrets.SENSO_API_KEY }}
+          SENSO_BASE_URL: ${{ vars.SENSO_BASE_URL }}
+        run: |
+          set -o pipefail
+          npx tsx scripts/live-canary.ts 2>&1 | tee canary.txt
+
+      - name: Publish the result to the run summary
+        if: always() && steps.guard.outputs.present == 'true'
+        run: |
+          {
+            echo '### Live canary'
+            echo ''
+            echo '```'
+            cat canary.txt 2>/dev/null || echo 'no output'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

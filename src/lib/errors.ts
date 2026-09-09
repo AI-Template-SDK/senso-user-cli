@@ -232,9 +232,13 @@ export function toCliError(err: unknown): CliError {
     }
     // Node reports every connection-level failure as a bare "fetch failed" with
     // the real reason on `cause`, so the cause is where the useful text is.
+    // "Failed to fetch" is the same failure worded the other way — it is what
+    // the WHATWG spec text says, and what a non-undici fetch implementation or a
+    // test double raises. Matching only Node's wording meant an equivalent
+    // failure exited 1 and a caller lost the retry signal that exit 5 carries.
     const detail = err.cause instanceof Error ? err.cause.message : "";
     if (
-      err.message.includes("fetch failed") ||
+      /fetch failed|failed to fetch|network ?error/i.test(err.message) ||
       /ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ECONNRESET/.test(detail)
     ) {
       return new CliError("Could not reach the Senso API.", EXIT.NETWORK, {

@@ -151,18 +151,24 @@ export function registerSkillsCommands(program: Command): void {
             }
           }
 
-          emit(ctx, { installed, failed });
-
           // Previously every install could fail and the command still exited 0,
           // reporting "Done" — so a CI step that installed skills could not tell
           // whether it had worked.
+          //
+          // Thrown BEFORE the payload is emitted, so stdout stays empty on a
+          // failure like every other command. The per-skill detail is already on
+          // stderr, and the hint says how to get more.
           if (failed.length > 0) {
             throw new CliError(
               `${failed.length} of ${skillPackages.length} skill(s) failed to install.`,
               EXIT.ERROR,
-              { hint: "Re-run with SENSO_DEBUG=1, or install one skill at a time to see why." },
+              {
+                hint: `Failed: ${failed.map((f) => f.skill).join(", ")}. Re-run one at a time, or with SENSO_DEBUG=1, to see why.`,
+              },
             );
           }
+
+          emit(ctx, { installed, failed });
 
           if (!ctx.quiet) {
             log.success("Done. Your agent can now use Senso — just talk to it naturally.");

@@ -43,7 +43,12 @@ const noConsoleRule = {
  * case, which keeps the exception in the module that owns the stream.
  */
 const noRawStreamRule = {
-  selector: "MemberExpression[object.name='process'][property.name=/^(stdout|stderr)$/]",
+  // `.write` specifically, not any access to the stream. Reading
+  // `process.stdout.isTTY` to decide whether an animated spinner is safe is a
+  // legitimate check — lib/progress.ts does exactly that — and the point of the
+  // rule is to stop unmediated OUTPUT, not to ban the object.
+  selector:
+    "MemberExpression[property.name='write'][object.object.name='process'][object.property.name=/^(stdout|stderr)$/]",
   message:
     "Do not write to process.stdout/stderr directly. Use writeStdout() from lib/output.ts for streamed payload, or utils/logger.ts for diagnostics. See eslint.config.mjs.",
 };
@@ -109,6 +114,14 @@ export default defineConfig(
       // `data as { answer?: string }` on a fetch result is the narrowing idiom
       // used throughout the command layer, and it is deliberate.
       "@typescript-eslint/consistent-type-assertions": "off",
+
+      // A type parameter that appears once is this codebase's way of letting a
+      // caller assert the shape of something untyped — `parseJsonFlag<Body>()`,
+      // `resolveOption<string[]>()`, `result.json<Payload>()`. The rule is right
+      // that nothing infers it; that is the point. The alternative is an `as`
+      // cast at every call site, which is the same assertion with less
+      // documentation.
+      "@typescript-eslint/no-unnecessary-type-parameters": "off",
 
       // Template literals interpolate numbers and ids constantly; requiring a
       // .toString() on each would add noise without catching anything.

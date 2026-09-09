@@ -22,6 +22,7 @@ import { registerApiKeyCommands } from "./commands/api-keys.js";
 import { registerSearchCommands } from "./commands/search.js";
 import { registerIngestCommands } from "./commands/ingest.js";
 import { registerContentCommands } from "./commands/content.js";
+import { registerCtaCommands } from "./commands/ctas.js";
 import { registerGenerateCommands } from "./commands/generate.js";
 import { registerEngineCommands } from "./commands/engine.js";
 import { registerDestinationsCommands } from "./commands/destinations.js";
@@ -42,7 +43,7 @@ import { registerRolesCommands } from "./commands/roles.js";
 import { registerCompetitorsCommands } from "./commands/competitors.js";
 import { registerTrackedSourcesCommands } from "./commands/tracked-sources.js";
 import { registerGeneratedContentCommands } from "./commands/generated-content.js";
-import { registerAnalyticsCommands } from "./commands/analytics.js";
+import { registerAnalyticsCommands } from "./commands/analytics/index.js";
 import { registerIndustriesCommands } from "./commands/industries.js";
 import { registerUpdateCommand } from "./commands/update.js";
 
@@ -122,7 +123,12 @@ export function createProgram(): Command {
       }
 
       // Best-effort and deliberately not awaited.
-      if (!UPDATE_CHECK_EXEMPT.has(actionCommand.name())) {
+      //
+      // `--no-update-check` was registered here and never read: Commander stores
+      // it as `updateCheck: false`, and the hook decided purely from --quiet and
+      // --output, so the documented flag did nothing at all.
+      const opted = program.opts<{ updateCheck?: boolean }>().updateCheck !== false;
+      if (opted && !UPDATE_CHECK_EXEMPT.has(actionCommand.name())) {
         void checkForUpdate(!decorated);
       }
     });
@@ -134,6 +140,7 @@ export function createProgram(): Command {
   registerSearchCommands(program);
   registerIngestCommands(program);
   registerContentCommands(program);
+  registerCtaCommands(program);
   registerGenerateCommands(program);
   registerEngineCommands(program);
   registerDestinationsCommands(program);

@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { apiRequest } from "../lib/api-client.js";
+import { parseEnumFlag, parseIntFlag } from "../lib/enum-arg.js";
 import { emit, emitConfirmation } from "../lib/output.js";
 import { runAction } from "../lib/run-action.js";
 import * as log from "../utils/logger.js";
@@ -7,6 +8,12 @@ import * as log from "../utils/logger.js";
 const MATCH_TYPES = "domain | host | path_prefix | exact_url";
 const TIERS = "primary (Owned) | tracked | secondary (External)";
 const CATEGORIES = "affiliated_domain | published_content | social | press";
+
+// The values behind the help strings above, for validation. MATCH_TYPES and
+// TIERS stay as they are because they are prose the user reads (TIERS glosses
+// two of the tiers with their UI names).
+const MATCH_TYPE_VALUES = ["domain", "host", "path_prefix", "exact_url"] as const;
+const TIER_VALUES = ["primary", "tracked", "secondary"] as const;
 
 interface SourceFlags {
   pattern?: string;
@@ -21,11 +28,15 @@ interface SourceFlags {
 function buildSourceBody(cmdOpts: SourceFlags): Record<string, unknown> {
   const body: Record<string, unknown> = {};
   if (cmdOpts.pattern !== undefined) body.pattern = cmdOpts.pattern;
-  if (cmdOpts.matchType !== undefined) body.match_type = cmdOpts.matchType;
-  if (cmdOpts.tier !== undefined) body.tier = cmdOpts.tier;
+  if (cmdOpts.matchType !== undefined)
+    body.match_type = parseEnumFlag("--match-type", cmdOpts.matchType, MATCH_TYPE_VALUES);
+  if (cmdOpts.tier !== undefined) body.tier = parseEnumFlag("--tier", cmdOpts.tier, TIER_VALUES);
   if (cmdOpts.category !== undefined) body.category = cmdOpts.category;
   if (cmdOpts.label !== undefined) body.label = cmdOpts.label;
-  if (cmdOpts.priority !== undefined) body.priority = Number(cmdOpts.priority);
+  // Checked rather than coerced: `Number("high")` is NaN and JSON.stringify
+  // writes NaN as null, so an unchecked typo told the API to CLEAR the priority
+  // instead of failing.
+  if (cmdOpts.priority !== undefined) body.priority = parseIntFlag("--priority", cmdOpts.priority);
   if (cmdOpts.active !== undefined) body.active = cmdOpts.active;
   return body;
 }

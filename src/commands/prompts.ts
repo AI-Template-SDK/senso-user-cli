@@ -1,11 +1,22 @@
 import { Command } from "commander";
 import { apiRequest } from "../lib/api-client.js";
+import { parseEnumFlag } from "../lib/enum-arg.js";
 import { CliError, EXIT } from "../lib/errors.js";
 import { emit, emitConfirmation } from "../lib/output.js";
 import { parseJsonFlag } from "../lib/json-arg.js";
 import { runAction } from "../lib/run-action.js";
 import { buildSetTagsBody, buildAttachTagBody } from "../lib/tag-args.js";
 import * as log from "../utils/logger.js";
+
+/** The sort orders `prompts list --sort` documents. */
+const SORT_ORDERS = [
+  "created_desc",
+  "created_asc",
+  "text_asc",
+  "text_desc",
+  "type_asc",
+  "type_desc",
+] as const;
 
 /** Columns for the tag endpoints, which all return the same tag shape. */
 const TAG_COLUMNS = ["id", "name", "curated"];
@@ -37,7 +48,7 @@ export function registerPromptCommands(program: Command): void {
             limit: cmdOpts.limit,
             offset: cmdOpts.offset,
             search: cmdOpts.search,
-            sort: cmdOpts.sort,
+            sort: parseEnumFlag("--sort", cmdOpts.sort, SORT_ORDERS),
           },
           apiKey: ctx.apiKey,
           baseUrl: ctx.baseUrl,

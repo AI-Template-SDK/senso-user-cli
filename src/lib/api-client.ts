@@ -234,14 +234,24 @@ export function uploadStatusToReason(status: string, error?: string): string {
   }
 }
 
+/**
+ * The human-readable result of an upload batch.
+ *
+ * All of it is stderr: it is a progress report, not the command's payload, so
+ * `ingest upload --output json` emits the API response on stdout and this
+ * alongside it. Silenced entirely by `quiet` — which `--output json` implies —
+ * because a caller asking for a machine-readable result did not ask for a
+ * per-file commentary next to it.
+ */
 export function printUploadSummary(
   uploaded: number,
   failed: { filename: string; reason: string }[],
   items: UploadResultItem[],
+  quiet = false,
 ): void {
+  if (quiet) return;
+
   const total = items.length;
-  // stderr: this is a progress report, not the command's payload. `ingest
-  // upload --output json` emits the API response on stdout and this alongside it.
   log.raw("");
   log.raw(`  ${pc.bold("Upload Summary")} — ${uploaded}/${total} file(s) uploaded`);
   log.raw("");

@@ -1,12 +1,26 @@
 name: Publish to npm
 
-# Triggered by pushing a version tag, e.g.:
+# Triggered by pushing a version tag:
+#
 #   npm version minor
 #   git push --follow-tags
 #
-# Uses npm Trusted Publishing (OIDC) — no NPM_TOKEN secret required.
-# Configure on npmjs.com: package settings -> Trusted Publisher -> GitHub Actions
+# Uses npm Trusted Publishing (OIDC) — no NPM_TOKEN secret. Configure on
+# npmjs.com: package settings -> Trusted Publisher -> GitHub Actions
 #   org: AI-Template-SDK, repo: senso-user-cli, workflow: publish.yml
+#
+# Three gates stand between a tag and a published package, and each one exists
+# because publishing is the single irreversible action in this repository — npm
+# permits unpublishing for 72 hours and never reuses a version number.
+#
+#   1. The tag must match the version in package.json.
+#   2. CHANGELOG.md must have a section for that version. A release nobody can
+#      read the notes for is a release nobody can safely upgrade to.
+#   3. The full test suite must pass on the tagged commit. Previously a tag
+#      published whatever it pointed at, even if CI had failed on it.
+#
+# First-party actions only, same as testing.yml. The GitHub release is cut with
+# the `gh` CLI, which is preinstalled on the runner.
 
 on:
   push:
@@ -14,17 +28,75 @@ on:
 
 permissions:
   contents: read
-  id-token: write
+
+env:
+  NODE_VERSION: "22"
 
 jobs:
-  publish:
+  # Gate 1 and 2: cheap checks that need no dependencies, so a mistyped tag
+  # fails in seconds rather than after a full test run.
+  verify:
+    name: Verify the tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check the tag matches package.json
+        id: version
+        run: |
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "v$PKG" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version v$PKG"
+            exit 1
+          fi
+          echo "version=$PKG" >> "$GITHUB_OUTPUT"
+
+      - name: Check the changelog has an entry for this version
+        run: |
+          PKG="$(node -p "require('./package.json').version")"
+          if ! grep -qE "^## \[$PKG\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## [$PKG]' section."
+            echo "::error::Move the Unreleased entries under a heading for this version before tagging."
+            exit 1
+          fi
+
+  # Gate 3. This duplicates the Testing workflow deliberately: `workflow_run`
+  # would let a tag publish a commit whose CI run had been cancelled or had never
+  # started, and a tag is exactly when being sure is worth the minutes.
+  test:
+    name: Test
+    needs: verify
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
         with:
-          node-version: 22
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: make install
+      - run: make lint
+      - run: make typecheck
+      - run: make security
+      - run: make unit
+      - run: make e2e
+      - run: make smoke
+
+  publish:
+    name: Publish
+    needs: [verify, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # to create the GitHub release
+      id-token: write # for npm trusted publishing
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           registry-url: https://registry.npmjs.org
 
@@ -34,14 +106,58 @@ jobs:
 
       - run: npm ci
 
-      - name: Check tag matches package.json version
-        run: |
-          PKG="v$(node -p "require('./package.json').version")"
-          if [ "$PKG" != "$GITHUB_REF_NAME" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match package.json version $PKG"
-            exit 1
-          fi
-
-      # prepublishOnly runs the build
+      # --provenance is implied by trusted publishing, but naming it here means
+      # the guarantee is visible in the file rather than inherited silently.
+      # prepublishOnly runs the build.
       - name: Publish
-        run: npm publish --access public
+        run: npm publish --access public --provenance
+
+      - name: Extract the release notes
+        id: notes
+        run: |
+          VERSION="${{ needs.verify.outputs.version }}"
+          # From this version's heading to the line before the next one.
+          awk -v v="$VERSION" '
+            $0 ~ ("^## \\[" v "\\]") { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          echo "Extracted $(wc -l < release-notes.md) lines"
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file release-notes.md \
+            --verify-tag
+
+  # Proves the thing users will actually install, from the registry rather than
+  # from the working tree. A package can publish successfully and still be
+  # broken — a missing `files` entry, or a bin path that does not resolve once
+  # it is inside node_modules.
+  verify-published:
+    name: Verify the published package
+    needs: [verify, publish]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # npm's registry CDN can lag a few seconds behind a publish.
+      - name: Wait for the registry
+        shell: bash
+        run: sleep 30
+
+      - name: Install and run the published version
+        shell: bash
+        run: |
+          VERSION="${{ needs.verify.outputs.version }}"
+          npx --yes "@senso-ai/cli@$VERSION" --version
+          npx --yes "@senso-ai/cli@$VERSION" --help > /dev/null

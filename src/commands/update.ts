@@ -3,6 +3,7 @@ import { Command } from "commander";
 import { getLatestVersion } from "../utils/updater.js";
 import { version } from "../lib/version.js";
 import { CliError, EXIT } from "../lib/errors.js";
+import { emitConfirmation } from "../lib/output.js";
 import { runAction } from "../lib/run-action.js";
 import * as log from "../utils/logger.js";
 import pc from "picocolors";
@@ -15,11 +16,15 @@ export function registerUpdateCommand(program: Command): void {
     .command("update")
     .description("Update CLI to the latest version")
     .action(
-      // This command has no API payload — everything it says is progress, which
-      // belongs on stderr, so it reports through the logger rather than emit().
-      runAction(program, async (_ctx) => {
-        log.info(`Current version: ${pc.bold(version)}`);
-        log.info("Checking npm for updates...");
+      // Progress belongs on stderr and is silenced by --quiet, which
+      // --output json implies. The outcome is still emitted as a payload, so
+      // `senso update --output json` is parseable rather than two English
+      // sentences followed by nothing.
+      runAction(program, async (ctx) => {
+        if (!ctx.quiet) {
+          log.info(`Current version: ${pc.bold(version)}`);
+          log.info("Checking npm for updates...");
+        }
 
         const latest = await getLatestVersion();
 
@@ -31,12 +36,18 @@ export function registerUpdateCommand(program: Command): void {
         }
 
         if (!semver.gt(latest, version)) {
-          log.success(`Already on the latest version (${version}).`);
+          emitConfirmation(ctx, `Already on the latest version (${version}).`, {
+            updated: false,
+            current: version,
+            latest,
+          });
           return;
         }
 
-        log.info(`New version available: ${pc.bold(latest)}`);
-        log.info("Updating...");
+        if (!ctx.quiet) {
+          log.info(`New version available: ${pc.bold(latest)}`);
+          log.info("Updating...");
+        }
 
         try {
           execSync(`npm install -g ${NPM_PACKAGE}@latest`, {
@@ -48,7 +59,11 @@ export function registerUpdateCommand(program: Command): void {
             cause: err,
           });
         }
-        log.success(`Updated to v${latest}.`);
+        emitConfirmation(ctx, `Updated to v${latest}.`, {
+          updated: true,
+          previous: version,
+          latest,
+        });
       }),
     );
 }

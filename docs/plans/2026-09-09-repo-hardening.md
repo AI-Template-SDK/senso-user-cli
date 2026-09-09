@@ -249,7 +249,10 @@ Everything the test suite and contributors need before the first test is written
 - [x] `.github/dependabot.yml` — npm and github-actions, monthly, minor+patch grouped, majors separate, assignee set, `@types/node` majors ignored with the "pinned in four places" comment
 - [x] `.github/PULL_REQUEST_TEMPLATE.md` with What / Why / Checklist / Risk / Verified how. Risk asks four yes/no questions: does this change stdout shape or `--output json` payloads, exit codes, the config file format, or what is sent to the API; plus "safe to roll back by reverting alone?" Blank is not an answer
 - [x] `.github/ISSUE_TEMPLATE/` bug + feature, bug template asks for `senso --version`, OS, Node, and the command with `--output json`
-- [ ] Set the GitHub repo description and homepage (currently empty) to match `package.json`
+- [ ] **Needs repository admin — cannot be done from a clone.** Set the GitHub repo
+      description and homepage to match `package.json` (`description` and `homepage` are
+      now populated there, so the values are ready to paste). Also worth setting: the
+      `senso`, `cli`, `ai-agent` and `geo` topics.
 - [x] Replace the 150-line boilerplate `.gitignore` with the 15 lines this repo needs
 
 **Dependencies**
@@ -272,57 +275,66 @@ Everything the test suite and contributors need before the first test is written
 - [x] `src/lib/run-action.ts`: `runAction(program, async (ctx) => ...)` that resolves global opts (apiKey, baseUrl, output, quiet) into a typed `ctx`, wraps the handler, maps `ApiError`/`CliError`/unknown to stderr + exit code. Every action goes through it.
 - [x] `src/program.ts` exporting `createProgram(): Command` with zero side effects; `src/cli.ts` becomes the 10-line bin that calls it (tsup entry unchanged)
 - [x] `SENSO_CONFIG_DIR` env override in `config.ts` (documented; used by tests and CI)
-- [ ] Inject `fetch` (or accept a base URL) so tests never need real DNS — MSW handles this without injection, but a `SENSO_BASE_URL` override already exists and e2e uses it
+- [x] Inject `fetch` (or accept a base URL) so tests never need real DNS — MSW handles this without injection, but a `SENSO_BASE_URL` override already exists and e2e uses it
 
 **Layer 1 — unit (`tests/unit/`)**, no network, `@vitest-environment node`:
 
-- [ ] `config.test.ts` — precedence flag > env > file; 0600 mode; missing/corrupt file → `{}`; `clearConfig` idempotent; `SENSO_CONFIG_DIR` honored
-- [ ] `api-client.test.ts` — headers (`X-API-Key`, `User-Agent` carries version); query param encoding drops `undefined`; 204 → undefined; non-JSON body → error; `ApiError` message extraction for `error|message|detail|errors[]` shapes; **timeout aborts at 30s** (fake timers); `formatApiError` table for 401/402/403/404/409/5xx/AbortError/ECONNREFUSED
-- [ ] `output.test.ts` — table column widths, empty rows, `columns` subset, plain string vs array, json indentation
-- [ ] `tag-args.test.ts` — csv trimming, empty → `{}`, id preferred over name
-- [ ] `updater.test.ts` — 24h gate, cached-newer shows box, `SENSO_NO_UPDATE_CHECK=1`, registry failure is silent, **does not clobber other config fields**
-- [ ] `version.test.ts` — reads `package.json` from `dist/` and `src/` layouts
-- [ ] `errors.test.ts` / `run-action.test.ts` — exit code mapping, stderr-only on failure, stdout untouched on failure in json mode
+- [x] `config.test.ts` — precedence flag > env > file; 0600 mode; missing/corrupt file → `{}`; `clearConfig` idempotent; `SENSO_CONFIG_DIR` honored
+- [x] `api-client.test.ts` — headers (`X-API-Key`, `User-Agent` carries version); query param encoding drops `undefined`; 204 → undefined; non-JSON body → error; `ApiError` message extraction for `error|message|detail|errors[]` shapes; **timeout aborts at 30s** (fake timers); `formatApiError` table for 401/402/403/404/409/5xx/AbortError/ECONNREFUSED
+- [x] `output.test.ts` — table column widths, empty rows, `columns` subset, plain string vs array, json indentation
+- [x] `tag-args.test.ts` — csv trimming, empty → `{}`, id preferred over name
+- [x] `updater.test.ts` — 24h gate, cached-newer shows box, `SENSO_NO_UPDATE_CHECK=1`, registry failure is silent, **does not clobber other config fields**
+- [x] `version.test.ts` — reads `package.json` from `dist/` and `src/` layouts
+- [x] `errors.test.ts` / `run-action.test.ts` — exit code mapping, stderr-only on failure, stdout untouched on failure in json mode
 
 **Layer 2 — command tests (`tests/commands/`)**, in-process, MSW with `onUnhandledRequest: 'error'` in `tests/setup.ts` (the network ban), stdout/stderr captured via spies on `process.stdout.write`:
 
-- [ ] One file per command group (30). Each covers, in this order: 401 → auth message + exit 3; 404; malformed body; then the happy path in `json`, `table` and `plain`
-- [ ] Assert the **exact request** each command sends (method, path, query, body) — this is where the CLI's contract with the API lives, and it is what catches "the API renamed a param"
-- [ ] `--data <json>` commands: invalid JSON → usage error, not a stack trace
-- [ ] `ingest upload` / `kb upload`: the two-step presigned-URL flow, per-file conflict/duplicate/invalid outcomes, S3 PUT failure surfaces per file
-- [ ] `generate sample`: polling loop with fake timers, `--no-wait`, terminal states, timeout message
-- [ ] `search stream`: SSE parsing across chunk boundaries (split mid-line), `error` event, `sources` event in json mode
-- [ ] `login`: mock `@clack/prompts` `text`; cancel path; verification failure leaves config untouched
-- [ ] `whoami`: cached fallback when API unreachable
-- [ ] `skills`: shipables invocation args (asserting the key is **not** on argv after Phase 0)
+- [x] One file per command group (30). Each covers, in this order: 401 → auth message + exit 3; 404; malformed body; then the happy path in `json`, `table` and `plain`
+- [x] Assert the **exact request** each command sends (method, path, query, body) — this is where the CLI's contract with the API lives, and it is what catches "the API renamed a param"
+- [x] `--data <json>` commands: invalid JSON → usage error, not a stack trace
+- [x] `ingest upload` / `kb upload`: the two-step presigned-URL flow, per-file conflict/duplicate/invalid outcomes, S3 PUT failure surfaces per file
+- [x] `generate sample`: polling loop with fake timers, `--no-wait`, terminal states, timeout message
+- [x] `search stream`: SSE parsing across chunk boundaries (split mid-line), `error` event, `sources` event in json mode
+- [x] `login`: mock `@clack/prompts` `text`; cancel path; verification failure leaves config untouched
+- [x] `whoami`: cached fallback when API unreachable
+- [x] `skills`: shipables invocation args (asserting the key is **not** on argv after Phase 0)
 
 **Layer 3 — CLI end-to-end (`tests/e2e/`)**, spawns `node dist/cli.js` against a `node:http` mock server via `SENSO_BASE_URL` + `SENSO_CONFIG_DIR` in a temp dir. This is what proves the bundle, not the source:
 
-- [ ] `--version` and `--help` exit 0, print nothing to stderr, touch no network, create no config dir
-- [ ] `--version` output equals `package.json` version read at test time — not a literal that can drift (live-survey's `/health` test)
-- [ ] `--output json` stdout is parseable JSON with **nothing else** on stdout, for a sample of 10 commands
-- [ ] Exit codes: usage (2), auth (3), API error (1), success (0)
-- [ ] `login` non-interactive (stdin not a TTY) fails with a clear message instead of hanging
-- [ ] `NO_COLOR=1` strips ANSI; `--quiet` strips banner and info lines
-- [ ] Windows path handling for `ingest upload` (runs on the OS matrix in CI)
+- [x] `--version` and `--help` exit 0, print nothing to stderr, touch no network, create no config dir
+- [x] `--version` output equals `package.json` version read at test time — not a literal that can drift (live-survey's `/health` test)
+- [x] `--output json` stdout is parseable JSON with **nothing else** on stdout, for a sample of 10 commands
+- [x] Exit codes: usage (2), auth (3), API error (1), success (0)
+- [x] `login` non-interactive (stdin not a TTY) fails with a clear message instead of hanging
+- [x] `NO_COLOR=1` strips ANSI; `--quiet` strips banner and info lines
+- [x] Windows path handling for `ingest upload` (runs on the OS matrix in CI)
 
 **Layer 4 — policy (`tests/policy/`)**, the repo's own rules, failure messages name the offender:
 
-- [ ] `readme-commands.test.ts` — every registered subcommand (walk `createProgram()`) appears in README's reference; every README `senso ...` line is a real command (both directions)
-- [ ] `output-contract.test.ts` — every action in `src/commands/` is registered via `runAction`; no `console.*` outside `lib/output.ts`/`utils/logger.ts`/`utils/branding.ts`. This is live-survey's `test_no_module_in_the_app_package_calls_print`, for the same reason: a bare write has no stream discipline, and that is how the banner ended up in JSON stdout
-- [ ] `american-english.test.ts` — port of contextos's, scoped to `src/` and `README.md`
-- [ ] `descriptions.test.ts` — every command and option has a description; descriptions end with a period; no description exceeds N chars (agents read these)
-- [ ] `node-version.test.ts` — `.nvmrc`, `engines`, CI matrix, tsup `target` agree
-- [ ] `skills-list.test.ts` — the skills fixture matches `tests/fixtures/shipables-registry.json` (refreshed by the scheduled drift job in Phase 5)
-- [ ] `changelog.test.ts` — `CHANGELOG.md` has `## [Unreleased]`; every git tag `v*` has a matching section
-- [ ] `package.test.ts` — `files` is exactly `["dist"]`; `bin` points at an existing built file after `make build`; no `dependencies` unused (`depcheck`)
+- [x] `readme-commands.test.ts` — every registered subcommand (walk `createProgram()`) appears in README's reference; every README `senso ...` line is a real command (both directions)
+- [x] `output-contract.test.ts` — every action in `src/commands/` is registered via `runAction`; no `console.*` outside `lib/output.ts`/`utils/logger.ts`/`utils/branding.ts`. This is live-survey's `test_no_module_in_the_app_package_calls_print`, for the same reason: a bare write has no stream discipline, and that is how the banner ended up in JSON stdout
+- [x] `american-english.test.ts` — port of contextos's, scoped to `src/` and `README.md`
+- [x] `descriptions.test.ts` — every command and option has a description, and no
+      duplicate command paths (in `tests/policy/repo-rules.test.ts`). The
+      "ends with a period" and length-cap checks were **deliberately dropped**: many
+      descriptions legitimately end in a flag name or a closing parenthesis, and a
+      length cap would push detail out of exactly the text an agent reads to choose a
+      command. Presence is the property worth enforcing; style is not.
+- [x] `node-version.test.ts` — `.nvmrc`, `engines`, CI matrix, tsup `target` agree
+- [x] `skills-list.test.ts` — the skills fixture matches `tests/fixtures/shipables-registry.json` (refreshed by the scheduled drift job in Phase 5)
+- [ ] `changelog.test.ts` — **not written.** The publish workflow already refuses to
+      publish a version with no `## [x.y.z]` section, which is the check that matters and
+      the moment it matters. A test asserting that every historical `v*` tag has a section
+      would fail today for tags predating this changelog, and backfilling entries for
+      releases nobody can now describe accurately would be inventing history.
+- [x] `package.test.ts` — `files` is exactly `["dist"]`; `bin` points at an existing built file after `make build`; no `dependencies` unused (`depcheck`)
 
 **Gates and CI**
 
-- [ ] `vitest.config.ts` with a why-comment, `coverage.provider: v8`, thresholds set at achieved-minus-headroom once the suite exists (target ≥85/80/85/85), `include: src/**`, exclude `src/cli.ts` (the bin)
-- [ ] `make unit` = `vitest run --coverage`; CI publishes the coverage table to the step summary (`if: always()`), as contextos does
-- [ ] `make smoke` = `npm pack` → install the tarball into a temp prefix → run `senso --version`, `senso --help`, one mocked command. CI runs it on `ubuntu`/`macos`/`windows` × Node `18`/`20`/`22`
-- [ ] e2e job depends on build; smoke depends on e2e
+- [x] `vitest.config.ts` with a why-comment, `coverage.provider: v8`, thresholds set at achieved-minus-headroom once the suite exists (target ≥85/80/85/85), `include: src/**`, exclude `src/cli.ts` (the bin)
+- [x] `make unit` = `vitest run --coverage`; CI publishes the coverage table to the step summary (`if: always()`), as contextos does
+- [x] `make smoke` = `npm pack` → install the tarball into a temp prefix → run `senso --version`, `senso --help`, one mocked command. CI runs it on `ubuntu`/`macos`/`windows` × Node `18`/`20`/`22`
+- [x] e2e job depends on build; smoke depends on e2e
 
 ### Phase 3 — Output, error and exit-code contract (size: M)
 
@@ -334,67 +346,76 @@ tests alongside. Document the result in README under "Using with AI agents".
 - [x] **`--output table` works or is refused.** Commands that return a list get `rows`/`columns`; commands that return a single object render a two-column key/value table; no more silent JSON fallback
 - [x] **Exit codes:** `0` success · `1` API or runtime error · `2` usage (Commander default) · `3` authentication (missing/invalid key, 401/403) · `4` not found (404) · `5` network/timeout. Put the table in README and in `--help` epilog
 - [x] `--output=json` (equals form) works; global options are resolved once via Commander, not by scanning `argv`
-- [ ] `NO_COLOR` and `FORCE_COLOR` honored (picocolors does this; add a test so it stays true)
+- [x] `NO_COLOR` and `FORCE_COLOR` honored (picocolors does this; add a test so it stays true)
 - [x] `SENSO_DEBUG=1` prints each request (method, URL, status, elapsed) to stderr with the key redacted — the first thing anyone asks for when a command fails in an agent
 - [x] Non-TTY `login` fails fast with "stdin is not a terminal; set SENSO_API_KEY" instead of waiting on a prompt
-- [ ] Split `analytics.ts` (1,341 lines) into `analytics/` with one file per subcommand and a shared `render.ts`; no behavior change
+- [x] Split `analytics.ts` (1,341 lines) into `analytics/` with one file per subcommand and a shared `render.ts`; no behavior change
 
 ### Phase 4 — Documentation (size: M)
 
 **README.md** — rewrite, not edit. Structure:
 
-- [ ] Badges row: CI status, npm version, npm downloads/month, Node ≥18, license AGPL-3.0. (All five resolve to real endpoints today; do not add a coverage badge unless a coverage service is adopted — a Codecov badge with no upload is a lie)
-- [ ] One-paragraph what-it-is, then a 60-second quick start (install, `SENSO_API_KEY`, one search, one `--output json`)
-- [ ] "Using with AI agents" as the second section: the stdout/stderr/exit-code contract, env vars table, the one-line `--output json --quiet` recipe, and the `skills install` path
-- [ ] Command reference **generated** from `createProgram()` by `scripts/gen-reference.ts` into `docs/reference/commands.md`, linked from README; the README keeps a grouped one-liner table. Policy test asserts the generated file is current
-- [ ] "Read it when you want to know" table pointing at CONTRIBUTING, SECURITY, CHANGELOG, CLAUDE.md, `docs/reference/commands.md`
-- [ ] Keep the excellent analytics "reading the numbers" section; move it to `docs/analytics.md` and link it, so the README stays scannable
-- [ ] Config file location table, auth precedence, update behavior — keep, trim
-- [ ] "Testing" section as a five-row stages table (Lint / Security / Unit / Build / Smoke → command → what it checks) and a "Repository layout" block, both in live-survey's form; target the whole README at about 200 lines
+- [x] Badges row: CI status, npm version, npm downloads/month, Node ≥18, license AGPL-3.0. (All five resolve to real endpoints today; do not add a coverage badge unless a coverage service is adopted — a Codecov badge with no upload is a lie)
+- [x] One-paragraph what-it-is, then a 60-second quick start (install, `SENSO_API_KEY`, one search, one `--output json`)
+- [x] "Using with AI agents" as the second section: the stdout/stderr/exit-code contract, env vars table, the one-line `--output json --quiet` recipe, and the `skills install` path
+- [x] Command reference **generated** from `createProgram()` by `scripts/gen-reference.ts` into `docs/reference/commands.md`, linked from README; the README keeps a grouped one-liner table. Policy test asserts the generated file is current
+- [x] "Read it when you want to know" table pointing at CONTRIBUTING, SECURITY, CHANGELOG, CLAUDE.md, `docs/reference/commands.md`
+- [x] Keep the excellent analytics "reading the numbers" section; move it to `docs/analytics.md` and link it, so the README stays scannable
+- [x] Config file location table, auth precedence, update behavior — keep, trim
+- [x] "Testing" section as a five-row stages table (Lint / Security / Unit / Build / Smoke → command → what it checks) and a "Repository layout" block, both in live-survey's form; target the whole README at about 200 lines
 
 **New documents**
 
-- [ ] `CONTRIBUTING.md` — setup, `make all`, the non-negotiables (network ban in tests; every command through `runAction`; README/reference regenerated in the same PR; American English; no credential in a tracked file; do not lower the coverage gate), test layering table, commit style (gitmoji), release steps
-- [ ] `SECURITY.md` — reporting address; what the CLI holds (API key in `config.json`, 0600, plaintext by design — keychain integration listed as future work); what leaves the machine (`X-API-Key`, `User-Agent` with version, update check to npmjs.org); known limitations recorded as decisions (argv exposure if shipables cannot read env; no certificate pinning; no key rotation command)
-- [ ] `CHANGELOG.md` — Keep a Changelog, "written for the person who has to act on them"; backfill from the 41 commits and 6 published versions **by theme rather than commit**, as live-survey did for its pre-1.0 history; then `[Unreleased]` going forward; the publish workflow checks the version has a section (Phase 6)
-- [ ] `CLAUDE.md` — what this is, layout, `make all` before finishing, non-negotiables, testing conventions, comment style, "things that look like bugs but are not" (the version walk-up in `version.ts`; banner on stderr; update check skipped for some commands; `--output table` refusing rather than falling back), and an **"Adding a command"** recipe in live-survey's numbered form: 1. path and params from the spec, 2. register under the right group via `runAction`, 3. `--output` for all three formats, 4. tests: missing key, 401, 404, malformed body, exact request shape, happy path per format, 5. README one-liner + regenerate the reference, 6. CHANGELOG entry, 7. `make all`
+- [x] `CONTRIBUTING.md` — setup, `make all`, the non-negotiables (network ban in tests; every command through `runAction`; README/reference regenerated in the same PR; American English; no credential in a tracked file; do not lower the coverage gate), test layering table, commit style (gitmoji), release steps
+- [x] `SECURITY.md` — reporting address; what the CLI holds (API key in `config.json`, 0600, plaintext by design — keychain integration listed as future work); what leaves the machine (`X-API-Key`, `User-Agent` with version, update check to npmjs.org); known limitations recorded as decisions (argv exposure if shipables cannot read env; no certificate pinning; no key rotation command)
+- [x] `CHANGELOG.md` — Keep a Changelog, "written for the person who has to act on them"; backfill from the 41 commits and 6 published versions **by theme rather than commit**, as live-survey did for its pre-1.0 history; then `[Unreleased]` going forward; the publish workflow checks the version has a section (Phase 6)
+- [x] `CLAUDE.md` — what this is, layout, `make all` before finishing, non-negotiables, testing conventions, comment style, "things that look like bugs but are not" (the version walk-up in `version.ts`; banner on stderr; update check skipped for some commands; `--output table` refusing rather than falling back), and an **"Adding a command"** recipe in live-survey's numbered form: 1. path and params from the spec, 2. register under the right group via `runAction`, 3. `--output` for all three formats, 4. tests: missing key, 401, 404, malformed body, exact request shape, happy path per format, 5. README one-liner + regenerate the reference, 6. CHANGELOG entry, 7. `make all`
       **The `docs/` set** (live-survey's shape; nothing here is secret, so it lives in the public tree)
-- [ ] `docs/README.md` — index opening with "The 60-second version" (three or four bullets: one bundle, one config file, one HTTP client, one output contract) then a "read it when you want to know" table
-- [ ] `docs/architecture.md` — how one invocation flows, with an ASCII diagram: argv → Commander → `runAction` → `api-client` → `output`; where the config and update checker sit; what is deliberately not there (no daemon, no cache, no telemetry)
-- [ ] `docs/configuration.md` — every env var and flag with purpose and default (`SENSO_API_KEY`, `SENSO_BASE_URL`, `SENSO_CONFIG_DIR`, `SENSO_NO_UPDATE_CHECK`, `SENSO_DEBUG`, `NO_COLOR`), config file location per OS, precedence, file mode. A policy test checks every `process.env.SENSO_*` read in `src/` is documented here (contextos's `.env.example` test, inverted)
-- [ ] `docs/development.md` — setup, the `make` stages table, test layers, how to add a command (the recipe also lives in CLAUDE.md), how to regenerate the command reference
-- [ ] `docs/releasing.md` — the tag-driven publish, what the workflow checks, what to do when it fails, how to yank
-- [ ] `docs/reference/commands.md` (generated) and `docs/reference/excluded-endpoints.md` (Phase 5)
-- [ ] `docs/plans/` — this file; later plans go beside it
+- [x] `docs/README.md` — index opening with "The 60-second version" (three or four bullets: one bundle, one config file, one HTTP client, one output contract) then a "read it when you want to know" table
+- [x] `docs/architecture.md` — how one invocation flows, with an ASCII diagram: argv → Commander → `runAction` → `api-client` → `output`; where the config and update checker sit; what is deliberately not there (no daemon, no cache, no telemetry)
+- [x] `docs/configuration.md` — every env var and flag with purpose and default (`SENSO_API_KEY`, `SENSO_BASE_URL`, `SENSO_CONFIG_DIR`, `SENSO_NO_UPDATE_CHECK`, `SENSO_DEBUG`, `NO_COLOR`), config file location per OS, precedence, file mode. A policy test checks every `process.env.SENSO_*` read in `src/` is documented here (contextos's `.env.example` test, inverted)
+- [x] `docs/development.md` — setup, the `make` stages table, test layers, how to add a command (the recipe also lives in CLAUDE.md), how to regenerate the command reference
+- [x] `docs/releasing.md` — the tag-driven publish, what the workflow checks, what to do when it fails, how to yank
+- [x] `docs/reference/commands.md` (generated) and `docs/reference/excluded-endpoints.md` (Phase 5)
+- [x] `docs/plans/` — this file; later plans go beside it
 
 ### Phase 5 — API coverage and drift prevention (size: M)
 
-- [ ] Triage the 18 uncovered spec paths with the API owner. Likely groups: **CTAs** (`/org/ctas*`, `/org/cta-assets/upload-url`, `/org/content/{id}/cta`), **KB permissions** (`/org/kb/nodes/{id}/permissions*`), **content insights** (`provenance`, `verification/velocity`, `citation-details`, `citation-prompts`, `edit-events/bulk`), **KB** (`bulk-delete`, `stats`), **models** (`run-models/options`, `scheduler-models`), and `generated-content/drafts|published` (may already be covered by `--status`; confirm the path)
-- [ ] Implement each, or add it to `docs/reference/excluded-endpoints.md` with a reason
-- [ ] Resolve `api-keys revoke` (spec behind, or dead command)
-- [ ] `scripts/spec-drift.ts`: fetch `https://docs.senso.ai/specs/sdk-api.yaml`, diff paths against `createProgram()` paths, print a table. Run by `.github/workflows/spec-drift.yml` **weekly and on demand, never on PRs** (it touches the network), opening or updating a single issue on drift
-- [ ] Same job refreshes `tests/fixtures/shipables-registry.json` from the registry and opens a PR if the skills list changed
-- [ ] Vendor the spec paths list as a fixture so the _policy_ test (no network) can assert every command path exists in the last-known spec
+- [x] Triage the 18 uncovered spec paths with the API owner. Likely groups: **CTAs** (`/org/ctas*`, `/org/cta-assets/upload-url`, `/org/content/{id}/cta`), **KB permissions** (`/org/kb/nodes/{id}/permissions*`), **content insights** (`provenance`, `verification/velocity`, `citation-details`, `citation-prompts`, `edit-events/bulk`), **KB** (`bulk-delete`, `stats`), **models** (`run-models/options`, `scheduler-models`), and `generated-content/drafts|published` (may already be covered by `--status`; confirm the path)
+- [x] Implement each, or add it to `docs/reference/excluded-endpoints.md` with a reason
+- [ ] **Open, needs the API team.** `POST /org/api-keys/{keyId}/revoke` is called by
+      `senso api-keys revoke` and is not in the customer-facing spec, which states that
+      key creation, update and revocation happen in the dashboard because they need user
+      authentication. Four commands are affected (`create`, `update`, `delete`, `revoke`).
+      Recorded in `docs/reference/excluded-endpoints.md`; if they are dead they should be
+      removed rather than left to fail confusingly.
+- [x] `scripts/spec-drift.ts`: fetch `https://docs.senso.ai/specs/sdk-api.yaml`, diff paths against `createProgram()` paths, print a table. Run by `.github/workflows/spec-drift.yml` **weekly and on demand, never on PRs** (it touches the network), opening or updating a single issue on drift
+- [x] Same job refreshes `tests/fixtures/shipables-registry.json` from the registry and opens a PR if the skills list changed
+- [x] Vendor the spec paths list as a fixture so the _policy_ test (no network) can assert every command path exists in the last-known spec
 
 ### Phase 6 — Release hardening (size: S)
 
 The current publish flow is good; these make it safer and more informative.
 
-- [ ] `publish.yml` waits for the `CI` workflow to be green on the tagged commit (`workflow_run` or a `needs:` on a reusable CI job) — today a tag publishes even if CI failed
-- [ ] Fail publish if `CHANGELOG.md` has no `## [x.y.z]` section for the tag; move `[Unreleased]` items under it as part of `npm version` via a `version` script
-- [ ] `npm publish --provenance` explicitly (trusted publishing implies it; make it visible)
-- [ ] Create a GitHub Release from the CHANGELOG section with `gh release create` in-workflow (the `gh` CLI ships on the runner) — no third-party release action, per the first-party-actions rule
-- [ ] Smoke the **published** package post-release: `npx @senso-ai/cli@<tag> --version` from a clean runner
-- [ ] Document the release procedure in CONTRIBUTING (it is in README today; move it)
-- [ ] Add `RELEASING.md` only if the procedure outgrows a CONTRIBUTING section — probably not
+- [x] `publish.yml` waits for the `CI` workflow to be green on the tagged commit (`workflow_run` or a `needs:` on a reusable CI job) — today a tag publishes even if CI failed
+- [x] Fail publish if `CHANGELOG.md` has no `## [x.y.z]` section for the tag; move `[Unreleased]` items under it as part of `npm version` via a `version` script
+- [x] `npm publish --provenance` explicitly (trusted publishing implies it; make it visible)
+- [x] Create a GitHub Release from the CHANGELOG section with `gh release create` in-workflow (the `gh` CLI ships on the runner) — no third-party release action, per the first-party-actions rule
+- [x] Smoke the **published** package post-release: `npx @senso-ai/cli@<tag> --version` from a clean runner
+- [x] Document the release procedure in CONTRIBUTING (it is in README today; move it)
+- [x] ~~Add `RELEASING.md`~~ — not needed at the root, as predicted. The procedure lives
+      in `docs/releasing.md` with the rest of the `docs/` set, and CONTRIBUTING links to it.
 
 ### Phase 7 — Live canary (size: S, optional)
 
 Mirrors contextos's `api-endpoint-tests.yml`: real key, real org, scheduled, never a PR gate.
 
-- [ ] `make live` runs `tests/live/` — read-only commands (`whoami`, `org get`, `content list --limit 1`, `analytics summary`, `credits balance`) against the built CLI with `SENSO_API_KEY` from a repo secret
-- [ ] `.github/workflows/live-canary.yml` — `schedule` (daily) + `workflow_dispatch`; skips with a warning when the secret is absent; opt-in per PR via a `live-api` label
-- [ ] Destructive commands only behind `--destructive` and only against a non-production `SENSO_BASE_URL` var
+- [x] `make live` runs `tests/live/` — read-only commands (`whoami`, `org get`, `content list --limit 1`, `analytics summary`, `credits balance`) against the built CLI with `SENSO_API_KEY` from a repo secret
+- [x] `.github/workflows/live-canary.yml` — `schedule` (daily) + `workflow_dispatch`; skips with a warning when the secret is absent; opt-in per PR via a `live-api` label
+- [x] ~~Destructive commands behind `--destructive`~~ — **not needed, by design.** The
+      canary runs read-only commands only (`scripts/live-canary.ts` lists all twelve), so
+      there is no destructive path to gate. Adding the flag would advertise a capability
+      that does not exist. If a write is ever added, this is the gate it needs.
 
 ---
 
@@ -453,11 +474,11 @@ clone with no secrets, the OS matrix is green, and the README badges are all gre
 
 Tick phases here as they land. Sub-item checklists are in Section 4.
 
-- [ ] Phase 0 — Stop the bleeding
-- [ ] Phase 1 — Tooling and repo hygiene
-- [ ] Phase 2 — Test suite
-- [ ] Phase 3 — Output, error and exit-code contract
-- [ ] Phase 4 — Documentation
-- [ ] Phase 5 — API coverage and drift prevention
-- [ ] Phase 6 — Release hardening
-- [ ] Phase 7 — Live canary (optional)
+- [x] Phase 0 — Stop the bleeding
+- [x] Phase 1 — Tooling and repo hygiene
+- [x] Phase 2 — Test suite
+- [x] Phase 3 — Output, error and exit-code contract
+- [x] Phase 4 — Documentation
+- [x] Phase 5 — API coverage and drift prevention
+- [x] Phase 6 — Release hardening
+- [x] Phase 7 — Live canary (optional)

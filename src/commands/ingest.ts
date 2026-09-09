@@ -16,6 +16,7 @@ import {
 import { CliError, EXIT } from "../lib/errors.js";
 import { pickFolder } from "../lib/folder-picker.js";
 import { emit } from "../lib/output.js";
+import { spinner } from "../lib/progress.js";
 import { runAction } from "../lib/run-action.js";
 import * as log from "../utils/logger.js";
 
@@ -173,7 +174,7 @@ export function registerIngestCommands(program: Command): void {
         const body: Record<string, unknown> = { files: fileData.map((f) => f.meta) };
         if (kbFolderNodeId) body.kb_folder_node_id = kbFolderNodeId;
 
-        const prepSpin = p.spinner();
+        const prepSpin = spinner(ctx.quiet);
         prepSpin.start("Preparing upload...");
 
         let response: UploadResponse;
@@ -222,7 +223,7 @@ export function registerIngestCommands(program: Command): void {
               failed.push({ filename: item.filename, reason: "Could not match to a local file." });
               continue;
             }
-            const uploadSpin = p.spinner();
+            const uploadSpin = spinner(ctx.quiet);
             uploadSpin.start(`Uploading ${item.filename}...`);
             try {
               await uploadToS3(item.upload_url, match.buffer, match.meta.content_type);
@@ -246,7 +247,16 @@ export function registerIngestCommands(program: Command): void {
         }
 
         // 4. Summary
-        printUploadSummary(uploaded, failed, items);
+        printUploadSummary(uploaded, failed, items, ctx.quiet);
+
+        // A batch where every file was rejected or every S3 PUT failed used to
+        // exit 0: nothing was stored, but a script branching on the exit code saw
+        // success and the only signal was English on stderr.
+        if (uploaded === 0 && items.length > 0) {
+          throw new CliError(`No files were uploaded (${items.length} attempted).`, EXIT.ERROR, {
+            hint: "Each file's reason is listed above. Re-run with --output json for the machine-readable detail.",
+          });
+        }
 
         // The human summary above is already on stderr, so `plain` adds nothing;
         // json and table callers still get the payload.

@@ -2,10 +2,27 @@ import { Command } from "commander";
 import pc from "picocolors";
 import { apiRequest } from "../lib/api-client.js";
 import { CliError, EXIT } from "../lib/errors.js";
+import { parseJsonFlag } from "../lib/json-arg.js";
 import { emit, emitConfirmation } from "../lib/output.js";
 import { runAction } from "../lib/run-action.js";
 import { buildSetTagsBody, buildAttachTagBody } from "../lib/tag-args.js";
 import * as log from "../utils/logger.js";
+
+/**
+ * The edit-telemetry batch, checked before it is sent.
+ *
+ * The endpoint records events in order and fails on the first invalid one,
+ * leaving the earlier ones recorded — a half-applied batch is not something the
+ * caller can undo, so an obviously wrong body is worth rejecting here instead.
+ */
+function assertEvents(events: unknown): void {
+  if (!Array.isArray(events) || events.length === 0) {
+    throw new CliError('--data must contain a non-empty "events" array.', EXIT.USAGE, {
+      code: "usage",
+      hint: 'Example: --data \'{"events":[{"event_type":"draft_saved","edit_source":"manual"}]}\'',
+    });
+  }
+}
 
 export function registerContentCommands(program: Command): void {
   const content = program
@@ -179,6 +196,136 @@ export function registerContentCommands(program: Command): void {
           apiKey: ctx.apiKey,
           baseUrl: ctx.baseUrl,
         });
+        emit(ctx, data);
+      }),
+    );
+
+  content
+    .command("verification-velocity")
+    .description(
+      "Get publish-to-citation velocity for all published content: how many live pages have ever been cited, the average days from publish to first citation, and the same broken down per publisher. Requires the GEO product.",
+    )
+    .action(
+      runAction(program, async (ctx) => {
+        const data = await apiRequest({
+          path: "/org/content/verification/velocity",
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
+        });
+        emit(ctx, data);
+      }),
+    );
+
+  content
+    .command("provenance")
+    .description(
+      "Audit the provenance of one published URL: how its knowledge base sources were ingested, the retrieved chunks and model context, the accepted generation attempt, the editing history, and every publish record. Each stage reports what stored evidence proves and what is missing rather than guessing. --url must match a live publish record's URL exactly — 'publish-records list' is where those URLs come from. Requires the GEO product.",
+    )
+    .requiredOption("--url <url>", "The live published URL to audit, matched exactly")
+    .action(
+      runAction(program, async (ctx, cmdOpts: { url: string }) => {
+        const data = await apiRequest({
+          path: "/org/content/provenance",
+          params: { published_url: cmdOpts.url },
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
+        });
+        emit(ctx, data);
+      }),
+    );
+
+  content
+    .command("citation-details <id>")
+    .description(
+      "Get citation detail for one published content item: a pooled summary, per-destination metrics, and a daily trend, over an optional date window and model/location filter. Content IDs come from 'content list' or 'content verification'. Requires the GEO product.",
+    )
+    .option("--start-date <YYYY-MM-DD>", "Inclusive start of the window")
+    .option("--end-date <YYYY-MM-DD>", "Inclusive end of the window; not before --start-date")
+    .option(
+      "--models <list>",
+      "Comma-separated models to filter by (e.g. chatgpt,perplexity). Omit for all.",
+    )
+    .option("--locations <list>", "Comma-separated locations to filter by. Omit for all.")
+    .action(
+      runAction(program, async (ctx, id: string, cmdOpts: Record<string, string>) => {
+        const data = await apiRequest({
+          path: `/org/content/${id}/citation-details`,
+          params: {
+            start_date: cmdOpts.startDate,
+            end_date: cmdOpts.endDate,
+            models: cmdOpts.models,
+            locations: cmdOpts.locations,
+          },
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
+        });
+        emit(ctx, data);
+      }),
+    );
+
+  content
+    .command("citation-prompts <id>")
+    .description(
+      "List the prompt/model rows whose question runs cite one of a published content item's live URLs, with the mention-rate and share-of-voice lift against runs that cite none of them. Use it to see which prompts a published page is actually winning. Content IDs come from 'content list'. Requires the GEO product.",
+    )
+    .option("--start-date <YYYY-MM-DD>", "Inclusive start of the window")
+    .option("--end-date <YYYY-MM-DD>", "Inclusive end of the window; not before --start-date")
+    .option(
+      "--models <list>",
+      "Comma-separated models to filter by (e.g. chatgpt,perplexity). Omit for all.",
+    )
+    .option("--locations <list>", "Comma-separated locations to filter by. Omit for all.")
+    .option(
+      "--destinations <list>",
+      "Comma-separated publisher slugs to restrict to. Unknown slugs are ignored.",
+    )
+    .action(
+      runAction(program, async (ctx, id: string, cmdOpts: Record<string, string>) => {
+        const data = await apiRequest<{ prompts?: Record<string, unknown>[] }>({
+          path: `/org/content/${id}/citation-prompts`,
+          params: {
+            start_date: cmdOpts.startDate,
+            end_date: cmdOpts.endDate,
+            models: cmdOpts.models,
+            locations: cmdOpts.locations,
+            destinations: cmdOpts.destinations,
+          },
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
+        });
+        // `external_urls` and `date_range` sit alongside `prompts` and are not
+        // pagination keys, so the generic row-finder declines the response.
+        // Naming the rows keeps the prompt table out of a JSON blob in a cell.
+        emit(ctx, data, {
+          table: {
+            rows: data.prompts ?? [],
+            columns: ["prompt", "model", "mention_rate", "avg_sov", "citation_count"],
+          },
+        });
+      }),
+    );
+
+  content
+    .command("record-edits <id>")
+    .description(
+      "Record Builder edit-telemetry events for a content item in bulk, and return how many were inserted versus skipped as duplicates. An event repeating a client_event_id already seen by the organization is skipped. Events are processed in order, so an invalid one fails the request with the earlier events already recorded. Requires the GEO product.",
+    )
+    .requiredOption(
+      "--data <json>",
+      'JSON: { "events": [{ "event_type": "ai_patch_accepted", "edit_source": "ai", "client_event_id": "<uuid>" }] }',
+    )
+    .action(
+      runAction(program, async (ctx, id: string, cmdOpts: { data: string }) => {
+        const body = parseJsonFlag<{ events?: unknown }>(cmdOpts.data);
+        assertEvents(body.events);
+        const data = await apiRequest({
+          method: "POST",
+          path: `/org/content/${id}/edit-events/bulk`,
+          body,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
+        });
+        if (!ctx.quiet) log.success(`Edit events recorded for content ${id}.`);
         emit(ctx, data);
       }),
     );

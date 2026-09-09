@@ -20,10 +20,9 @@ import { CliError, EXIT, invalidJsonError } from "./errors.js";
  * parse cleanly but every endpoint taking one of these flags wants an object, so
  * they would otherwise fail at the API with a less useful message.
  */
-/* T appears once by design: it is a caller-supplied assertion about the body's
-   shape (`parseJsonFlag<UpdateBody>(...)`), not something inferable from the
+/* T is a caller-supplied assertion about the body's shape
+   (`parseJsonFlag<UpdateBody>(...)`), not something inferable from the
    arguments. The alternative is an `as UpdateBody` at every call site. */
-// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
 export function parseJsonFlag<T = Record<string, unknown>>(value: string, flag = "--data"): T {
   let parsed: unknown;
   try {

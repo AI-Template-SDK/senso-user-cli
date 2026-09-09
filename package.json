@@ -24,6 +24,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "reference": "tsx scripts/gen-reference.ts",
+    "version": "tsx scripts/changelog-release.ts && git add CHANGELOG.md",
     "prepare": "husky || true",
     "prepublishOnly": "npm run build"
   },

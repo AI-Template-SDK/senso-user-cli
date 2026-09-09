@@ -1,7 +1,11 @@
 import { Command } from "commander";
 import { apiRequest } from "../lib/api-client.js";
+import { parseEnumFlag } from "../lib/enum-arg.js";
 import { emit } from "../lib/output.js";
 import { runAction } from "../lib/run-action.js";
+
+/** The two listings, which are path segments rather than a query parameter. */
+const STATUSES = ["published", "drafts"] as const;
 
 export function registerGeneratedContentCommands(program: Command): void {
   const gc = program
@@ -20,8 +24,12 @@ export function registerGeneratedContentCommands(program: Command): void {
     .option("--search <query>", "Filter by title")
     .action(
       runAction(program, async (ctx, cmdOpts: Record<string, string>) => {
-        const status =
-          cmdOpts.status === "drafts" || cmdOpts.status === "draft" ? "drafts" : "published";
+        // `draft` has always been accepted as a spelling of `drafts`; fold it in
+        // before validating, so the hint names only the two documented values.
+        // Anything else used to fall through to "published" and return a
+        // plausible-looking wrong list.
+        const requested = cmdOpts.status === "draft" ? "drafts" : cmdOpts.status;
+        const status = parseEnumFlag("--status", requested, STATUSES) ?? "published";
         const data = await apiRequest({
           path: `/org/generated-content/${status}`,
           params: { limit: cmdOpts.limit, offset: cmdOpts.offset, search: cmdOpts.search },

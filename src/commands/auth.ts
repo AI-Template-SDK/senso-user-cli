@@ -3,7 +3,7 @@ import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { apiRequest } from "../lib/api-client.js";
 import { readConfig, writeConfig, clearConfig, getApiKey, getConfigPath } from "../lib/config.js";
-import { CliError, EXIT } from "../lib/errors.js";
+import { CliError, EXIT, toCliError } from "../lib/errors.js";
 import { emit, emitConfirmation } from "../lib/output.js";
 import { runAction } from "../lib/run-action.js";
 import { banner } from "../utils/branding.js";
@@ -157,6 +157,13 @@ export function registerAuthCommands(program: Command): void {
           // Offline, or the API is down. If a previous login cached the org
           // there is still something true to say, and saying it beats failing —
           // "which org am I pointed at" is answerable without the network.
+          //
+          // But NOT when the key itself was rejected. Falling back on a 401
+          // meant a revoked key printed a cached organization and exited 0, from
+          // the one command whose entire job is to say whether you are
+          // authenticated.
+          const mapped = toCliError(err);
+          if (mapped.exitCode === EXIT.AUTH) throw mapped;
           if (!config.orgName) throw err;
 
           log.warn("Could not reach the Senso API. Showing the last known values.");

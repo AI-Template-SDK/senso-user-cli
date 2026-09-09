@@ -127,16 +127,48 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 }
 
 /**
- * Finds the list inside a response.
+ * Keys a list envelope is allowed to carry besides the list itself.
  *
- * The API is not consistent about this — some endpoints return a bare array,
- * most wrap it (`{ items: [...], total }`, `{ nodes: [...] }`, `{ data: [...] }`),
- * and the wrapper key differs per endpoint. Rather than teach 150 commands their
- * own shape, look for the first array-of-objects property. That is the list in
- * every response shape this API actually returns.
+ * See findRows: this set is what separates "a page of results" from "one object
+ * that happens to contain a list".
+ */
+const ENVELOPE_KEYS = new Set([
+  "total",
+  "total_count",
+  "count",
+  "limit",
+  "offset",
+  "page",
+  "page_size",
+  "per_page",
+  "has_more",
+  "next",
+  "previous",
+  "cursor",
+  "next_cursor",
+]);
+
+/**
+ * Finds the list inside a response, or decides there is not one.
  *
- * Returns null when the payload is a single object, which is the signal to
- * render it as key/value instead.
+ * The API is not consistent about how it wraps a list — some endpoints return a
+ * bare array, most wrap it (`{ items: [...], total }`, `{ nodes: [...] }`,
+ * `{ data: [...] }`), and the key differs per endpoint. Rather than teach ~150
+ * commands their own shape, this looks for the list.
+ *
+ * The subtlety, and the reason this is not simply "the first array property":
+ * a single object often CONTAINS a list without being one. `/org/me` returns the
+ * organization with a `locations: [...]` field, and an earlier version of this
+ * function treated that as the payload — so `senso org get` rendered the
+ * locations and silently dropped the organization's name, slug and tier from
+ * both `plain` and `table`. Only `--output json` was unaffected, which is why it
+ * went unnoticed.
+ *
+ * So a payload counts as a list only when it is *nothing but* a list plus
+ * pagination metadata. Anything carrying its own fields is a single object with
+ * a nested list, and renders as key/value.
+ *
+ * Returns null for "render this as a single object".
  */
 function findRows(data: unknown): Record<string, unknown>[] | null {
   if (Array.isArray(data)) {
@@ -144,12 +176,19 @@ function findRows(data: unknown): Record<string, unknown>[] | null {
   }
   if (!isPlainObject(data)) return null;
 
-  for (const value of Object.values(data)) {
-    if (Array.isArray(value) && value.length > 0 && value.every(isPlainObject)) {
-      return value;
-    }
-  }
-  return null;
+  const entries = Object.entries(data);
+  const arrays = entries.filter(
+    ([, v]) => Array.isArray(v) && v.length > 0 && v.every(isPlainObject),
+  );
+
+  // Exactly one candidate list, and every other key is pagination metadata.
+  if (arrays.length !== 1) return null;
+  const [listKey, list] = arrays[0] as [string, Record<string, unknown>[]];
+
+  const otherKeys = entries.map(([k]) => k).filter((k) => k !== listKey);
+  if (!otherKeys.every((k) => ENVELOPE_KEYS.has(k))) return null;
+
+  return list;
 }
 
 /** `key: value` lines for a single object, one per line, nothing truncated. */

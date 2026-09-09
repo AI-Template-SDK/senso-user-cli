@@ -7,7 +7,7 @@ import * as log from "../utils/logger.js";
 /**
  * Thrown when the user cancels the picker with Ctrl-C or Escape.
  *
- * Cancelling is not a failure, but the picker is several frames deep in an
+ * Canceling is not a failure, but the picker is several frames deep in an
  * interactive loop and cannot simply return "no folder" — its caller has files
  * to upload and nowhere to put them. The caller catches this and returns
  * cleanly, so the process exits 0 with no error printed.
