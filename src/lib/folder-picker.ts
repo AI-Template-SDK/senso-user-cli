@@ -90,7 +90,7 @@ async function promptCreateFolder(
   });
 
   if (p.isCancel(name)) {
-    p.cancel("Upload cancelled.");
+    p.cancel("Upload canceled.");
     process.exit(0);
   }
 
@@ -185,7 +185,7 @@ export async function pickFolder(
     });
 
     if (p.isCancel(choice)) {
-      p.cancel("Upload cancelled.");
+      p.cancel("Upload canceled.");
       process.exit(0);
     }
 

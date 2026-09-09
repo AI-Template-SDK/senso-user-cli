@@ -119,7 +119,7 @@ export function registerIngestCommands(program: Command): void {
           });
 
           if (p.isCancel(answer) || (answer as string).trim().toLowerCase() === "no") {
-            p.cancel("Upload cancelled.");
+            p.cancel("Upload canceled.");
             process.exit(0);
           }
 

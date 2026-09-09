@@ -13,7 +13,7 @@ function parseMaxResults(value: string): number {
 export function registerSearchCommands(program: Command): void {
   const search = program
     .command("search")
-    .description("Search the knowledge base with natural language queries. Returns AI-generated answers synthesised from matching content chunks, or raw chunks/content IDs.");
+    .description("Search the knowledge base with natural language queries. Returns AI-generated answers synthesized from matching content chunks, or raw chunks/content IDs.");
 
   // Default: senso search <query> → POST /org/search (answer + results)
   search
@@ -243,10 +243,9 @@ export function registerSearchCommands(program: Command): void {
     });
 }
 
-function outputByFormat(format: string | undefined, data: unknown): void {
-  if (format === "json") {
-    console.log(JSON.stringify(data, null, 2));
-  } else {
-    console.log(JSON.stringify(data, null, 2));
-  }
+// Both arms of this used to print JSON, so --output table|plain were silently
+// ignored on `search context|content|full`. Collapsed to the single behavior it
+// actually had; Phase 3 of the hardening plan replaces it with real formatting.
+function outputByFormat(_format: string | undefined, data: unknown): void {
+  console.log(JSON.stringify(data, null, 2));
 }

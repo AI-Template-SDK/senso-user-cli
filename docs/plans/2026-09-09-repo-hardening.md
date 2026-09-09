@@ -206,19 +206,19 @@ the test suite, 3 fixes the behaviors the tests now pin, 4 documents it, 5 close
 
 Fixes for the audit findings that are independent of everything else.
 
-- [ ] Send the mini banner to **stderr** and suppress it when `--output json` (bug 1)
-- [ ] Move the update check into the `preAction` hook so it never runs for `--version` or
+- [x] Send the mini banner to **stderr** and suppress it when `--output json` (bug 1)
+- [x] Move the update check into the `preAction` hook so it never runs for `--version` or
       `--help`; skip it for `login`, `logout` and `update`; cut the registry timeout to 3s
       (bug 2, bug 10)
 - [x] ~~Pass `SENSO_API_KEY` to shipables via the child environment, not argv (bug 3)~~ —
       **not possible**, verified against shipables 0.1.2 (no `process.env` fallback for an
       `--env` value). Comment added at the call site; SECURITY.md entry is tracked in Phase 4
       and the upstream request in Phase 5
-- [ ] Remove the dead `outputByFormat` branch in `search.ts` (bug 4)
-- [ ] Add `senso-onboarding` to the skills list (bug 8, interim until Phase 5 fixture)
-- [ ] Fix the 7 British spellings (`organization`, `synthesized`, `canceled`)
-- [ ] `npm audit fix` / bump vitest to clear the 7 dev-dependency advisories
-- [ ] Drop `--passWithNoTests` from CI — it should fail until Phase 2 lands, and that is
+- [x] Remove the dead `outputByFormat` branch in `search.ts` (bug 4)
+- [x] Add `senso-onboarding` to the skills list (bug 8, interim until Phase 5 fixture)
+- [x] Fix the 7 British spellings (`organization`, `synthesized`, `canceled`)
+- [x] `npm audit fix` / bump vitest to clear the 7 dev-dependency advisories
+- [x] Drop `--passWithNoTests` from CI — it should fail until Phase 2 lands, and that is
       the point (or land Phase 0 and Phase 2's first test together)
 
 ### Phase 1 — Tooling and repo hygiene (size: M)

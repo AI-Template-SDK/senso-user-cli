@@ -35,6 +35,11 @@ import { registerAnalyticsCommands } from "./commands/analytics.js";
 import { registerIndustriesCommands } from "./commands/industries.js";
 import { registerUpdateCommand } from "./commands/update.js";
 
+// `login` and `logout` own the config file for the duration of their run, and
+// `update` asks the registry itself — a second check would be redundant work
+// and a second writer.
+const UPDATE_CHECK_EXEMPT = new Set(["login", "logout", "update"]);
+
 const program = new Command();
 
 program
@@ -46,10 +51,27 @@ program
   .option("--output <format>", "Output format: json | table | plain", "plain")
   .option("--quiet", "Suppress non-essential output")
   .option("--no-update-check", "Skip version check")
-  .hook("preAction", async () => {
+  // preAction runs once per invocation, after Commander has parsed the global
+  // options and resolved which command is running — which is why both of these
+  // live here rather than in main(). Commander exits on `--version` and
+  // `--help` without dispatching an action, so neither the banner nor the
+  // update check fires for them: `senso --version` stays offline and pure,
+  // which is what a CI smoke test needs.
+  .hook("preAction", (_thisCommand, actionCommand) => {
     const opts = program.opts();
-    if (!opts.quiet) {
+    // JSON output is consumed by a program. Even on stderr, a banner is noise
+    // an agent has to be told to ignore, so suppress it entirely.
+    const decorated = !opts.quiet && opts.output !== "json";
+    if (decorated) {
       miniBanner();
+    }
+
+    // Skipped for the three commands that either write the config file
+    // themselves or check the registry on their own behalf. Best-effort and
+    // deliberately not awaited.
+    const name = actionCommand.name();
+    if (!UPDATE_CHECK_EXEMPT.has(name)) {
+      void checkForUpdate(!decorated);
     }
   });
 
@@ -85,16 +107,7 @@ registerAnalyticsCommands(program);
 registerIndustriesCommands(program);
 registerUpdateCommand(program);
 
-// Parse and execute
 async function main() {
-  const quiet =
-    process.argv.includes("--quiet") ||
-    (process.argv.includes("--output") &&
-      process.argv[process.argv.indexOf("--output") + 1] === "json");
-
-  // Check for updates (non-blocking, stderr only — don't await to avoid slowing startup)
-  checkForUpdate(quiet).catch(() => {});
-
   await program.parseAsync(process.argv);
 }
 

@@ -53,7 +53,7 @@ export function registerAuthCommands(program: Command): void {
       });
 
       if (p.isCancel(result)) {
-        p.cancel("Login cancelled.");
+        p.cancel("Login canceled.");
         process.exit(0);
       }
 

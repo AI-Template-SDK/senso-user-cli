@@ -6,6 +6,9 @@ import { getApiKey } from "../lib/config.js";
 
 const execFileAsync = promisify(execFile);
 
+// Mirrors the skills published from senso-contextos/skills/. This list drifted
+// once already — senso-onboarding shipped there and was never added here — so
+// tests/policy/skills-list.test.ts now compares it against a fixture.
 const SENSO_SKILLS = [
   "senso-ai/senso-search",
   "senso-ai/senso-ingest",
@@ -13,6 +16,7 @@ const SENSO_SKILLS = [
   "senso-ai/senso-brand-setup",
   "senso-ai/senso-kb-organize",
   "senso-ai/senso-review-publish",
+  "senso-ai/senso-onboarding",
 ];
 
 const AGENT_FLAGS: Record<string, string> = {
@@ -89,6 +93,14 @@ export function registerSkillsCommands(program: Command): void {
       }
 
       // Build env flags for API key
+      // KNOWN LIMITATION: this puts the API key in the child's argv, where it is
+      // readable in `ps` output and lands in shell history. It cannot be fixed
+      // from this side. shipables 0.1.2 uses --env to populate the installed
+      // skill's MCP server environment and never falls back to process.env for a
+      // value — non-interactively an unsupplied variable becomes the empty
+      // string with a warning — so passing the key through the child's own
+      // environment would install a skill with no credential at all. Recorded in
+      // SECURITY.md; the fix belongs upstream in shipables.
       const envFlags: string[] = [];
       const apiKey = getApiKey({ apiKey: opts.apiKey });
       if (apiKey) {

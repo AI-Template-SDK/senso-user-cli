@@ -15,7 +15,7 @@ export function banner(): void {
   const branded = sensoGradient.multiline(ascii);
   const tagline = pc.dim("        Infrastructure for the Agentic Web");
 
-  console.log(
+  console.error(
     boxen(`${branded}\n${tagline}`, {
       padding: 1,
       margin: { top: 1, bottom: 1, left: 2, right: 2 },
@@ -25,9 +25,12 @@ export function banner(): void {
   );
 }
 
+// stderr, not stdout. Everything this module prints is decoration, and stdout
+// belongs to the payload — `senso roles list --output json | jq` used to fail
+// because the banner landed on stdout ahead of the JSON.
 export function miniBanner(): void {
   const title = sensoGradient("Senso CLI");
-  console.log(`\n  ${title} ${pc.dim(`v${version}`)}\n`);
+  console.error(`\n  ${title} ${pc.dim(`v${version}`)}\n`);
 }
 
 export function updateBox(current: string, latest: string): void {

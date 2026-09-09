@@ -28,7 +28,7 @@ jobs:
         run: npm run build
 
       - name: Test
-        run: npx vitest run --passWithNoTests
+        run: npx vitest run
 
       - name: Smoke test CLI
         run: node dist/cli.js --version
