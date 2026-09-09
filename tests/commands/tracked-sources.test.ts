@@ -147,6 +147,25 @@ describe("tracked-sources, when the request fails", () => {
 });
 
 describe("tracked-sources, on usage errors", () => {
+  it("reports one missing required flag at a time, naming it", async () => {
+    // `add` requires --pattern, --match-type and --tier. Commander reports the
+    // first missing one and exits rather than collecting them, which is worth
+    // pinning: a caller fixing them one at a time should expect exactly this,
+    // and changing to "report them all" would change the usage contract.
+    //
+    // The message is assertable because tests/helpers.ts routes Commander's own
+    // output into the captured streams — it writes usage errors straight to
+    // process.stderr rather than through console.
+    const nothing = await runCli(["tracked-sources", "add"]);
+    expect(nothing.exitCode).toBe(2);
+    expect(nothing.stdout).toBe("");
+    expect(nothing.stderr).toContain("--pattern");
+
+    const onlyPattern = await runCli(["tracked-sources", "add", "--pattern", "example.com"]);
+    expect(onlyPattern.exitCode).toBe(2);
+    expect(onlyPattern.stderr).toContain("--match-type");
+  });
+
   it("exits 2 when a required flag is missing", async () => {
     const res = await runCli(["tracked-sources", "add", "--pattern", "example.com"]);
 

@@ -291,6 +291,22 @@ describe("CI and the Makefile cannot mean different things", () => {
     ).toEqual([]);
   });
 
+  it("scopes the test targets to one vitest project each", () => {
+    // The bug this exists for: `make unit` ran `vitest run --coverage` with no
+    // project filter, so it also ran the e2e project — which drives the BUILT
+    // bundle that `unit` does not build. It passed on every developer machine,
+    // because a stale dist/ from an earlier build was always lying around, and
+    // failed in CI on a clean checkout. That is precisely the "cannot mean
+    // different things" property the Makefile exists to provide.
+    const unit = /^unit:[^\n]*\n\t([^\n]*)/m.exec(makefile)?.[1] ?? "";
+    const e2e = /^e2e:[^\n]*\n(?:[^\n]*\n)*?\t([^\n]*vitest[^\n]*)/m.exec(makefile)?.[1] ?? "";
+
+    expect(unit, "`make unit` must pass --project unit, or it also runs e2e").toContain(
+      "--project unit",
+    );
+    expect(e2e, "`make e2e` must pass --project e2e").toContain("--project e2e");
+  });
+
   it("documents every target with a help line", () => {
     // `make help` is the discovery mechanism; a target without `## ` is
     // invisible to anyone who has not read the file.

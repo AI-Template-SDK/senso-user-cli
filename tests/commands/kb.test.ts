@@ -52,7 +52,12 @@ const ONE_NODE = {
 const TAGS = { tags: [{ tag_id: "t-1", name: "handbook", created_at: "2026-03-01T00:00:00Z" }] };
 
 /** Where a presigned URL points. Nothing listens on it; MSW answers. */
+// The presigned URL the API hands back, signature and all — the tests assert
+// the CLI uses it verbatim rather than reconstructing it.
 const S3_URL = "https://s3.test.invalid/senso-uploads/abc123?X-Amz-Signature=deadbeef";
+// MSW matches handlers on the path and warns if the pattern carries a query
+// string, so handlers register on this and read the signature off request.url.
+const S3_PATH = "https://s3.test.invalid/senso-uploads/abc123";
 
 let workDir: string;
 
@@ -951,7 +956,7 @@ describe("kb upload, when S3 refuses the bytes", () => {
         HttpResponse.json(uploadResponse([accepted("a.txt", failing), accepted("b.txt")])),
       ),
       http.put(failing, () => new HttpResponse(null, { status: 500 })),
-      http.put(S3_URL, async ({ request }) => {
+      http.put(S3_PATH, async ({ request }) => {
         puts.push(Buffer.from(await request.arrayBuffer()).toString("utf-8"));
         return new HttpResponse(null, { status: 200 });
       }),
@@ -1083,7 +1088,7 @@ describe("kb update-file, on the wire", () => {
         body = await request.json();
         return HttpResponse.json(accepted("doc.txt"));
       }),
-      http.put(S3_URL, async ({ request }) => {
+      http.put(S3_PATH, async ({ request }) => {
         puts.push(Buffer.from(await request.arrayBuffer()).toString("utf-8"));
         return new HttpResponse(null, { status: 200 });
       }),

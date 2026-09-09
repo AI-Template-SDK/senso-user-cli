@@ -35,7 +35,7 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterAll, beforeAll } from "vitest";
+import { afterAll } from "vitest";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -410,18 +410,22 @@ export async function runSenso(args: string[], opts: RunOptions = {}): Promise<R
 // ── Preconditions and cleanup ────────────────────────────────────────────────
 
 /**
- * Registered here rather than in each test file so that importing this harness
- * is enough to get the check. Vitest attaches the hook to whichever file is
- * being collected when this module is imported.
+ * A missing build is a precondition failure, not a test failure — so it is
+ * checked here, at import time, rather than in a `beforeAll`.
+ *
+ * The difference is what the reader sees. From a hook, the throw happens after
+ * the suite's own `beforeAll` has been scheduled but before it has run, so
+ * `afterAll` still fires with its mock server unassigned and the real message —
+ * "run npm run build" — arrives buried under two `Cannot read properties of
+ * undefined` teardown errors. Throwing during collection means the file never
+ * loads, no hooks run, and the reason is the only thing printed.
  */
-beforeAll(() => {
-  if (!existsSync(CLI_PATH)) {
-    throw new Error(
-      `The e2e suite runs the built bundle, and it is not there:\n  ${CLI_PATH}\n\n` +
-        `Run \`npm run build\` first, or use \`make e2e\`, which builds and then runs this project.`,
-    );
-  }
-});
+if (!existsSync(CLI_PATH)) {
+  throw new Error(
+    `The e2e suite runs the built bundle, and it is not there:\n  ${CLI_PATH}\n\n` +
+      `Run \`npm run build\` first, or use \`make e2e\`, which builds and then runs this project.`,
+  );
+}
 
 afterAll(() => {
   for (const root of tempRoots.splice(0)) {

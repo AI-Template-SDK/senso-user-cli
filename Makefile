@@ -67,8 +67,14 @@ security: ## Dependency audit (SCA) + static analysis (SAST) + secret scan
 	docker run --rm -v "$(CURDIR):/repo" $(GITLEAKS_IMAGE) \
 		detect --source=/repo --config=/repo/.gitleaks.toml --no-banner --redact --exit-code 1
 
+# `--project unit` is load-bearing. Without it vitest runs every configured
+# project, which pulls in e2e — and e2e drives the BUILT bundle, which this
+# target does not build. That failed in CI while passing on every developer
+# machine, because a stale dist/ from an earlier build was always lying around
+# locally. If you are tempted to drop the flag, that is the bug you are
+# recreating.
 unit: ## Unit, command and policy tests with the coverage gate. Touches no network.
-	$(NPX) vitest run --coverage
+	$(NPX) vitest run --project unit --coverage
 
 e2e: ## Drive the built CLI as a subprocess against a local mock API
 	$(NPM) run build

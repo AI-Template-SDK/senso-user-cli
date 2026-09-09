@@ -156,11 +156,25 @@ describe("competitors, on usage errors", () => {
     expect(res.stderr).toContain("--data must be a JSON object");
   });
 
-  it("exits 2 when a required flag is missing", async () => {
+  it("exits 2 when a required flag is missing, and names the flag", async () => {
+    // The message is assertable because tests/helpers.ts routes Commander's own
+    // output into the captured streams. Commander writes usage errors straight
+    // to process.stderr rather than through console, so before that these cases
+    // could only check the exit code — and the text leaked into the runner's
+    // output as unattributed noise.
     const res = await runCli(["competitors", "add"]);
 
     expect(res.exitCode).toBe(2);
     expect(res.stdout).toBe("");
+    expect(res.stderr).toContain("--name");
+  });
+
+  it("exits 2 on a flag the command does not have", async () => {
+    const res = await runCli(["competitors", "list", "--nonsense"]);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stdout).toBe("");
+    expect(res.stderr).toContain("--nonsense");
   });
 });
 
