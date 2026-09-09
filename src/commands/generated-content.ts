@@ -5,18 +5,22 @@ import * as log from "../utils/logger.js";
 export function registerGeneratedContentCommands(program: Command): void {
   const gc = program
     .command("generated-content")
-    .description("Browse AI-generated content (GEO). List published or draft generated items, or fetch a single item with its rendered body. Requires the GEO product and read:content permission.");
+    .description(
+      "Browse AI-generated content (GEO). List published or draft generated items, or fetch a single item with its rendered body. Requires the GEO product and read:content permission.",
+    );
 
-  gc
-    .command("list")
-    .description("List generated content. Use --status to switch between published and draft items.")
+  gc.command("list")
+    .description(
+      "List generated content. Use --status to switch between published and draft items.",
+    )
     .option("--status <status>", "Which items to list: published | drafts", "published")
     .option("--limit <n>", "Items per page (max 100)", "10")
     .option("--offset <n>", "Pagination offset", "0")
     .option("--search <query>", "Filter by title")
     .action(async (cmdOpts: Record<string, string>) => {
       const opts = program.opts();
-      const status = cmdOpts.status === "drafts" || cmdOpts.status === "draft" ? "drafts" : "published";
+      const status =
+        cmdOpts.status === "drafts" || cmdOpts.status === "draft" ? "drafts" : "published";
       try {
         const data = await apiRequest({
           path: `/org/generated-content/${status}`,
@@ -31,9 +35,10 @@ export function registerGeneratedContentCommands(program: Command): void {
       }
     });
 
-  gc
-    .command("get <id>")
-    .description("Get a single generated content item including its question text and rendered body.")
+  gc.command("get <id>")
+    .description(
+      "Get a single generated content item including its question text and rendered body.",
+    )
     .action(async (id: string) => {
       const opts = program.opts();
       try {

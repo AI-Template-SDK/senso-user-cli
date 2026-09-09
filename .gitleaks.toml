@@ -1,0 +1,31 @@
+# Secret scanning over the FULL git history, not just the working tree: a
+# credential that was committed and later deleted is still in the history and
+# still clonable by anyone who has ever fetched this repository.
+#
+# The allowlist below is EMPTY, and that is the point. A full-history scan of
+# this repository on 2026-09-09 (gitleaks v8.30.0, default rules, 42 commits)
+# found nothing. Both sibling repositories — senso-contextos and live-survey —
+# found a live API key on their first scan and still carry an open "rotate this"
+# item; starting clean means every future finding is a real one.
+#
+# If a finding ever appears, the fix is to ROTATE THE CREDENTIAL. Adding a path
+# or a fingerprint here silences the scanner; it does not make the key in the
+# history any less readable. If a finding is genuinely a false positive (a test
+# fixture, a documented example key), prefer changing the string so it cannot be
+# mistaken for a credential — that fixes it for every future scanner too.
+
+title = "senso-user-cli gitleaks config"
+
+[extend]
+useDefault = true
+
+# Example keys in documentation. Anchored and enumerated rather than excusing a
+# path or a file type, so a real key cannot match: a real key carries 40+
+# characters of random suffix, never a run of x's and never a trailing ellipsis.
+[[allowlists]]
+description = "Self-evident placeholder API keys in documentation and help text."
+regexes = [
+  '''^tgr_(live|test)_x{3,}$''',
+  '''^tgr_your_key_here$''',
+  '''^tgr_\.\.\.$''',
+]

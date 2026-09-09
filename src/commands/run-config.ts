@@ -5,15 +5,20 @@ import * as log from "../utils/logger.js";
 export function registerRunConfigCommands(program: Command): void {
   const rc = program
     .command("run-config")
-    .description("Configure which AI models are used for question runs and on which days they run. Models include chatgpt, gemini, etc.");
+    .description(
+      "Configure which AI models are used for question runs and on which days they run. Models include chatgpt, gemini, etc.",
+    );
 
-  rc
-    .command("models")
+  rc.command("models")
     .description("Get the AI models currently configured for question runs (e.g. chatgpt, gemini).")
     .action(async () => {
       const opts = program.opts();
       try {
-        const data = await apiRequest({ path: "/org/run-models", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        const data = await apiRequest({
+          path: "/org/run-models",
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
         log.error(formatApiError(err));
@@ -21,9 +26,10 @@ export function registerRunConfigCommands(program: Command): void {
       }
     });
 
-  rc
-    .command("set-models")
-    .description("Replace the configured AI models for question runs. At least one model name is required.")
+  rc.command("set-models")
+    .description(
+      "Replace the configured AI models for question runs. At least one model name is required.",
+    )
     .requiredOption("--data <json>", 'JSON: { "models": ["chatgpt", "gemini"] }')
     .action(async (cmdOpts: { data: string }) => {
       const opts = program.opts();
@@ -44,13 +50,18 @@ export function registerRunConfigCommands(program: Command): void {
       }
     });
 
-  rc
-    .command("schedule")
-    .description("Get the days of the week when question runs are triggered (0=Sunday, 1=Monday, ..., 6=Saturday).")
+  rc.command("schedule")
+    .description(
+      "Get the days of the week when question runs are triggered (0=Sunday, 1=Monday, ..., 6=Saturday).",
+    )
     .action(async () => {
       const opts = program.opts();
       try {
-        const data = await apiRequest({ path: "/org/run-schedule", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        const data = await apiRequest({
+          path: "/org/run-schedule",
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
         log.error(formatApiError(err));
@@ -58,9 +69,10 @@ export function registerRunConfigCommands(program: Command): void {
       }
     });
 
-  rc
-    .command("set-schedule")
-    .description("Set which days of the week question runs are triggered. Values must be 0-6 (Sunday-Saturday).")
+  rc.command("set-schedule")
+    .description(
+      "Set which days of the week question runs are triggered. Values must be 0-6 (Sunday-Saturday).",
+    )
     .requiredOption("--data <json>", 'JSON: { "schedule": [1, 3, 5] }')
     .action(async (cmdOpts: { data: string }) => {
       const opts = program.opts();

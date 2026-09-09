@@ -11,17 +11,12 @@ interface NpmPackageInfo {
 }
 
 export async function checkForUpdate(quiet: boolean): Promise<void> {
-  if (
-    process.env.SENSO_NO_UPDATE_CHECK === "1" ||
-    quiet
-  ) {
+  if (process.env.SENSO_NO_UPDATE_CHECK === "1" || quiet) {
     return;
   }
 
   const config = readConfig();
-  const lastCheck = config.lastUpdateCheck
-    ? new Date(config.lastUpdateCheck).getTime()
-    : 0;
+  const lastCheck = config.lastUpdateCheck ? new Date(config.lastUpdateCheck).getTime() : 0;
 
   if (Date.now() - lastCheck < CHECK_INTERVAL_MS) {
     // Show cached result if we have one
@@ -58,13 +53,10 @@ const REGISTRY_TIMEOUT_MS = 3_000;
 
 export async function getLatestVersion(): Promise<string | null> {
   try {
-    const res = await fetch(
-      `https://registry.npmjs.org/${NPM_PACKAGE}`,
-      {
-        headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(REGISTRY_TIMEOUT_MS),
-      },
-    );
+    const res = await fetch(`https://registry.npmjs.org/${NPM_PACKAGE}`, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(REGISTRY_TIMEOUT_MS),
+    });
     if (!res.ok) return null;
     const data = (await res.json()) as NpmPackageInfo;
     return data["dist-tags"]?.latest ?? null;

@@ -1,7 +1,7 @@
 {
   "name": "@senso-ai/cli",
   "version": "0.12.0",
-  "description": "Senso CLI — Infrastructure for the Agentic Web. Interact with your Senso knowledge base from the terminal.",
+  "description": "Senso CLI \u2014 Infrastructure for the Agentic Web. Manage your Senso knowledge base, content and GEO analytics from the terminal.",
   "type": "module",
   "bin": {
     "senso": "./dist/cli.js"
@@ -15,39 +15,65 @@
   "scripts": {
     "dev": "tsx src/cli.ts",
     "build": "tsup",
-    "prepublishOnly": "npm run build",
-    "test": "vitest"
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "reference": "tsx scripts/gen-reference.ts",
+    "prepare": "husky || true",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@clack/prompts": "^0.9.1",
-    "boxen": "^8.0.1",
-    "commander": "^13.1.0",
-    "env-paths": "^3.0.0",
-    "figlet": "^1.8.0",
-    "gradient-string": "^3.0.0",
-    "picocolors": "^1.1.1",
-    "semver": "^7.7.4"
+    "@clack/prompts": "1.8.0",
+    "boxen": "8.0.1",
+    "commander": "15.0.0",
+    "env-paths": "4.0.0",
+    "figlet": "1.11.4",
+    "gradient-string": "3.0.0",
+    "picocolors": "1.1.1",
+    "semver": "7.8.5"
   },
   "devDependencies": {
-    "@types/figlet": "^1.7.0",
-    "@types/gradient-string": "^1.1.6",
-    "@types/node": "^22.13.0",
-    "@types/semver": "^7.7.1",
-    "tsup": "^8.4.0",
-    "tsx": "^4.19.0",
-    "typescript": "^5.7.0",
+    "@eslint/js": "10.0.1",
+    "@types/figlet": "1.7.0",
+    "@types/gradient-string": "1.1.6",
+    "@types/node": "26.5.0",
+    "@types/semver": "7.8.0",
+    "@vitest/coverage-v8": "5.0.0",
+    "eslint": "10.10.0",
+    "husky": "9.1.7",
+    "lint-staged": "17.5.0",
+    "msw": "2.15.0",
+    "prettier": "3.9.6",
+    "tsup": "8.5.1",
+    "tsx": "4.23.13",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.70.0",
     "vitest": "^5.0.0"
   },
   "license": "AGPL-3.0-or-later",
   "repository": {
     "type": "git",
-    "url": "https://github.com/AI-Template-SDK/senso-user-cli"
+    "url": "git+https://github.com/AI-Template-SDK/senso-user-cli.git"
   },
   "keywords": [
     "senso",
     "cli",
     "ai",
+    "agent",
+    "agentic",
     "knowledge-base",
-    "agentic"
-  ]
+    "geo",
+    "generative-engine-optimization",
+    "rag",
+    "llm"
+  ],
+  "homepage": "https://github.com/AI-Template-SDK/senso-user-cli#readme",
+  "bugs": {
+    "url": "https://github.com/AI-Template-SDK/senso-user-cli/issues"
+  }
 }

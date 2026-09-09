@@ -5,7 +5,9 @@ import * as log from "../utils/logger.js";
 export function registerQuestionsCommands(program: Command): void {
   const questions = program
     .command("questions")
-    .description("Manage org-scoped geo questions. These are lightweight CRUD questions distinct from prompts (which include full run history).");
+    .description(
+      "Manage org-scoped geo questions. These are lightweight CRUD questions distinct from prompts (which include full run history).",
+    );
 
   questions
     .command("list")
@@ -29,13 +31,24 @@ export function registerQuestionsCommands(program: Command): void {
 
   questions
     .command("create")
-    .description("Create a new geo question. Type must be one of: decision, consideration, awareness, evaluation.")
-    .requiredOption("--data <json>", 'JSON: { "question_text": "...", "type": "decision", "tag_ids": [] }')
+    .description(
+      "Create a new geo question. Type must be one of: decision, consideration, awareness, evaluation.",
+    )
+    .requiredOption(
+      "--data <json>",
+      'JSON: { "question_text": "...", "type": "decision", "tag_ids": [] }',
+    )
     .action(async (cmdOpts: { data: string }) => {
       const opts = program.opts();
       try {
         const body = JSON.parse(cmdOpts.data);
-        const data = await apiRequest({ method: "POST", path: "/org/questions", body, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        const data = await apiRequest({
+          method: "POST",
+          path: "/org/questions",
+          body,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         log.success("Question created.");
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
@@ -46,13 +59,24 @@ export function registerQuestionsCommands(program: Command): void {
 
   questions
     .command("patch <questionId>")
-    .description("Partially update a question. Supports updating tag associations and/or the funnel stage (type). At least one of tag_ids or type must be provided.")
-    .requiredOption("--data <json>", 'JSON: { "tag_ids": ["<uuid>", ...], "type": "decision|consideration|awareness|evaluation" } — pass tag_ids: null to clear all tags')
+    .description(
+      "Partially update a question. Supports updating tag associations and/or the funnel stage (type). At least one of tag_ids or type must be provided.",
+    )
+    .requiredOption(
+      "--data <json>",
+      'JSON: { "tag_ids": ["<uuid>", ...], "type": "decision|consideration|awareness|evaluation" } — pass tag_ids: null to clear all tags',
+    )
     .action(async (questionId: string, cmdOpts: { data: string }) => {
       const opts = program.opts();
       try {
         const body = JSON.parse(cmdOpts.data);
-        const data = await apiRequest({ method: "PATCH", path: `/org/questions/${questionId}`, body, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        const data = await apiRequest({
+          method: "PATCH",
+          path: `/org/questions/${questionId}`,
+          body,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         log.success(`Question ${questionId} updated.`);
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
@@ -67,7 +91,12 @@ export function registerQuestionsCommands(program: Command): void {
     .action(async (questionId: string) => {
       const opts = program.opts();
       try {
-        await apiRequest({ method: "DELETE", path: `/org/questions/${questionId}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        await apiRequest({
+          method: "DELETE",
+          path: `/org/questions/${questionId}`,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         log.success(`Question ${questionId} deleted.`);
       } catch (err) {
         log.error(formatApiError(err));

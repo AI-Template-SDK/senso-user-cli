@@ -60,78 +60,87 @@ function buildAgentFlags(agent?: string): string[] {
 export function registerSkillsCommands(program: Command): void {
   const skills = program
     .command("skills")
-    .description("Install and manage Senso agent skills. Skills teach AI coding agents (Claude Code, Cursor, Codex, etc.) how to use Senso automatically.");
+    .description(
+      "Install and manage Senso agent skills. Skills teach AI coding agents (Claude Code, Cursor, Codex, etc.) how to use Senso automatically.",
+    );
 
   skills
     .command("install [names...]")
-    .description("Install Senso agent skills. Use --all for all six official skills, or pass individual short names (search, ingest, content-gen, brand-setup, kb-organize, review-publish).")
+    .description(
+      "Install Senso agent skills. Use --all for all six official skills, or pass individual short names (search, ingest, content-gen, brand-setup, kb-organize, review-publish).",
+    )
     .option("--all", "Install all six official Senso skills")
-    .option("--agent <name>", "Target a specific agent: claude, cursor, codex, copilot, gemini, cline")
+    .option(
+      "--agent <name>",
+      "Target a specific agent: claude, cursor, codex, copilot, gemini, cline",
+    )
     .option("--global", "Install globally instead of project-level")
-    .action(async (names: string[], cmdOpts: { all?: boolean; agent?: string; global?: boolean }) => {
-      const opts = program.opts();
+    .action(
+      async (names: string[], cmdOpts: { all?: boolean; agent?: string; global?: boolean }) => {
+        const opts = program.opts();
 
-      // Determine which skills to install
-      let skillPackages: string[];
-      if (cmdOpts.all || names.length === 0) {
-        skillPackages = [...SENSO_SKILLS];
-      } else {
-        skillPackages = names.map((n) => {
-          // Allow short names like "search" -> "senso-ai/senso-search"
-          if (n.startsWith("@")) return n;
-          return `senso-ai/senso-${n}`;
-        });
-      }
-
-      // Build agent flags
-      let agentFlags: string[];
-      try {
-        agentFlags = buildAgentFlags(cmdOpts.agent);
-      } catch (err) {
-        log.error(err instanceof Error ? err.message : String(err));
-        process.exit(1);
-      }
-
-      // Build env flags for API key
-      // KNOWN LIMITATION: this puts the API key in the child's argv, where it is
-      // readable in `ps` output and lands in shell history. It cannot be fixed
-      // from this side. shipables 0.1.2 uses --env to populate the installed
-      // skill's MCP server environment and never falls back to process.env for a
-      // value — non-interactively an unsupplied variable becomes the empty
-      // string with a warning — so passing the key through the child's own
-      // environment would install a skill with no credential at all. Recorded in
-      // SECURITY.md; the fix belongs upstream in shipables.
-      const envFlags: string[] = [];
-      const apiKey = getApiKey({ apiKey: opts.apiKey });
-      if (apiKey) {
-        envFlags.push("--env", `SENSO_API_KEY=${apiKey}`);
-      }
-
-      const globalFlag = cmdOpts.global ? ["--global"] : [];
-
-      log.info(`Installing ${skillPackages.length} skill(s)...`);
-
-      for (const pkg of skillPackages) {
-        try {
-          const args = ["install", pkg, ...agentFlags, ...globalFlag, ...envFlags, "--yes"];
-          const { stdout, stderr } = await runShipables(args);
-
-          if (!opts.quiet) {
-            if (stdout.trim()) console.log(stdout.trim());
-            if (stderr.trim()) console.error(stderr.trim());
-          }
-
-          const shortName = pkg.replace("senso-ai/senso-", "");
-          log.success(`Installed ${shortName}`);
-        } catch (err) {
-          const shortName = pkg.replace("senso-ai/senso-", "");
-          const msg = err instanceof Error ? err.message : String(err);
-          log.error(`Failed to install ${shortName}: ${msg}`);
+        // Determine which skills to install
+        let skillPackages: string[];
+        if (cmdOpts.all || names.length === 0) {
+          skillPackages = [...SENSO_SKILLS];
+        } else {
+          skillPackages = names.map((n) => {
+            // Allow short names like "search" -> "senso-ai/senso-search"
+            if (n.startsWith("@")) return n;
+            return `senso-ai/senso-${n}`;
+          });
         }
-      }
 
-      log.success("Done. Your agent can now use Senso — just talk to it naturally.");
-    });
+        // Build agent flags
+        let agentFlags: string[];
+        try {
+          agentFlags = buildAgentFlags(cmdOpts.agent);
+        } catch (err) {
+          log.error(err instanceof Error ? err.message : String(err));
+          process.exit(1);
+        }
+
+        // Build env flags for API key
+        // KNOWN LIMITATION: this puts the API key in the child's argv, where it is
+        // readable in `ps` output and lands in shell history. It cannot be fixed
+        // from this side. shipables 0.1.2 uses --env to populate the installed
+        // skill's MCP server environment and never falls back to process.env for a
+        // value — non-interactively an unsupplied variable becomes the empty
+        // string with a warning — so passing the key through the child's own
+        // environment would install a skill with no credential at all. Recorded in
+        // SECURITY.md; the fix belongs upstream in shipables.
+        const envFlags: string[] = [];
+        const apiKey = getApiKey({ apiKey: opts.apiKey });
+        if (apiKey) {
+          envFlags.push("--env", `SENSO_API_KEY=${apiKey}`);
+        }
+
+        const globalFlag = cmdOpts.global ? ["--global"] : [];
+
+        log.info(`Installing ${skillPackages.length} skill(s)...`);
+
+        for (const pkg of skillPackages) {
+          try {
+            const args = ["install", pkg, ...agentFlags, ...globalFlag, ...envFlags, "--yes"];
+            const { stdout, stderr } = await runShipables(args);
+
+            if (!opts.quiet) {
+              if (stdout.trim()) console.log(stdout.trim());
+              if (stderr.trim()) console.error(stderr.trim());
+            }
+
+            const shortName = pkg.replace("senso-ai/senso-", "");
+            log.success(`Installed ${shortName}`);
+          } catch (err) {
+            const shortName = pkg.replace("senso-ai/senso-", "");
+            const msg = err instanceof Error ? err.message : String(err);
+            log.error(`Failed to install ${shortName}: ${msg}`);
+          }
+        }
+
+        log.success("Done. Your agent can now use Senso — just talk to it naturally.");
+      },
+    );
 
   skills
     .command("list")
@@ -182,7 +191,9 @@ export function registerSkillsCommands(program: Command): void {
 
   skills
     .command("remove <name>")
-    .description("Remove an installed Senso skill. Use the short name (e.g., search, ingest, content-gen).")
+    .description(
+      "Remove an installed Senso skill. Use the short name (e.g., search, ingest, content-gen).",
+    )
     .option("--global", "Remove from global install")
     .action(async (name: string, cmdOpts: { global?: boolean }) => {
       const opts = program.opts();

@@ -27,23 +27,23 @@ and the `print()` ban that becomes our `console.*` ban.
 
 ### 1.1 The numbers
 
-| Measure | Value | Source |
-|---|---|---|
-| Command groups / subcommands | 30 files / **169** subcommands | `node dist/cli.js <group> --help` |
-| Source lines | 6,321 (analytics.ts alone is 1,341) | `wc -l src/**` |
-| Test files | **0** | `npx vitest run` → "No test files found" |
-| CI test step | `vitest run --passWithNoTests` | `.github/workflows/ci.yml` — green because it asserts nothing |
-| Lint / format config | none | no eslint, prettier, editorconfig |
-| Repo documents | README, LICENSE | no CONTRIBUTING, SECURITY, CHANGELOG, CLAUDE.md, CODEOWNERS, dependabot, PR template |
-| README command coverage | 20 of 30 groups; **89 of 169 subcommands undocumented** | grep of README against `--help` |
-| Commands honoring `--output` | **3 of 30 files** (`search`, `content`, `analytics`) | 115 raw `console.log(JSON.stringify(...))` sites elsewhere |
-| `process.exit()` call sites | 174, inside command actions | makes actions untestable in-process |
-| `npm audit --audit-level=high` | 7 findings (1 critical, 4 high) — all in `vite` via `vitest` (dev-only) | fixable by upgrading vitest |
-| Outdated majors | `@clack/prompts` 0.9→1.8, `commander` 13→15, `env-paths` 3→4, `vitest` 3→5, `typescript` 5.9→7 | `npm outdated` |
-| API spec coverage | **18 spec paths have no command**; 1 CLI path (`api-keys revoke`) not in spec | compared against `senso-contextos/docs/specs/sdk-api.yaml` |
-| Skills list drift | CLI hardcodes 6 skills; contextos publishes **7** (`senso-onboarding` missing) | `src/commands/skills.ts` vs `senso-contextos/skills/` |
-| British spellings in user-visible text | 7 sites (`organisation`, `synthesised`, `cancelled`) | grep |
-| Secrets in git history | **none** — gitleaks v8.30.0 over all 42 commits, default rules | `docker run zricethezav/gitleaks:v8.30.0 detect` |
+| Measure                                | Value                                                                                          | Source                                                                               |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Command groups / subcommands           | 30 files / **169** subcommands                                                                 | `node dist/cli.js <group> --help`                                                    |
+| Source lines                           | 6,321 (analytics.ts alone is 1,341)                                                            | `wc -l src/**`                                                                       |
+| Test files                             | **0**                                                                                          | `npx vitest run` → "No test files found"                                             |
+| CI test step                           | `vitest run --passWithNoTests`                                                                 | `.github/workflows/ci.yml` — green because it asserts nothing                        |
+| Lint / format config                   | none                                                                                           | no eslint, prettier, editorconfig                                                    |
+| Repo documents                         | README, LICENSE                                                                                | no CONTRIBUTING, SECURITY, CHANGELOG, CLAUDE.md, CODEOWNERS, dependabot, PR template |
+| README command coverage                | 20 of 30 groups; **89 of 169 subcommands undocumented**                                        | grep of README against `--help`                                                      |
+| Commands honoring `--output`           | **3 of 30 files** (`search`, `content`, `analytics`)                                           | 115 raw `console.log(JSON.stringify(...))` sites elsewhere                           |
+| `process.exit()` call sites            | 174, inside command actions                                                                    | makes actions untestable in-process                                                  |
+| `npm audit --audit-level=high`         | 7 findings (1 critical, 4 high) — all in `vite` via `vitest` (dev-only)                        | fixable by upgrading vitest                                                          |
+| Outdated majors                        | `@clack/prompts` 0.9→1.8, `commander` 13→15, `env-paths` 3→4, `vitest` 3→5, `typescript` 5.9→7 | `npm outdated`                                                                       |
+| API spec coverage                      | **18 spec paths have no command**; 1 CLI path (`api-keys revoke`) not in spec                  | compared against `senso-contextos/docs/specs/sdk-api.yaml`                           |
+| Skills list drift                      | CLI hardcodes 6 skills; contextos publishes **7** (`senso-onboarding` missing)                 | `src/commands/skills.ts` vs `senso-contextos/skills/`                                |
+| British spellings in user-visible text | 7 sites (`organisation`, `synthesised`, `cancelled`)                                           | grep                                                                                 |
+| Secrets in git history                 | **none** — gitleaks v8.30.0 over all 42 commits, default rules                                 | `docker run zricethezav/gitleaks:v8.30.0 detect`                                     |
 
 Typecheck and build are clean, the bundle is 184 KB ESM, and the publish workflow with
 tag-matches-version guard and npm trusted publishing is solid. That part is done right and
@@ -70,10 +70,10 @@ These are concrete, reproducible, and each becomes a test in Phase 2.
    linger until the registry answers or the 10s timeout fires. Fix: run the check from the
    `preAction` hook (which never fires for `--version`/`--help`), skip it for
    `login`/`logout`/`update`, and cut the timeout to 3s.
-   *(Corrected 2026-09-09: an earlier draft of this item claimed the checker could clobber a
+   _(Corrected 2026-09-09: an earlier draft of this item claimed the checker could clobber a
    freshly stored API key. It cannot — `updateConfig` re-reads the file immediately before
    writing and JavaScript is single-threaded, so `login`'s write is always preserved. Verified
-   with a standalone reproduction before writing any fix.)*
+   with a standalone reproduction before writing any fix.)_
 
 3. **API key passed on the command line to shipables.** `skills install` runs
    `npx @senso-ai/shipables install ... --env SENSO_API_KEY=<key>`, so the key is visible in
@@ -87,7 +87,7 @@ These are concrete, reproducible, and each becomes a test in Phase 2.
    (`src/commands/skills.ts`)
 
 4. **`outputByFormat` in `search.ts` is a dead branch** — both arms print JSON. `search
-   context|content|full` therefore ignore `--output table|plain`.
+context|content|full` therefore ignore `--output table|plain`.
 
 5. **`--output table` silently falls back to JSON** for any command that does not supply
    rows, which is most of them. The flag is advertised globally but works for a handful.
@@ -135,30 +135,30 @@ These are concrete, reproducible, and each becomes a test in Phase 2.
 ## 2. What "awesome" looks like (lifted from senso-contextos and live-survey)
 
 Each pattern below is one at least one reference repo already runs, with the reason it
-applies to a CLI. Rows marked *(both)* are shared; the rest name their source.
+applies to a CLI. Rows marked _(both)_ are shared; the rest name their source.
 
-| Pattern | What contextos does | Why it matters here |
-|---|---|---|
-| **Makefile as the single contract** *(both)* | Every CI job calls a `make` target; `make all` locally == green pipeline. "Add the check to the Makefile first, then have CI call it." | Our CI runs ad-hoc `npx` commands nobody runs locally. Parity ends the "passes on my machine" class. |
-| **CI needs no secrets** *(both)* | Enforced by a mechanical network ban (MSW `onUnhandledRequest: 'error'` in contextos, `pytest-socket --disable-socket` in live-survey), so fork PRs run the full suite. live-survey sets dummy env values inline in the workflow. | A public repo will get outside PRs. If tests needed `SENSO_API_KEY`, forks would silently skip them. |
-| **Cheapest-first job chain** *(both)* | `lint → security → unit → build → smoke`, chained with `needs:`, `concurrency` cancels superseded runs. | A typo should not spend the minutes an OS-matrix smoke test costs. |
-| **First-party actions only** *(live-survey)* | The workflow uses only `actions/checkout` and `actions/setup-python`; gitleaks runs from a pinned Docker image, Docker work uses plain `docker` commands. Reason given: one fewer third party with write access to the pipeline, and GitHub has hard-disabled old action majors before. | Same rule: `checkout` and `setup-node` only. Releases via `gh` in-workflow, scanners via pinned images. |
-| **Policy tests** *(both)* | Tests that enforce the repo's own written rules. contextos: nav drift, `.env.example` completeness, American English, skills packaging. live-survey: swagger drift in both directions, and a **`print()` ban** in `app/` because "print has no level and no logger name, so it cannot be filtered". Failure messages name the offender. | Our README is 89 commands behind the code *because nothing checked*. The `print` ban maps directly onto a `console.*` ban outside `lib/output.ts` and `utils/logger.ts`, which is what makes the stdout contract enforceable. |
-| **Failure cases first, test names as sentences, file docstring says what is worth protecting** *(both)* | `it('404s a traversal attempt reaching outside the specs directory')`; `test_the_liveness_endpoints_need_no_api_key`. | The interesting CLI cases are 401, 402, timeouts, malformed bodies, and a missing key — not the happy path. |
-| **Coverage gate with headroom** *(both)* | live-survey achieves 95%, gates at 90; contextos achieves 94/95/77, gates at 85/85/70. "Do not lower the gate to pass" is a written rule in both. | Same. |
-| **No import-time side effects in the unit under test** *(live-survey)* | "Import the app inside a fixture, not at module scope" — modules that build clients at import time are the reason. | Our `cli.ts` calls `parseAsync` at import. The `createProgram()` factory is the same fix. |
-| **README / CONTRIBUTING / SECURITY / CHANGELOG / CLAUDE.md** *(both)* | Each answers one question; README has a "read it when you want to know" table pointing at the others. live-survey's README is ~150 lines: what it does, quick start, environment table, testing stages table, documentation table, repository layout. | A public CLI's README is its landing page. Contributors need the rules; security researchers need a contact; users need a changelog. |
-| **A `docs/` set with an index** *(live-survey)* | `docs/README.md` opens with a "60-second version" then a table; one file each for architecture (with an ASCII component diagram), data model, API reference, development, deployment, operations. CLAUDE.md says "read architecture.md before a non-trivial change". contextos keeps the same set under `docs-internal/engineering/` because its `docs/` is the served app. | We have one 500-line README doing all of this. Split it: README for users, `docs/` for how it works. Nothing here is secret, so `docs/` is fine in a public tree. |
-| **"Adding an endpoint" recipe in CLAUDE.md** *(live-survey)* | Seven numbered steps: models, service, data access, route, spec, tests (auth rejection, validation, each error branch, happy path), `make all`. | "Adding a command" is the one recipe every contributor here needs. It fixes the layering (`runAction`, `api-client`, `output`) as a checklist. |
-| **SECURITY.md records known limitations as decisions** *(both)* | "Recorded here so they are decisions rather than oversights." Both carry an "OPEN — rotate the key" notice for a historical leak, and both refuse to let a gitleaks allowlist stand in for rotation. | The API-key-on-argv issue, the plaintext config file, the 0600 mode — all belong there. Our history is clean, so the allowlist starts and stays empty. |
-| **CODEOWNERS, dependabot (monthly, grouped, majors separate), PR template with a Risk section** *(both)* | live-survey's Dependabot adds assignees and ignores the pinned language's major/minor because it "is pinned in three places". Its PR risk section asks: breaking API change, migration needed, rollback path. | Same for Node: pinned in `.nvmrc`, `engines`, CI, tsup target. Our risk questions: does this change stdout shape, exit codes, the config file, or what is sent to the API. |
-| **Security scanning: dependency audit (high+), gitleaks over full history, SAST** *(both)* | `npm audit` + semgrep in contextos; `pip-audit` + bandit at medium severity in live-survey, with the reason "a scan whose output is routinely ignored stops being read at all". Pinned images, run through `make security` locally and in CI. | We ship a binary that handles credentials. gitleaks over history is cheap insurance for a public repo. |
-| **Smoke test proves the shipped artifact, not the source** *(both)* | Boots the built image with dummy creds and probes only what needs no external service: routes registered, auth wired, non-root, healthy. Counts PASS/FAIL and dumps logs on failure. | Our artifact is the npm tarball. Smoke = `npm pack`, install into a temp prefix, run `--version`/`--help`/one mocked command on the OS × Node matrix. |
-| **The version is tested, not trusted** *(live-survey)* | `/health` returns `app.version` and a test asserts it equals the real version, "not a literal that can drift". | `senso --version` must equal `package.json` version in the e2e suite, from the built bundle. |
-| **Comments say why, config files open with a rationale** *(both)* | Every config file explains why its settings are what they are; deliberate oddities (line length 300, `ConsistentRead=True`) are listed under "things that look like bugs but are not". | Our tsup/tsconfig/CI files have none. |
-| **CHANGELOG written for the person who has to act on it** *(both)* | Keep a Changelog; live-survey backfilled pre-1.0 history "by theme rather than listed individually". | Backfill our 41 commits the same way. |
-| **Live API suite is separate, scheduled, never a PR gate** *(contextos)* | "A gate that silently passes is not a gate." | Same design for an optional `make live` canary that runs the built CLI against a real org. |
-| **Commit style** *(both)* | Gitmoji prefix, lowercase imperative. | This repo already uses gitmoji; write it down. |
+| Pattern                                                                                                  | What contextos does                                                                                                                                                                                                                                                                                                                                                         | Why it matters here                                                                                                                                                                                                           |
+| -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Makefile as the single contract** _(both)_                                                             | Every CI job calls a `make` target; `make all` locally == green pipeline. "Add the check to the Makefile first, then have CI call it."                                                                                                                                                                                                                                      | Our CI runs ad-hoc `npx` commands nobody runs locally. Parity ends the "passes on my machine" class.                                                                                                                          |
+| **CI needs no secrets** _(both)_                                                                         | Enforced by a mechanical network ban (MSW `onUnhandledRequest: 'error'` in contextos, `pytest-socket --disable-socket` in live-survey), so fork PRs run the full suite. live-survey sets dummy env values inline in the workflow.                                                                                                                                           | A public repo will get outside PRs. If tests needed `SENSO_API_KEY`, forks would silently skip them.                                                                                                                          |
+| **Cheapest-first job chain** _(both)_                                                                    | `lint → security → unit → build → smoke`, chained with `needs:`, `concurrency` cancels superseded runs.                                                                                                                                                                                                                                                                     | A typo should not spend the minutes an OS-matrix smoke test costs.                                                                                                                                                            |
+| **First-party actions only** _(live-survey)_                                                             | The workflow uses only `actions/checkout` and `actions/setup-python`; gitleaks runs from a pinned Docker image, Docker work uses plain `docker` commands. Reason given: one fewer third party with write access to the pipeline, and GitHub has hard-disabled old action majors before.                                                                                     | Same rule: `checkout` and `setup-node` only. Releases via `gh` in-workflow, scanners via pinned images.                                                                                                                       |
+| **Policy tests** _(both)_                                                                                | Tests that enforce the repo's own written rules. contextos: nav drift, `.env.example` completeness, American English, skills packaging. live-survey: swagger drift in both directions, and a **`print()` ban** in `app/` because "print has no level and no logger name, so it cannot be filtered". Failure messages name the offender.                                     | Our README is 89 commands behind the code _because nothing checked_. The `print` ban maps directly onto a `console.*` ban outside `lib/output.ts` and `utils/logger.ts`, which is what makes the stdout contract enforceable. |
+| **Failure cases first, test names as sentences, file docstring says what is worth protecting** _(both)_  | `it('404s a traversal attempt reaching outside the specs directory')`; `test_the_liveness_endpoints_need_no_api_key`.                                                                                                                                                                                                                                                       | The interesting CLI cases are 401, 402, timeouts, malformed bodies, and a missing key — not the happy path.                                                                                                                   |
+| **Coverage gate with headroom** _(both)_                                                                 | live-survey achieves 95%, gates at 90; contextos achieves 94/95/77, gates at 85/85/70. "Do not lower the gate to pass" is a written rule in both.                                                                                                                                                                                                                           | Same.                                                                                                                                                                                                                         |
+| **No import-time side effects in the unit under test** _(live-survey)_                                   | "Import the app inside a fixture, not at module scope" — modules that build clients at import time are the reason.                                                                                                                                                                                                                                                          | Our `cli.ts` calls `parseAsync` at import. The `createProgram()` factory is the same fix.                                                                                                                                     |
+| **README / CONTRIBUTING / SECURITY / CHANGELOG / CLAUDE.md** _(both)_                                    | Each answers one question; README has a "read it when you want to know" table pointing at the others. live-survey's README is ~150 lines: what it does, quick start, environment table, testing stages table, documentation table, repository layout.                                                                                                                       | A public CLI's README is its landing page. Contributors need the rules; security researchers need a contact; users need a changelog.                                                                                          |
+| **A `docs/` set with an index** _(live-survey)_                                                          | `docs/README.md` opens with a "60-second version" then a table; one file each for architecture (with an ASCII component diagram), data model, API reference, development, deployment, operations. CLAUDE.md says "read architecture.md before a non-trivial change". contextos keeps the same set under `docs-internal/engineering/` because its `docs/` is the served app. | We have one 500-line README doing all of this. Split it: README for users, `docs/` for how it works. Nothing here is secret, so `docs/` is fine in a public tree.                                                             |
+| **"Adding an endpoint" recipe in CLAUDE.md** _(live-survey)_                                             | Seven numbered steps: models, service, data access, route, spec, tests (auth rejection, validation, each error branch, happy path), `make all`.                                                                                                                                                                                                                             | "Adding a command" is the one recipe every contributor here needs. It fixes the layering (`runAction`, `api-client`, `output`) as a checklist.                                                                                |
+| **SECURITY.md records known limitations as decisions** _(both)_                                          | "Recorded here so they are decisions rather than oversights." Both carry an "OPEN — rotate the key" notice for a historical leak, and both refuse to let a gitleaks allowlist stand in for rotation.                                                                                                                                                                        | The API-key-on-argv issue, the plaintext config file, the 0600 mode — all belong there. Our history is clean, so the allowlist starts and stays empty.                                                                        |
+| **CODEOWNERS, dependabot (monthly, grouped, majors separate), PR template with a Risk section** _(both)_ | live-survey's Dependabot adds assignees and ignores the pinned language's major/minor because it "is pinned in three places". Its PR risk section asks: breaking API change, migration needed, rollback path.                                                                                                                                                               | Same for Node: pinned in `.nvmrc`, `engines`, CI, tsup target. Our risk questions: does this change stdout shape, exit codes, the config file, or what is sent to the API.                                                    |
+| **Security scanning: dependency audit (high+), gitleaks over full history, SAST** _(both)_               | `npm audit` + semgrep in contextos; `pip-audit` + bandit at medium severity in live-survey, with the reason "a scan whose output is routinely ignored stops being read at all". Pinned images, run through `make security` locally and in CI.                                                                                                                               | We ship a binary that handles credentials. gitleaks over history is cheap insurance for a public repo.                                                                                                                        |
+| **Smoke test proves the shipped artifact, not the source** _(both)_                                      | Boots the built image with dummy creds and probes only what needs no external service: routes registered, auth wired, non-root, healthy. Counts PASS/FAIL and dumps logs on failure.                                                                                                                                                                                        | Our artifact is the npm tarball. Smoke = `npm pack`, install into a temp prefix, run `--version`/`--help`/one mocked command on the OS × Node matrix.                                                                         |
+| **The version is tested, not trusted** _(live-survey)_                                                   | `/health` returns `app.version` and a test asserts it equals the real version, "not a literal that can drift".                                                                                                                                                                                                                                                              | `senso --version` must equal `package.json` version in the e2e suite, from the built bundle.                                                                                                                                  |
+| **Comments say why, config files open with a rationale** _(both)_                                        | Every config file explains why its settings are what they are; deliberate oddities (line length 300, `ConsistentRead=True`) are listed under "things that look like bugs but are not".                                                                                                                                                                                      | Our tsup/tsconfig/CI files have none.                                                                                                                                                                                         |
+| **CHANGELOG written for the person who has to act on it** _(both)_                                       | Keep a Changelog; live-survey backfilled pre-1.0 history "by theme rather than listed individually".                                                                                                                                                                                                                                                                        | Backfill our 41 commits the same way.                                                                                                                                                                                         |
+| **Live API suite is separate, scheduled, never a PR gate** _(contextos)_                                 | "A gate that silently passes is not a gate."                                                                                                                                                                                                                                                                                                                                | Same design for an optional `make live` canary that runs the built CLI against a real org.                                                                                                                                    |
+| **Commit style** _(both)_                                                                                | Gitmoji prefix, lowercase imperative.                                                                                                                                                                                                                                                                                                                                       | This repo already uses gitmoji; write it down.                                                                                                                                                                                |
 
 What the references do that we **should not** copy: Docker build/smoke and a deploy
 runbook (no container, no server), Playwright (no browser), Spectral (no spec of our own —
@@ -226,42 +226,48 @@ Fixes for the audit findings that are independent of everything else.
 Everything the test suite and contributors need before the first test is written.
 
 **Task runner and parity**
-- [ ] `Makefile` with `help install lint format typecheck security unit build smoke all clean live`, each with a `##` help line and a why-comment (mirror contextos)
-- [ ] Rewrite `ci.yml` (rename to `testing.yml`, workflow name **Testing**, as both references do) to call only `make` targets, chained `needs:` cheapest-first, `concurrency` cancel-in-progress, `permissions: contents: read`
-- [ ] **First-party actions only**: `actions/checkout` and `actions/setup-node`, pinned to current majors. Everything else (gitleaks, semgrep, release creation) runs from a pinned image or the `gh` CLI. Write the reason at the top of the workflow.
-- [ ] Add `.nvmrc` (22) and a policy test that `.nvmrc`, `engines.node` floor (18) and the CI matrix agree
+
+- [x] `Makefile` with `help install lint format typecheck security unit build smoke all clean live`, each with a `##` help line and a why-comment (mirror contextos)
+- [x] Rewrite `ci.yml` (rename to `testing.yml`, workflow name **Testing**, as both references do) to call only `make` targets, chained `needs:` cheapest-first, `concurrency` cancel-in-progress, `permissions: contents: read`
+- [x] **First-party actions only**: `actions/checkout` and `actions/setup-node`, pinned to current majors. Everything else (gitleaks, semgrep, release creation) runs from a pinned image or the `gh` CLI. Write the reason at the top of the workflow.
+- [x] Add `.nvmrc` (22) and a policy test that `.nvmrc`, `engines.node` floor (18) and the CI matrix agree
 
 **Lint and format**
-- [ ] ESLint 9 flat config with `typescript-eslint` (strict, type-checked), `no-console` **off** but with a rule that only `lib/output.ts` and `utils/logger.ts` may write to stdout/stderr directly (via `no-restricted-syntax` on `console.*` outside those files) — this is what makes the stdout contract enforceable
-- [ ] Prettier + `.prettierrc.json` + `.prettierignore`; `.editorconfig`
-- [ ] `lint-staged` + husky pre-commit running only the fast checks (Prettier, ESLint `--fix`, gitleaks on staged diff) — contextos's `scripts/pre-commit-checks.sh` is the template
+
+- [x] ESLint 9 flat config with `typescript-eslint` (strict, type-checked), `no-console` **off** but with a rule that only `lib/output.ts` and `utils/logger.ts` may write to stdout/stderr directly (via `no-restricted-syntax` on `console.*` outside those files) — this is what makes the stdout contract enforceable
+- [x] Prettier + `.prettierrc.json` + `.prettierignore`; `.editorconfig`
+- [x] `lint-staged` + husky pre-commit running only the fast checks (Prettier, ESLint `--fix`, gitleaks on staged diff) — contextos's `scripts/pre-commit-checks.sh` is the template
 
 **Security**
-- [ ] `make security`: `npm audit --audit-level=high` + gitleaks (pinned image `zricethezav/gitleaks:v8.30.0`, full history, **empty allowlist** — the history is clean as of 2026-09-09) + semgrep `p/nodejs` `p/security-audit` (pinned image). Comment each gate's threshold with why, as live-survey does for bandit's medium severity
-- [ ] CI security job uses `fetch-depth: 0`
+
+- [x] `make security`: `npm audit --audit-level=high` + gitleaks (pinned image `zricethezav/gitleaks:v8.30.0`, full history, **empty allowlist** — the history is clean as of 2026-09-09) + semgrep `p/nodejs` `p/security-audit` (pinned image). Comment each gate's threshold with why, as live-survey does for bandit's medium severity
+- [x] CI security job uses `fetch-depth: 0`
 
 **GitHub**
-- [ ] `.github/CODEOWNERS` (default owner; call out `src/lib/config.ts`, `src/lib/api-client.ts`, `.github/`, `Makefile`)
-- [ ] `.github/dependabot.yml` — npm and github-actions, monthly, minor+patch grouped, majors separate, assignee set, `@types/node` majors ignored with the "pinned in four places" comment
-- [ ] `.github/PULL_REQUEST_TEMPLATE.md` with What / Why / Checklist / Risk / Verified how. Risk asks four yes/no questions: does this change stdout shape or `--output json` payloads, exit codes, the config file format, or what is sent to the API; plus "safe to roll back by reverting alone?" Blank is not an answer
-- [ ] `.github/ISSUE_TEMPLATE/` bug + feature, bug template asks for `senso --version`, OS, Node, and the command with `--output json`
+
+- [x] `.github/CODEOWNERS` (default owner; call out `src/lib/config.ts`, `src/lib/api-client.ts`, `.github/`, `Makefile`)
+- [x] `.github/dependabot.yml` — npm and github-actions, monthly, minor+patch grouped, majors separate, assignee set, `@types/node` majors ignored with the "pinned in four places" comment
+- [x] `.github/PULL_REQUEST_TEMPLATE.md` with What / Why / Checklist / Risk / Verified how. Risk asks four yes/no questions: does this change stdout shape or `--output json` payloads, exit codes, the config file format, or what is sent to the API; plus "safe to roll back by reverting alone?" Blank is not an answer
+- [x] `.github/ISSUE_TEMPLATE/` bug + feature, bug template asks for `senso --version`, OS, Node, and the command with `--output json`
 - [ ] Set the GitHub repo description and homepage (currently empty) to match `package.json`
-- [ ] Replace the 150-line boilerplate `.gitignore` with the 15 lines this repo needs
+- [x] Replace the 150-line boilerplate `.gitignore` with the 15 lines this repo needs
 
 **Dependencies**
-- [ ] Upgrade `commander` 13→15, `@clack/prompts` 0.9→1.x, `env-paths` 3→4, `vitest` 3→5, `@types/node`; check `typescript` 7 separately (major, may need tsup bump)
-- [ ] Pin GitHub Actions to current majors (`checkout@v7`, `setup-node@v7` as contextos does)
+
+- [x] Upgrade `commander` 13→15, `@clack/prompts` 0.9→1.x, `env-paths` 3→4, `vitest` 3→5, `@types/node`; check `typescript` 7 separately (major, may need tsup bump)
+- [x] Pin GitHub Actions to current majors (`checkout@v7`, `setup-node@v7` as contextos does)
 
 ### Phase 2 — Test suite (size: L, the core of the plan)
 
 > **Sequencing deviation, decided during execution.** The prerequisite refactor below and
-> the whole of Phase 3 land *before* the tests are written, in that order. The plan as
+> the whole of Phase 3 land _before_ the tests are written, in that order. The plan as
 > drafted had Phase 2 pin current behavior and Phase 3 then change it, which means writing
 > ~30 command test files against behavior that is about to be replaced and rewriting them
 > a week later. Nothing in Phase 3 depends on the tests existing, so doing it first costs
 > nothing and saves the rework. The tracker reflects the executed order.
 
 **Prerequisite refactor** (tests cannot be written against the current shape):
+
 - [ ] `src/lib/errors.ts`: `class CliError extends Error { exitCode }`; replace all 174 `process.exit()` in commands with `throw new CliError(...)` or a return; `cli.ts` catches once, formats, exits
 - [ ] `src/lib/run-action.ts`: `runAction(program, async (ctx) => ...)` that resolves global opts (apiKey, baseUrl, output, quiet) into a typed `ctx`, wraps the handler, maps `ApiError`/`CliError`/unknown to stderr + exit code. Every action goes through it.
 - [ ] `src/program.ts` exporting `createProgram(): Command` with zero side effects; `src/cli.ts` becomes the 10-line bin that calls it (tsup entry unchanged)
@@ -269,6 +275,7 @@ Everything the test suite and contributors need before the first test is written
 - [ ] Inject `fetch` (or accept a base URL) so tests never need real DNS — MSW handles this without injection, but a `SENSO_BASE_URL` override already exists and e2e uses it
 
 **Layer 1 — unit (`tests/unit/`)**, no network, `@vitest-environment node`:
+
 - [ ] `config.test.ts` — precedence flag > env > file; 0600 mode; missing/corrupt file → `{}`; `clearConfig` idempotent; `SENSO_CONFIG_DIR` honored
 - [ ] `api-client.test.ts` — headers (`X-API-Key`, `User-Agent` carries version); query param encoding drops `undefined`; 204 → undefined; non-JSON body → error; `ApiError` message extraction for `error|message|detail|errors[]` shapes; **timeout aborts at 30s** (fake timers); `formatApiError` table for 401/402/403/404/409/5xx/AbortError/ECONNREFUSED
 - [ ] `output.test.ts` — table column widths, empty rows, `columns` subset, plain string vs array, json indentation
@@ -278,6 +285,7 @@ Everything the test suite and contributors need before the first test is written
 - [ ] `errors.test.ts` / `run-action.test.ts` — exit code mapping, stderr-only on failure, stdout untouched on failure in json mode
 
 **Layer 2 — command tests (`tests/commands/`)**, in-process, MSW with `onUnhandledRequest: 'error'` in `tests/setup.ts` (the network ban), stdout/stderr captured via spies on `process.stdout.write`:
+
 - [ ] One file per command group (30). Each covers, in this order: 401 → auth message + exit 3; 404; malformed body; then the happy path in `json`, `table` and `plain`
 - [ ] Assert the **exact request** each command sends (method, path, query, body) — this is where the CLI's contract with the API lives, and it is what catches "the API renamed a param"
 - [ ] `--data <json>` commands: invalid JSON → usage error, not a stack trace
@@ -289,6 +297,7 @@ Everything the test suite and contributors need before the first test is written
 - [ ] `skills`: shipables invocation args (asserting the key is **not** on argv after Phase 0)
 
 **Layer 3 — CLI end-to-end (`tests/e2e/`)**, spawns `node dist/cli.js` against a `node:http` mock server via `SENSO_BASE_URL` + `SENSO_CONFIG_DIR` in a temp dir. This is what proves the bundle, not the source:
+
 - [ ] `--version` and `--help` exit 0, print nothing to stderr, touch no network, create no config dir
 - [ ] `--version` output equals `package.json` version read at test time — not a literal that can drift (live-survey's `/health` test)
 - [ ] `--output json` stdout is parseable JSON with **nothing else** on stdout, for a sample of 10 commands
@@ -298,6 +307,7 @@ Everything the test suite and contributors need before the first test is written
 - [ ] Windows path handling for `ingest upload` (runs on the OS matrix in CI)
 
 **Layer 4 — policy (`tests/policy/`)**, the repo's own rules, failure messages name the offender:
+
 - [ ] `readme-commands.test.ts` — every registered subcommand (walk `createProgram()`) appears in README's reference; every README `senso ...` line is a real command (both directions)
 - [ ] `output-contract.test.ts` — every action in `src/commands/` is registered via `runAction`; no `console.*` outside `lib/output.ts`/`utils/logger.ts`/`utils/branding.ts`. This is live-survey's `test_no_module_in_the_app_package_calls_print`, for the same reason: a bare write has no stream discipline, and that is how the banner ended up in JSON stdout
 - [ ] `american-english.test.ts` — port of contextos's, scoped to `src/` and `README.md`
@@ -308,6 +318,7 @@ Everything the test suite and contributors need before the first test is written
 - [ ] `package.test.ts` — `files` is exactly `["dist"]`; `bin` points at an existing built file after `make build`; no `dependencies` unused (`depcheck`)
 
 **Gates and CI**
+
 - [ ] `vitest.config.ts` with a why-comment, `coverage.provider: v8`, thresholds set at achieved-minus-headroom once the suite exists (target ≥85/80/85/85), `include: src/**`, exclude `src/cli.ts` (the bin)
 - [ ] `make unit` = `vitest run --coverage`; CI publishes the coverage table to the step summary (`if: always()`), as contextos does
 - [ ] `make smoke` = `npm pack` → install the tarball into a temp prefix → run `senso --version`, `senso --help`, one mocked command. CI runs it on `ubuntu`/`macos`/`windows` × Node `18`/`20`/`22`
@@ -331,6 +342,7 @@ tests alongside. Document the result in README under "Using with AI agents".
 ### Phase 4 — Documentation (size: M)
 
 **README.md** — rewrite, not edit. Structure:
+
 - [ ] Badges row: CI status, npm version, npm downloads/month, Node ≥18, license AGPL-3.0. (All five resolve to real endpoints today; do not add a coverage badge unless a coverage service is adopted — a Codecov badge with no upload is a lie)
 - [ ] One-paragraph what-it-is, then a 60-second quick start (install, `SENSO_API_KEY`, one search, one `--output json`)
 - [ ] "Using with AI agents" as the second section: the stdout/stderr/exit-code contract, env vars table, the one-line `--output json --quiet` recipe, and the `skills install` path
@@ -341,11 +353,12 @@ tests alongside. Document the result in README under "Using with AI agents".
 - [ ] "Testing" section as a five-row stages table (Lint / Security / Unit / Build / Smoke → command → what it checks) and a "Repository layout" block, both in live-survey's form; target the whole README at about 200 lines
 
 **New documents**
+
 - [ ] `CONTRIBUTING.md` — setup, `make all`, the non-negotiables (network ban in tests; every command through `runAction`; README/reference regenerated in the same PR; American English; no credential in a tracked file; do not lower the coverage gate), test layering table, commit style (gitmoji), release steps
 - [ ] `SECURITY.md` — reporting address; what the CLI holds (API key in `config.json`, 0600, plaintext by design — keychain integration listed as future work); what leaves the machine (`X-API-Key`, `User-Agent` with version, update check to npmjs.org); known limitations recorded as decisions (argv exposure if shipables cannot read env; no certificate pinning; no key rotation command)
 - [ ] `CHANGELOG.md` — Keep a Changelog, "written for the person who has to act on them"; backfill from the 41 commits and 6 published versions **by theme rather than commit**, as live-survey did for its pre-1.0 history; then `[Unreleased]` going forward; the publish workflow checks the version has a section (Phase 6)
 - [ ] `CLAUDE.md` — what this is, layout, `make all` before finishing, non-negotiables, testing conventions, comment style, "things that look like bugs but are not" (the version walk-up in `version.ts`; banner on stderr; update check skipped for some commands; `--output table` refusing rather than falling back), and an **"Adding a command"** recipe in live-survey's numbered form: 1. path and params from the spec, 2. register under the right group via `runAction`, 3. `--output` for all three formats, 4. tests: missing key, 401, 404, malformed body, exact request shape, happy path per format, 5. README one-liner + regenerate the reference, 6. CHANGELOG entry, 7. `make all`
-**The `docs/` set** (live-survey's shape; nothing here is secret, so it lives in the public tree)
+      **The `docs/` set** (live-survey's shape; nothing here is secret, so it lives in the public tree)
 - [ ] `docs/README.md` — index opening with "The 60-second version" (three or four bullets: one bundle, one config file, one HTTP client, one output contract) then a "read it when you want to know" table
 - [ ] `docs/architecture.md` — how one invocation flows, with an ASCII diagram: argv → Commander → `runAction` → `api-client` → `output`; where the config and update checker sit; what is deliberately not there (no daemon, no cache, no telemetry)
 - [ ] `docs/configuration.md` — every env var and flag with purpose and default (`SENSO_API_KEY`, `SENSO_BASE_URL`, `SENSO_CONFIG_DIR`, `SENSO_NO_UPDATE_CHECK`, `SENSO_DEBUG`, `NO_COLOR`), config file location per OS, precedence, file mode. A policy test checks every `process.env.SENSO_*` read in `src/` is documented here (contextos's `.env.example` test, inverted)
@@ -361,7 +374,7 @@ tests alongside. Document the result in README under "Using with AI agents".
 - [ ] Resolve `api-keys revoke` (spec behind, or dead command)
 - [ ] `scripts/spec-drift.ts`: fetch `https://docs.senso.ai/specs/sdk-api.yaml`, diff paths against `createProgram()` paths, print a table. Run by `.github/workflows/spec-drift.yml` **weekly and on demand, never on PRs** (it touches the network), opening or updating a single issue on drift
 - [ ] Same job refreshes `tests/fixtures/shipables-registry.json` from the registry and opens a PR if the skills list changed
-- [ ] Vendor the spec paths list as a fixture so the *policy* test (no network) can assert every command path exists in the last-known spec
+- [ ] Vendor the spec paths list as a fixture so the _policy_ test (no network) can assert every command path exists in the last-known spec
 
 ### Phase 6 — Release hardening (size: S)
 
@@ -387,16 +400,16 @@ Mirrors contextos's `api-endpoint-tests.yml`: real key, real org, scheduled, nev
 
 ## 5. Order of operations and rough sizing
 
-| Phase | Depends on | Size | Outcome that unblocks the next |
-|---|---|---|---|
-| 0 Stop the bleeding | — | S | Hazards gone; CI honest |
-| 1 Tooling | 0 | M | `make all`, lint, security scans, GitHub scaffolding |
-| 2 Test suite | 1 (and the `runAction`/`CliError` refactor) | L | Behavior pinned; coverage gate live |
-| 3 Output contract | 2 | M | Every command agent-safe |
-| 4 Documentation | 3 (README documents the new contract) | M | Public face done; policy tests keep it true |
-| 5 API drift | 2 | M | Coverage complete; drift becomes an issue, not a surprise |
-| 6 Release hardening | 4 (CHANGELOG exists) | S | Tags cannot publish broken builds |
-| 7 Live canary | 6 | S | Early warning on API changes |
+| Phase               | Depends on                                  | Size | Outcome that unblocks the next                            |
+| ------------------- | ------------------------------------------- | ---- | --------------------------------------------------------- |
+| 0 Stop the bleeding | —                                           | S    | Hazards gone; CI honest                                   |
+| 1 Tooling           | 0                                           | M    | `make all`, lint, security scans, GitHub scaffolding      |
+| 2 Test suite        | 1 (and the `runAction`/`CliError` refactor) | L    | Behavior pinned; coverage gate live                       |
+| 3 Output contract   | 2                                           | M    | Every command agent-safe                                  |
+| 4 Documentation     | 3 (README documents the new contract)       | M    | Public face done; policy tests keep it true               |
+| 5 API drift         | 2                                           | M    | Coverage complete; drift becomes an issue, not a surprise |
+| 6 Release hardening | 4 (CHANGELOG exists)                        | S    | Tags cannot publish broken builds                         |
+| 7 Live canary       | 6                                           | S    | Early warning on API changes                              |
 
 Phases 3 and 5 can run in parallel once 2 lands. Phase 4's README can start during 3 as
 long as it is finished after.
@@ -419,8 +432,15 @@ clone with no secrets, the OS matrix is green, and the README badges are all gre
 4. **Where the API key lives.** Plaintext `config.json` at 0600 is fine for a CLI whose
    users are developers and agents; OS keychain support is a real feature, not hygiene,
    so it is out of scope here and goes in SECURITY.md as a known limitation.
-5. **Typescript 7.** Major bump; check tsup and typescript-eslint support before
-   including it in Phase 1, otherwise defer.
+5. **Typescript 7.** ~~Major bump; check tsup and typescript-eslint support before
+   including it in Phase 1, otherwise defer.~~ **Decided 2026-09-09: deferred.** TypeScript
+   7.0.2 was installed and works — tsup builds, and it found a real latent crash in
+   `ingest upload` where an empty prompt reached `.trim()` on `undefined`. But no
+   typescript-eslint release supports it (peer range `>=4.8.4 <6.1.0` on latest, canary and
+   rc alike), and a type-aware linter is what enforces the `console` ban that the whole
+   output contract rests on. A lint gate that works beats a compiler major. Pinned at
+   TypeScript 5.9.3, with a Dependabot ignore so the bump is taken deliberately alongside
+   the linter. The bug it found stays fixed.
 6. **`docs/` in the public tree.** live-survey keeps its docs public-in-repo; contextos
    moved them to `docs-internal/` only because its `docs/` is a served app. This repo has
    no served surface and nothing in the planned docs is sensitive, so `docs/` at the root

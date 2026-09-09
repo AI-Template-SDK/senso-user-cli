@@ -290,11 +290,7 @@ function emitContext(format: OutputFormat, lines: string[]): void {
  */
 function emitNotes(format: OutputFormat, notes?: string[]): void {
   if (format === "json" || !notes || notes.length === 0) return;
-  outputPlain([
-    "",
-    `  ${pc.bold("Notes")}`,
-    ...notes.map((note) => `  ${pc.dim("•")} ${note}`),
-  ]);
+  outputPlain(["", `  ${pc.bold("Notes")}`, ...notes.map((note) => `  ${pc.dim("•")} ${note}`)]);
 }
 
 // ---------------------------------------------------------------------------
@@ -333,14 +329,21 @@ function windowParams(o: WindowFilters): Record<string, string | undefined> {
 function addWindowOptions(cmd: Command, opts: { tag?: boolean } = {}): Command {
   const withTag = opts.tag !== false;
   const base = cmd
-    .option("--from <date>", "Window start, YYYY-MM-DD (default: 30 days ending at the most recent day with data)")
+    .option(
+      "--from <date>",
+      "Window start, YYYY-MM-DD (default: 30 days ending at the most recent day with data)",
+    )
     .option("--to <date>", "Window end, YYYY-MM-DD (max window: 365 days)")
     .option("--models <list>", "Comma-separated model filter — see 'senso analytics filters'")
-    .option("--location <list>", "Comma-separated location filter, case-sensitive (e.g. US, US/California)")
-    .option("--prompt-type <type>", "Funnel stage: awareness | consideration | evaluation | decision");
-  return withTag
-    ? base.option("--tag <tag>", "Restrict to prompts carrying this tag")
-    : base;
+    .option(
+      "--location <list>",
+      "Comma-separated location filter, case-sensitive (e.g. US, US/California)",
+    )
+    .option(
+      "--prompt-type <type>",
+      "Funnel stage: awareness | consideration | evaluation | decision",
+    );
+  return withTag ? base.option("--tag <tag>", "Restrict to prompts carrying this tag") : base;
 }
 
 function addPagingOptions(cmd: Command, defaultLimit: number): Command {
@@ -837,15 +840,7 @@ export function registerAnalyticsCommands(program: Command): void {
               share: rate(p.citation_share),
               avg_pos: position(p.avg_citation_rank),
             })),
-            columns: [
-              "url",
-              "tier",
-              "answers",
-              "citations",
-              "coverage",
-              "share",
-              "avg_pos",
-            ],
+            columns: ["url", "tier", "answers", "citations", "coverage", "share", "avg_pos"],
           },
           plain: [
             ...context,
@@ -1052,14 +1047,7 @@ export function registerAnalyticsCommands(program: Command): void {
                 sov: rate(p.share_of_voice),
                 avg_rank: rate(p.avg_rank),
               })),
-              columns: [
-                "period",
-                "answered",
-                "mentioned",
-                "mention_rate",
-                "sov",
-                "avg_rank",
-              ],
+              columns: ["period", "answered", "mentioned", "mention_rate", "sov", "avg_rank"],
             },
             plain: [
               ...context,
@@ -1103,15 +1091,30 @@ export function registerAnalyticsCommands(program: Command): void {
       .description(
         "The newest stored answer per prompt × model × location, with its citations and competitor mentions. This is a snapshot, not a window: --from/--to filter on when each answer was collected, so narrowing them hides combinations instead of returning older answers. Historical answer text is not retained.",
       )
-      .option("--from <date>", "Answers collected on or after this date, YYYY-MM-DD (hides rows, never reveals older answers)")
-      .option("--to <date>", "Answers collected on or before this date, YYYY-MM-DD (hides rows, never reveals older answers)")
+      .option(
+        "--from <date>",
+        "Answers collected on or after this date, YYYY-MM-DD (hides rows, never reveals older answers)",
+      )
+      .option(
+        "--to <date>",
+        "Answers collected on or before this date, YYYY-MM-DD (hides rows, never reveals older answers)",
+      )
       .option("--models <list>", "Comma-separated model filter")
       .option("--location <list>", "Comma-separated location filter, case-sensitive")
-      .option("--prompt-type <type>", "Funnel stage: awareness | consideration | evaluation | decision")
+      .option(
+        "--prompt-type <type>",
+        "Funnel stage: awareness | consideration | evaluation | decision",
+      )
       .option("--tag <tag>", "Restrict to prompts carrying this tag")
-      .option("--mentioned <bool>", "Only answers that did (true) or did not (false) name your brand")
+      .option(
+        "--mentioned <bool>",
+        "Only answers that did (true) or did not (false) name your brand",
+      )
       .option("--cited <bool>", "Only answers that did (true) or did not (false) cite anything")
-      .option("--citation-tier <tier>", "Only answers citing this tier: primary | tracked | secondary"),
+      .option(
+        "--citation-tier <tier>",
+        "Only answers citing this tier: primary | tracked | secondary",
+      ),
     25,
   ).action(
     async (cmdOpts: {
@@ -1293,17 +1296,14 @@ export function registerAnalyticsCommands(program: Command): void {
         });
 
         const models = (data.models ?? []).map((m) => m.display_name || m.id);
-        const competitors = (data.tracked_competitors ?? []).map(
-          (c) => c.display_name || c.id,
-        );
+        const competitors = (data.tracked_competitors ?? []).map((c) => c.display_name || c.id);
         const range = data.date_range;
         const rangeText =
           range?.earliest_day && range?.latest_day
             ? `${range.earliest_day} → ${range.latest_day}`
             : "no rollup days yet";
 
-        const list = (values: string[]): string =>
-          values.length ? values.join(", ") : NO_VALUE;
+        const list = (values: string[]): string => (values.length ? values.join(", ") : NO_VALUE);
 
         emitContext(format, ["", `  ${pc.bold("Available filters")}`]);
         output(format, {

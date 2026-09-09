@@ -97,10 +97,12 @@ async function promptCreateFolder(
   return createFolder((name as string).trim(), parentId, opts);
 }
 
-export async function pickFolder(
-  opts: FolderPickerOptions,
-): Promise<FolderPickerResult> {
+export async function pickFolder(opts: FolderPickerOptions): Promise<FolderPickerResult> {
+  // The folders drilled into, deepest last. `.at(-1)` returning undefined *is*
+  // the "we are at the root" case, so every read goes through this one accessor
+  // rather than indexing by length-1 and assuming a hit.
   const navigationStack: Array<{ id: string; name: string }> = [];
+  const currentFolder = (): { id: string; name: string } | undefined => navigationStack.at(-1);
   let currentParentId: string | null = null;
   let currentOffset = 0;
   let loadedFolders: KBNode[] = [];
@@ -142,10 +144,7 @@ export async function pickFolder(
         ? "My Files"
         : "My Files > " + navigationStack.map((s) => s.name).join(" > ");
 
-    const currentFolderName =
-      navigationStack.length > 0
-        ? navigationStack[navigationStack.length - 1].name
-        : null;
+    const currentFolderName = currentFolder()?.name ?? null;
 
     // Show location and keyboard hints
     console.log();
@@ -155,7 +154,9 @@ export async function pickFolder(
       console.log(`  ${pc.dim("Use arrow keys to navigate, Enter to select.")}`);
       console.log(`  ${pc.dim("Pick a folder to open it, or choose an action below the list.")}`);
     } else {
-      console.log(`  ${pc.dim("Use arrow keys to navigate, Enter to select a folder to open it.")}`);
+      console.log(
+        `  ${pc.dim("Use arrow keys to navigate, Enter to select a folder to open it.")}`,
+      );
     }
     console.log();
 
@@ -171,7 +172,10 @@ export async function pickFolder(
     }
 
     if (currentFolderName) {
-      options.push({ value: "__SELECT_CURRENT__", label: pc.green(`✓ Select "${currentFolderName}"`) });
+      options.push({
+        value: "__SELECT_CURRENT__",
+        label: pc.green(`✓ Select "${currentFolderName}"`),
+      });
       options.push({ value: "__BACK__", label: pc.dim("← Go back") });
     }
     options.push({
@@ -193,10 +197,7 @@ export async function pickFolder(
 
     if (selected === "__BACK__") {
       navigationStack.pop();
-      currentParentId =
-        navigationStack.length > 0
-          ? navigationStack[navigationStack.length - 1].id
-          : null;
+      currentParentId = currentFolder()?.id ?? null;
       currentOffset = 0;
       loadedFolders = [];
       needsFetch = true;
@@ -210,8 +211,13 @@ export async function pickFolder(
     }
 
     if (selected === "__SELECT_CURRENT__") {
-      const current = navigationStack[navigationStack.length - 1];
-      return { folderId: current.id, folderName: current.name };
+      // Only offered when there is a folder to select, but read defensively:
+      // the option list and the stack are built in separate passes.
+      const current = currentFolder();
+      if (current) {
+        return { folderId: current.id, folderName: current.name };
+      }
+      continue;
     }
 
     if (selected === "__NEW_FOLDER__") {

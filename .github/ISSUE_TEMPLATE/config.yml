@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/AI-Template-SDK/senso-user-cli/security/policy
+    about: Do not open a public issue. Email security@senso.ai — see SECURITY.md.
+  - name: Senso API and product documentation
+    url: https://docs.senso.ai
+    about: Questions about the API itself, API keys, or your organization.

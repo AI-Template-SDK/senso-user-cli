@@ -64,11 +64,11 @@ That's it. Every endpoint in the Senso Org API is available as a CLI command.
 
 ## Platform Support
 
-| Platform | Supported | Config Location |
-|----------|-----------|-----------------|
-| **Linux** | Node 18+ | `~/.config/senso/config.json` |
-| **macOS** | Node 18+ | `~/Library/Preferences/senso/config.json` |
-| **Windows** | Node 18+ | `%APPDATA%\senso\config.json` |
+| Platform    | Supported | Config Location                           |
+| ----------- | --------- | ----------------------------------------- |
+| **Linux**   | Node 18+  | `~/.config/senso/config.json`             |
+| **macOS**   | Node 18+  | `~/Library/Preferences/senso/config.json` |
+| **Windows** | Node 18+  | `%APPDATA%\senso\config.json`             |
 
 Config paths are handled automatically via XDG-compatible directories. The config file stores your API key, org info, and update check timestamps with owner-only permissions (`0600`).
 
@@ -233,15 +233,15 @@ senso analytics filters              Filter values that have data for this org
 
 Options:
 
-| Command | Options |
-|---------|---------|
-| all except `prompt <promptId>`, `glossary`, `filters` | `--from`, `--to`, `--models`, `--location`, `--prompt-type`, `--tag` |
-| `mentions`, `citations` | `--group-by <day\|week>` |
-| `domains` | `--tier`, `--domain-contains`, `--sort <citations\|coverage>`, `--limit`, `--offset` |
-| `pages` | `--tier`, `--domain`, `--domain-contains`, `--url-contains`, `--sort <citations\|coverage>`, `--limit`, `--offset` |
-| `prompts` | `--search`, `--sort <mention_rate\|share_of_voice\|citations\|answered\|text>`, `--order <asc\|desc>`, `--limit`, `--offset` |
-| `prompt <promptId>` | `--from`, `--to`, `--models`, `--location`, `--no-include-answers` |
-| `answers` | `--from`, `--to`, `--models`, `--location`, `--prompt-type`, `--tag`, `--mentioned <bool>`, `--cited <bool>`, `--citation-tier <primary\|tracked\|secondary>`, `--limit`, `--offset` |
+| Command                                               | Options                                                                                                                                                                              |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| all except `prompt <promptId>`, `glossary`, `filters` | `--from`, `--to`, `--models`, `--location`, `--prompt-type`, `--tag`                                                                                                                 |
+| `mentions`, `citations`                               | `--group-by <day\|week>`                                                                                                                                                             |
+| `domains`                                             | `--tier`, `--domain-contains`, `--sort <citations\|coverage>`, `--limit`, `--offset`                                                                                                 |
+| `pages`                                               | `--tier`, `--domain`, `--domain-contains`, `--url-contains`, `--sort <citations\|coverage>`, `--limit`, `--offset`                                                                   |
+| `prompts`                                             | `--search`, `--sort <mention_rate\|share_of_voice\|citations\|answered\|text>`, `--order <asc\|desc>`, `--limit`, `--offset`                                                         |
+| `prompt <promptId>`                                   | `--from`, `--to`, `--models`, `--location`, `--no-include-answers`                                                                                                                   |
+| `answers`                                             | `--from`, `--to`, `--models`, `--location`, `--prompt-type`, `--tag`, `--mentioned <bool>`, `--cited <bool>`, `--citation-tier <primary\|tracked\|secondary>`, `--limit`, `--offset` |
 
 `--from`/`--to` are `YYYY-MM-DD` and default to the 30 days ending at the most recent day that has data for your model/location filter (max window: 365 days). `--models` and `--location` are comma-separated; locations are case-sensitive exact codes (`US`, `US/California`) — the API also accepts `locations` as an alias for the `location` query param. Run `senso analytics filters` to see the values that actually have data.
 
@@ -249,7 +249,7 @@ Options:
 
 Reading the numbers:
 
-- **Share of Voice** is your mention instances ÷ `brand_mention_total` — mentions of *every* brand the models named, not just your tracked competitors. It matches the Share of Voice in the Senso app. `tracked_mention_total` is still returned as a raw count in `totals`, but it is not the denominator.
+- **Share of Voice** is your mention instances ÷ `brand_mention_total` — mentions of _every_ brand the models named, not just your tracked competitors. It matches the Share of Voice in the Senso app. `tracked_mention_total` is still returned as a raw count in `totals`, but it is not the denominator.
 - **Citation Rate** and **Citation Coverage** divide by `D` — answers with at least one citation. **Citation Share** divides by `S` — total citation instances. They are different metrics on different denominators; every table shows the numerator and denominator next to the percentage so you can check.
 - The three tier **rates** are independent and can sum past 100% (one answer can cite an owned page and an external page). The three tier **shares** partition and sum to exactly 100%.
 - A metric renders as `—` when its denominator was zero. That is "not measured", not 0%.
@@ -317,15 +317,15 @@ senso --help                         Show help
 
 ## Global Options
 
-| Flag | Description |
-|------|-------------|
-| `--api-key <key>` | Override API key (or set `SENSO_API_KEY` env var) |
-| `--base-url <url>` | Override API base URL (default: `https://apiv2.senso.ai/api/v1`) |
-| `--output <format>` | Output format: `json`, `table`, or `plain` (default: `plain`) |
-| `--quiet` | Suppress banners and non-essential output |
-| `--no-update-check` | Skip version check (or set `SENSO_NO_UPDATE_CHECK=1`) |
-| `-v, --version` | Show version |
-| `-h, --help` | Show help |
+| Flag                | Description                                                      |
+| ------------------- | ---------------------------------------------------------------- |
+| `--api-key <key>`   | Override API key (or set `SENSO_API_KEY` env var)                |
+| `--base-url <url>`  | Override API base URL (default: `https://apiv2.senso.ai/api/v1`) |
+| `--output <format>` | Output format: `json`, `table`, or `plain` (default: `plain`)    |
+| `--quiet`           | Suppress banners and non-essential output                        |
+| `--no-update-check` | Skip version check (or set `SENSO_NO_UPDATE_CHECK=1`)            |
+| `-v, --version`     | Show version                                                     |
+| `-h, --help`        | Show help                                                        |
 
 ---
 
@@ -455,17 +455,17 @@ src/
 
 ### Tech Stack
 
-| Concern | Choice |
-|---------|--------|
-| Language | TypeScript |
-| Runtime | Node.js 18+ |
-| Bundler | tsup (esbuild) — single 50KB ESM bundle |
-| CLI Framework | Commander.js |
-| Interactive Prompts | @clack/prompts |
-| Colors | picocolors |
-| ASCII Branding | figlet + gradient-string + boxen |
-| Config | env-paths (XDG-compatible) |
-| HTTP | Native `fetch` |
+| Concern             | Choice                                  |
+| ------------------- | --------------------------------------- |
+| Language            | TypeScript                              |
+| Runtime             | Node.js 18+                             |
+| Bundler             | tsup (esbuild) — single 50KB ESM bundle |
+| CLI Framework       | Commander.js                            |
+| Interactive Prompts | @clack/prompts                          |
+| Colors              | picocolors                              |
+| ASCII Branding      | figlet + gradient-string + boxen        |
+| Config              | env-paths (XDG-compatible)              |
+| HTTP                | Native `fetch`                          |
 
 ### Releasing a New Version
 

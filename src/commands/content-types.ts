@@ -5,10 +5,11 @@ import * as log from "../utils/logger.js";
 export function registerContentTypeCommands(program: Command): void {
   const ct = program
     .command("content-types")
-    .description("Manage content type configurations. Content types define the output format and structure for AI-generated content (e.g. blog post, FAQ, landing page).");
+    .description(
+      "Manage content type configurations. Content types define the output format and structure for AI-generated content (e.g. blog post, FAQ, landing page).",
+    );
 
-  ct
-    .command("list")
+  ct.command("list")
     .description("List all content types configured for the organization.")
     .option("--limit <n>", "Maximum number of content types to return (default: 50)")
     .option("--offset <n>", "Number of items to skip (for pagination)")
@@ -28,10 +29,14 @@ export function registerContentTypeCommands(program: Command): void {
       }
     });
 
-  ct
-    .command("create")
-    .description("Create a new content type. Requires a name and a config defining the output structure. config accepts a defined set of keys: template, template_spec, cta_text, cta_destination, writing_rules (array). Unknown keys are rejected.")
-    .requiredOption("--data <json>", 'JSON: { "name": "Blog Post", "config": { "template": "...", "cta_text": "...", "cta_destination": "...", "writing_rules": [] } }')
+  ct.command("create")
+    .description(
+      "Create a new content type. Requires a name and a config defining the output structure. config accepts a defined set of keys: template, template_spec, cta_text, cta_destination, writing_rules (array). Unknown keys are rejected.",
+    )
+    .requiredOption(
+      "--data <json>",
+      'JSON: { "name": "Blog Post", "config": { "template": "...", "cta_text": "...", "cta_destination": "...", "writing_rules": [] } }',
+    )
     .action(async (cmdOpts: { data: string }) => {
       const opts = program.opts();
       try {
@@ -51,13 +56,16 @@ export function registerContentTypeCommands(program: Command): void {
       }
     });
 
-  ct
-    .command("get <id>")
+  ct.command("get <id>")
     .description("Get a content type by ID, including its full configuration.")
     .action(async (id: string) => {
       const opts = program.opts();
       try {
-        const data = await apiRequest({ path: `/org/content-types/${id}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        const data = await apiRequest({
+          path: `/org/content-types/${id}`,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
         log.error(formatApiError(err));
@@ -65,10 +73,14 @@ export function registerContentTypeCommands(program: Command): void {
       }
     });
 
-  ct
-    .command("update <id>")
-    .description("Replace a content type's name and config (PUT). Both fields are required — run 'get <id>' first to preserve existing values. For single-field updates, use 'content-types patch <id>'.")
-    .requiredOption("--data <json>", 'JSON: { "name": "Updated Name", "config": { "template": "...", "cta_text": "...", "cta_destination": "...", "writing_rules": [] } }')
+  ct.command("update <id>")
+    .description(
+      "Replace a content type's name and config (PUT). Both fields are required — run 'get <id>' first to preserve existing values. For single-field updates, use 'content-types patch <id>'.",
+    )
+    .requiredOption(
+      "--data <json>",
+      'JSON: { "name": "Updated Name", "config": { "template": "...", "cta_text": "...", "cta_destination": "...", "writing_rules": [] } }',
+    )
     .action(async (id: string, cmdOpts: { data: string }) => {
       const opts = program.opts();
       try {
@@ -88,10 +100,14 @@ export function registerContentTypeCommands(program: Command): void {
       }
     });
 
-  ct
-    .command("patch <id>")
-    .description("Partially update a content type (PATCH). Only the fields you provide are changed — existing fields are preserved. Preferred over 'update' for targeted changes like updating just the template.")
-    .requiredOption("--data <json>", 'JSON: { "config": { "template": "Updated template instruction" } }')
+  ct.command("patch <id>")
+    .description(
+      "Partially update a content type (PATCH). Only the fields you provide are changed — existing fields are preserved. Preferred over 'update' for targeted changes like updating just the template.",
+    )
+    .requiredOption(
+      "--data <json>",
+      'JSON: { "config": { "template": "Updated template instruction" } }',
+    )
     .action(async (id: string, cmdOpts: { data: string }) => {
       const opts = program.opts();
       try {
@@ -111,13 +127,17 @@ export function registerContentTypeCommands(program: Command): void {
       }
     });
 
-  ct
-    .command("delete <id>")
+  ct.command("delete <id>")
     .description("Delete a content type. This cannot be undone.")
     .action(async (id: string) => {
       const opts = program.opts();
       try {
-        await apiRequest({ method: "DELETE", path: `/org/content-types/${id}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        await apiRequest({
+          method: "DELETE",
+          path: `/org/content-types/${id}`,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         log.success(`Content type ${id} deleted.`);
       } catch (err) {
         log.error(formatApiError(err));

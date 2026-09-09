@@ -6,21 +6,33 @@ import * as log from "../utils/logger.js";
 export function registerPromptCommands(program: Command): void {
   const prompts = program
     .command("prompts")
-    .description("Manage prompts (GEO questions). Each prompt is a question that drives both AI content generation (use with 'generate sample --prompt-id') and brand visibility monitoring — tracking how AI models mention your brand, products, and competitors.");
+    .description(
+      "Manage prompts (GEO questions). Each prompt is a question that drives both AI content generation (use with 'generate sample --prompt-id') and brand visibility monitoring — tracking how AI models mention your brand, products, and competitors.",
+    );
 
   prompts
     .command("list")
-    .description("List all prompts in the organization. Use --search to filter by question text, --sort to order results.")
+    .description(
+      "List all prompts in the organization. Use --search to filter by question text, --sort to order results.",
+    )
     .option("--limit <n>", "Maximum prompts to return (max: 100)")
     .option("--offset <n>", "Number of prompts to skip (for pagination)")
     .option("--search <query>", "Filter prompts by question text")
-    .option("--sort <order>", "Sort order: created_desc, created_asc, text_asc, text_desc, type_asc, type_desc")
+    .option(
+      "--sort <order>",
+      "Sort order: created_desc, created_asc, text_asc, text_desc, type_asc, type_desc",
+    )
     .action(async (cmdOpts: Record<string, string>) => {
       const opts = program.opts();
       try {
         const data = await apiRequest({
           path: "/org/prompts",
-          params: { limit: cmdOpts.limit, offset: cmdOpts.offset, search: cmdOpts.search, sort: cmdOpts.sort },
+          params: {
+            limit: cmdOpts.limit,
+            offset: cmdOpts.offset,
+            search: cmdOpts.search,
+            sort: cmdOpts.sort,
+          },
           apiKey: opts.apiKey,
           baseUrl: opts.baseUrl,
         });
@@ -33,8 +45,13 @@ export function registerPromptCommands(program: Command): void {
 
   prompts
     .command("create")
-    .description("Create a new prompt. Type must be one of: decision, consideration, awareness, evaluation.")
-    .requiredOption("--data <json>", 'JSON: { "question_text": "What are the best...", "type": "decision" }')
+    .description(
+      "Create a new prompt. Type must be one of: decision, consideration, awareness, evaluation.",
+    )
+    .requiredOption(
+      "--data <json>",
+      'JSON: { "question_text": "What are the best...", "type": "decision" }',
+    )
     .action(async (cmdOpts: { data: string }) => {
       const opts = program.opts();
       try {
@@ -56,11 +73,17 @@ export function registerPromptCommands(program: Command): void {
 
   prompts
     .command("get <promptId>")
-    .description("Get a prompt with its full run history. Includes all question runs with mentions, claims, citations, and competitor data.")
+    .description(
+      "Get a prompt with its full run history. Includes all question runs with mentions, claims, citations, and competitor data.",
+    )
     .action(async (promptId: string) => {
       const opts = program.opts();
       try {
-        const data = await apiRequest({ path: `/org/prompts/${promptId}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        const data = await apiRequest({
+          path: `/org/prompts/${promptId}`,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
         log.error(formatApiError(err));
@@ -74,7 +97,12 @@ export function registerPromptCommands(program: Command): void {
     .action(async (promptId: string) => {
       const opts = program.opts();
       try {
-        await apiRequest({ method: "DELETE", path: `/org/prompts/${promptId}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        await apiRequest({
+          method: "DELETE",
+          path: `/org/prompts/${promptId}`,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         log.success(`Prompt ${promptId} deleted.`);
       } catch (err) {
         log.error(formatApiError(err));
@@ -84,7 +112,9 @@ export function registerPromptCommands(program: Command): void {
 
   const tags = prompts
     .command("tags")
-    .description("Manage tags attached to a prompt. Prompts are auto-tagged on creation — use these commands to override, add, or remove tags afterwards. Tag names are resolved against the org's tag library; unknown names are created automatically.");
+    .description(
+      "Manage tags attached to a prompt. Prompts are auto-tagged on creation — use these commands to override, add, or remove tags afterwards. Tag names are resolved against the org's tag library; unknown names are created automatically.",
+    );
 
   tags
     .command("list <promptId>")
@@ -92,7 +122,11 @@ export function registerPromptCommands(program: Command): void {
     .action(async (promptId: string) => {
       const opts = program.opts();
       try {
-        const data = await apiRequest({ path: `/org/prompts/${promptId}/tags`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        const data = await apiRequest({
+          path: `/org/prompts/${promptId}/tags`,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
         log.error(formatApiError(err));
@@ -102,7 +136,9 @@ export function registerPromptCommands(program: Command): void {
 
   tags
     .command("set <promptId>")
-    .description("Replace the prompt's full tag collection. Provide --names (comma-separated) and/or --ids (comma-separated UUIDs). Unknown names are created.")
+    .description(
+      "Replace the prompt's full tag collection. Provide --names (comma-separated) and/or --ids (comma-separated UUIDs). Unknown names are created.",
+    )
     .option("--names <list>", "Comma-separated tag names (created if missing)")
     .option("--ids <list>", "Comma-separated existing tag UUIDs")
     .action(async (promptId: string, cmdOpts: { names?: string; ids?: string }) => {
@@ -186,4 +222,3 @@ export function registerPromptCommands(program: Command): void {
       }
     });
 }
-

@@ -1,0 +1,30 @@
+# Review is required, and by whom, as an enforced property of the repository
+# rather than a convention.
+#
+# The default owner covers everything. The paths below are called out so that a
+# change to one of them is visibly a security or contract review rather than an
+# ordinary one — the reviewer should know, from the file list alone, that they
+# are looking at credential handling, at what gets sent to the API, or at what
+# ships to npm.
+
+* @Chippers255
+
+# Credential handling. config.ts decides where the API key is stored and with
+# what permissions; api-client.ts decides what leaves the machine and in which
+# header.
+/src/lib/config.ts        @Chippers255
+/src/lib/api-client.ts    @Chippers255
+
+# The error and exit-code contract. Agents branch on these values.
+/src/lib/errors.ts        @Chippers255
+/src/lib/run-action.ts    @Chippers255
+
+# The pipeline, the task runner, and the scanners' configuration.
+/.github/                 @Chippers255
+/Makefile                 @Chippers255
+/scripts/                 @Chippers255
+/.gitleaks.toml           @Chippers255
+
+# What ships to npm. `files`, `bin` and `engines` decide what users install.
+/package.json             @Chippers255
+/tsup.config.ts           @Chippers255

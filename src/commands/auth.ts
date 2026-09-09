@@ -2,13 +2,7 @@ import { Command } from "commander";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { apiRequest, formatApiError } from "../lib/api-client.js";
-import {
-  readConfig,
-  writeConfig,
-  clearConfig,
-  getApiKey,
-  getConfigPath,
-} from "../lib/config.js";
+import { readConfig, writeConfig, clearConfig, getApiKey, getConfigPath } from "../lib/config.js";
 import { banner } from "../utils/branding.js";
 import * as log from "../utils/logger.js";
 
@@ -20,10 +14,7 @@ interface OrgMeResponse {
   [key: string]: unknown;
 }
 
-async function verifyApiKey(
-  apiKey: string,
-  baseUrl?: string,
-): Promise<OrgMeResponse> {
+async function verifyApiKey(apiKey: string, baseUrl?: string): Promise<OrgMeResponse> {
   return apiRequest<OrgMeResponse>({
     path: "/org/me",
     apiKey,
@@ -34,14 +25,18 @@ async function verifyApiKey(
 export function registerAuthCommands(program: Command): void {
   program
     .command("login")
-    .description("Authenticate with Senso. Paste your API key and it will be validated against your organization, then stored locally.")
+    .description(
+      "Authenticate with Senso. Paste your API key and it will be validated against your organization, then stored locally.",
+    )
     .action(async () => {
       const opts = program.opts();
 
       banner();
 
       console.log(`  ${pc.bold("Welcome to Senso CLI!")}\n`);
-      console.log(`  ${pc.dim("1.")} Go to ${pc.cyan("https://docs.senso.ai")} to create an account`);
+      console.log(
+        `  ${pc.dim("1.")} Go to ${pc.cyan("https://docs.senso.ai")} to create an account`,
+      );
       console.log(`  ${pc.dim("2.")} Generate an API key from your dashboard\n`);
 
       const result = await p.text({
@@ -94,7 +89,9 @@ export function registerAuthCommands(program: Command): void {
 
   program
     .command("whoami")
-    .description("Show which organization you are authenticated as, including org ID, slug, tier, and API key prefix.")
+    .description(
+      "Show which organization you are authenticated as, including org ID, slug, tier, and API key prefix.",
+    )
     .action(async () => {
       const opts = program.opts();
       const apiKey = getApiKey({ apiKey: opts.apiKey });
@@ -113,13 +110,17 @@ export function registerAuthCommands(program: Command): void {
 
         if (format === "json") {
           console.log(
-            JSON.stringify({
-              orgId: org.org_id,
-              orgName: org.name,
-              orgSlug: org.slug,
-              isFreeTier: org.is_free_tier,
-              apiKeyPrefix: apiKey.slice(0, 8) + "...",
-            }, null, 2),
+            JSON.stringify(
+              {
+                orgId: org.org_id,
+                orgName: org.name,
+                orgSlug: org.slug,
+                isFreeTier: org.is_free_tier,
+                apiKeyPrefix: apiKey.slice(0, 8) + "...",
+              },
+              null,
+              2,
+            ),
           );
         } else {
           console.log();

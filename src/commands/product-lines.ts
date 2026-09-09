@@ -5,10 +5,11 @@ import * as log from "../utils/logger.js";
 export function registerProductLineCommands(program: Command): void {
   const pl = program
     .command("product-lines")
-    .description("Manage product lines — flexible org-scoped product/service definitions. Each product line has a name and an arbitrary JSON 'details' blob carried by downstream generation and evaluation pipelines.");
+    .description(
+      "Manage product lines — flexible org-scoped product/service definitions. Each product line has a name and an arbitrary JSON 'details' blob carried by downstream generation and evaluation pipelines.",
+    );
 
-  pl
-    .command("list")
+  pl.command("list")
     .description("List all product lines for the organization.")
     .option("--limit <n>", "Maximum items to return (default: 50)")
     .option("--offset <n>", "Number of items to skip (for pagination)")
@@ -28,9 +29,10 @@ export function registerProductLineCommands(program: Command): void {
       }
     });
 
-  pl
-    .command("create")
-    .description("Create a new product line. 'details' is an open-ended JSON object — put whatever structured metadata (SKUs, URLs, positioning, pricing tiers) your workflows need.")
+  pl.command("create")
+    .description(
+      "Create a new product line. 'details' is an open-ended JSON object — put whatever structured metadata (SKUs, URLs, positioning, pricing tiers) your workflows need.",
+    )
     .requiredOption("--data <json>", 'JSON: { "name": "Pro Plan", "details": { ... } }')
     .action(async (cmdOpts: { data: string }) => {
       const opts = program.opts();
@@ -51,13 +53,16 @@ export function registerProductLineCommands(program: Command): void {
       }
     });
 
-  pl
-    .command("get <id>")
+  pl.command("get <id>")
     .description("Get a product line by ID.")
     .action(async (id: string) => {
       const opts = program.opts();
       try {
-        const data = await apiRequest({ path: `/org/product-lines/${id}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        const data = await apiRequest({
+          path: `/org/product-lines/${id}`,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
         log.error(formatApiError(err));
@@ -65,9 +70,10 @@ export function registerProductLineCommands(program: Command): void {
       }
     });
 
-  pl
-    .command("update <id>")
-    .description("Replace a product line's name and details (PUT). Both fields are required — run 'get <id>' first to preserve existing values. For single-field updates, use 'product-lines patch <id>'.")
+  pl.command("update <id>")
+    .description(
+      "Replace a product line's name and details (PUT). Both fields are required — run 'get <id>' first to preserve existing values. For single-field updates, use 'product-lines patch <id>'.",
+    )
     .requiredOption("--data <json>", 'JSON: { "name": "Updated Name", "details": { ... } }')
     .action(async (id: string, cmdOpts: { data: string }) => {
       const opts = program.opts();
@@ -88,9 +94,10 @@ export function registerProductLineCommands(program: Command): void {
       }
     });
 
-  pl
-    .command("patch <id>")
-    .description("Partially update a product line (PATCH). Only the fields you provide are changed — existing fields are preserved.")
+  pl.command("patch <id>")
+    .description(
+      "Partially update a product line (PATCH). Only the fields you provide are changed — existing fields are preserved.",
+    )
     .requiredOption("--data <json>", 'JSON: { "details": { "price": 99 } }')
     .action(async (id: string, cmdOpts: { data: string }) => {
       const opts = program.opts();
@@ -111,13 +118,17 @@ export function registerProductLineCommands(program: Command): void {
       }
     });
 
-  pl
-    .command("delete <id>")
+  pl.command("delete <id>")
     .description("Delete a product line. This cannot be undone.")
     .action(async (id: string) => {
       const opts = program.opts();
       try {
-        await apiRequest({ method: "DELETE", path: `/org/product-lines/${id}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        await apiRequest({
+          method: "DELETE",
+          path: `/org/product-lines/${id}`,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         log.success(`Product line ${id} deleted.`);
       } catch (err) {
         log.error(formatApiError(err));

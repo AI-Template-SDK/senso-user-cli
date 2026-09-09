@@ -51,12 +51,7 @@ export function getApiKey(opts?: { apiKey?: string }): string | undefined {
 }
 
 export function getBaseUrl(opts?: { baseUrl?: string }): string {
-  return (
-    opts?.baseUrl ||
-    process.env.SENSO_BASE_URL ||
-    readConfig().baseUrl ||
-    DEFAULT_BASE_URL
-  );
+  return opts?.baseUrl || process.env.SENSO_BASE_URL || readConfig().baseUrl || DEFAULT_BASE_URL;
 }
 
 export function getConfigPath(): string {

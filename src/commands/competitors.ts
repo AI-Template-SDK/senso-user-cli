@@ -5,7 +5,9 @@ import * as log from "../utils/logger.js";
 export function registerCompetitorsCommands(program: Command): void {
   const competitors = program
     .command("competitors")
-    .description("Manage the curated list of competitor brands your organization tracks. Tracked competitors feed downstream share-of-voice analytics and inform content-generation prompts.");
+    .description(
+      "Manage the curated list of competitor brands your organization tracks. Tracked competitors feed downstream share-of-voice analytics and inform content-generation prompts.",
+    );
 
   competitors
     .command("list")
@@ -52,8 +54,13 @@ export function registerCompetitorsCommands(program: Command): void {
 
   competitors
     .command("batch-add")
-    .description("Add up to 50 tracked competitors in one call. Designed for accepting AI-generated suggestions returned by `competitors suggest`.")
-    .requiredOption("--data <json>", 'JSON: { "items": [{ "name": "...", "url": "...", "source": "manual|suggested_run_text|suggested_web_search", "rationale": "...", "confidence": 0.85 }, ...] }')
+    .description(
+      "Add up to 50 tracked competitors in one call. Designed for accepting AI-generated suggestions returned by `competitors suggest`.",
+    )
+    .requiredOption(
+      "--data <json>",
+      'JSON: { "items": [{ "name": "...", "url": "...", "source": "manual|suggested_run_text|suggested_web_search", "rationale": "...", "confidence": 0.85 }, ...] }',
+    )
     .action(async (cmdOpts: { data: string }) => {
       const opts = program.opts();
       try {
@@ -75,7 +82,9 @@ export function registerCompetitorsCommands(program: Command): void {
 
   competitors
     .command("suggest")
-    .description("Get AI-generated competitor suggestions seeded from your org's website and recent prompt-run results. Pipe accepted suggestions into `competitors batch-add`.")
+    .description(
+      "Get AI-generated competitor suggestions seeded from your org's website and recent prompt-run results. Pipe accepted suggestions into `competitors batch-add`.",
+    )
     .action(async () => {
       const opts = program.opts();
       try {

@@ -31,7 +31,9 @@ function buildSourceBody(cmdOpts: SourceFlags): Record<string, unknown> {
 export function registerTrackedSourcesCommands(program: Command): void {
   const sources = program
     .command("tracked-sources")
-    .description("Manage citation-classification rules that tier each cited URL as Owned (primary), Tracked, or External (secondary). Tracked sources drive share-of-voice and citation analytics. Rules created from published content are read-only.");
+    .description(
+      "Manage citation-classification rules that tier each cited URL as Owned (primary), Tracked, or External (secondary). Tracked sources drive share-of-voice and citation analytics. Rules created from published content are read-only.",
+    );
 
   sources
     .command("list")
@@ -54,10 +56,16 @@ export function registerTrackedSourcesCommands(program: Command): void {
   sources
     .command("add")
     .description("Add a tracked source rule. New rules are always created active.")
-    .requiredOption("--pattern <pattern>", "Value to match cited URLs against, interpreted per --match-type")
+    .requiredOption(
+      "--pattern <pattern>",
+      "Value to match cited URLs against, interpreted per --match-type",
+    )
     .requiredOption("--match-type <type>", `Match strategy: ${MATCH_TYPES}`)
     .requiredOption("--tier <tier>", `Classification tier: ${TIERS}`)
-    .option("--category <category>", `Optional sub-category (only meaningful for the 'tracked' tier): ${CATEGORIES}`)
+    .option(
+      "--category <category>",
+      `Optional sub-category (only meaningful for the 'tracked' tier): ${CATEGORIES}`,
+    )
     .option("--label <label>", "Optional human-readable label")
     .option("--priority <n>", "Optional ordering priority (integer)")
     .action(async (cmdOpts: SourceFlags) => {
@@ -80,11 +88,19 @@ export function registerTrackedSourcesCommands(program: Command): void {
 
   sources
     .command("update <sourceId>")
-    .description("Replace a tracked source rule (PUT). Pattern, match type, and tier are required. Published rules are read-only.")
-    .requiredOption("--pattern <pattern>", "Value to match cited URLs against, interpreted per --match-type")
+    .description(
+      "Replace a tracked source rule (PUT). Pattern, match type, and tier are required. Published rules are read-only.",
+    )
+    .requiredOption(
+      "--pattern <pattern>",
+      "Value to match cited URLs against, interpreted per --match-type",
+    )
     .requiredOption("--match-type <type>", `Match strategy: ${MATCH_TYPES}`)
     .requiredOption("--tier <tier>", `Classification tier: ${TIERS}`)
-    .option("--category <category>", `Optional sub-category (only meaningful for the 'tracked' tier): ${CATEGORIES}`)
+    .option(
+      "--category <category>",
+      `Optional sub-category (only meaningful for the 'tracked' tier): ${CATEGORIES}`,
+    )
     .option("--label <label>", "Optional human-readable label")
     .option("--priority <n>", "Optional ordering priority (integer)")
     .option("--active", "Mark the rule active")

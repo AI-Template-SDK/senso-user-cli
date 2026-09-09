@@ -13,18 +13,29 @@ function parseMaxResults(value: string): number {
 export function registerSearchCommands(program: Command): void {
   const search = program
     .command("search")
-    .description("Search the knowledge base with natural language queries. Returns AI-generated answers synthesized from matching content chunks, or raw chunks/content IDs.");
+    .description(
+      "Search the knowledge base with natural language queries. Returns AI-generated answers synthesized from matching content chunks, or raw chunks/content IDs.",
+    );
 
   // Default: senso search <query> → POST /org/search (answer + results)
   search
     .argument("<query>", "Search query")
     .option("--max-results <n>", "Maximum number of results (max: 20)", "5")
-    .option("--content-ids <ids...>", "Restrict search to specific content item IDs (space-separated UUIDs)")
-    .option("--require-scoped-ids", "Only return results from the specified --content-ids (omit to allow fallback to all content)")
+    .option(
+      "--content-ids <ids...>",
+      "Restrict search to specific content item IDs (space-separated UUIDs)",
+    )
+    .option(
+      "--require-scoped-ids",
+      "Only return results from the specified --content-ids (omit to allow fallback to all content)",
+    )
     .action(async (query: string, cmdOpts: Record<string, string | boolean | string[]>) => {
       const opts = program.opts();
       try {
-        const body: Record<string, unknown> = { query, max_results: parseMaxResults(cmdOpts.maxResults as string) };
+        const body: Record<string, unknown> = {
+          query,
+          max_results: parseMaxResults(cmdOpts.maxResults as string),
+        };
         if (cmdOpts.contentIds) body.content_ids = cmdOpts.contentIds;
         if (cmdOpts.requireScopedIds) body.require_scoped_ids = true;
         const data = await apiRequest({
@@ -69,14 +80,22 @@ export function registerSearchCommands(program: Command): void {
 
   search
     .command("context <query>")
-    .description("Search the knowledge base — returns matching content chunks only, without AI answer generation. Use this to feed verified chunks into your own LLM pipeline instead of using Senso's generated answer.")
+    .description(
+      "Search the knowledge base — returns matching content chunks only, without AI answer generation. Use this to feed verified chunks into your own LLM pipeline instead of using Senso's generated answer.",
+    )
     .option("--max-results <n>", "Maximum results (max: 20)", "5")
-    .option("--content-ids <ids...>", "Restrict search to specific content item IDs (space-separated UUIDs)")
+    .option(
+      "--content-ids <ids...>",
+      "Restrict search to specific content item IDs (space-separated UUIDs)",
+    )
     .option("--require-scoped-ids", "Only return results from the specified --content-ids")
     .action(async (query: string, cmdOpts: Record<string, string | boolean | string[]>) => {
       const opts = program.opts();
       try {
-        const body: Record<string, unknown> = { query, max_results: parseMaxResults(cmdOpts.maxResults as string) };
+        const body: Record<string, unknown> = {
+          query,
+          max_results: parseMaxResults(cmdOpts.maxResults as string),
+        };
         if (cmdOpts.contentIds) body.content_ids = cmdOpts.contentIds;
         if (cmdOpts.requireScopedIds) body.require_scoped_ids = true;
         const data = await apiRequest({
@@ -95,14 +114,22 @@ export function registerSearchCommands(program: Command): void {
 
   search
     .command("content <query>")
-    .description("Search the knowledge base — returns deduplicated content IDs and titles only. Use this to discover which documents are relevant before fetching full content with 'content get <id>'.")
+    .description(
+      "Search the knowledge base — returns deduplicated content IDs and titles only. Use this to discover which documents are relevant before fetching full content with 'content get <id>'.",
+    )
     .option("--max-results <n>", "Maximum results (max: 20)", "5")
-    .option("--content-ids <ids...>", "Restrict search to specific content item IDs (space-separated UUIDs)")
+    .option(
+      "--content-ids <ids...>",
+      "Restrict search to specific content item IDs (space-separated UUIDs)",
+    )
     .option("--require-scoped-ids", "Only return results from the specified --content-ids")
     .action(async (query: string, cmdOpts: Record<string, string | boolean | string[]>) => {
       const opts = program.opts();
       try {
-        const body: Record<string, unknown> = { query, max_results: parseMaxResults(cmdOpts.maxResults as string) };
+        const body: Record<string, unknown> = {
+          query,
+          max_results: parseMaxResults(cmdOpts.maxResults as string),
+        };
         if (cmdOpts.contentIds) body.content_ids = cmdOpts.contentIds;
         if (cmdOpts.requireScopedIds) body.require_scoped_ids = true;
         const data = await apiRequest({
@@ -121,14 +148,22 @@ export function registerSearchCommands(program: Command): void {
 
   search
     .command("full <query>")
-    .description("Alias for the default search — returns AI answer plus matching chunks. Equivalent to 'senso search <query>'.")
+    .description(
+      "Alias for the default search — returns AI answer plus matching chunks. Equivalent to 'senso search <query>'.",
+    )
     .option("--max-results <n>", "Maximum results (max: 20)", "5")
-    .option("--content-ids <ids...>", "Restrict search to specific content item IDs (space-separated UUIDs)")
+    .option(
+      "--content-ids <ids...>",
+      "Restrict search to specific content item IDs (space-separated UUIDs)",
+    )
     .option("--require-scoped-ids", "Only return results from the specified --content-ids")
     .action(async (query: string, cmdOpts: Record<string, string | boolean | string[]>) => {
       const opts = program.opts();
       try {
-        const body: Record<string, unknown> = { query, max_results: parseMaxResults(cmdOpts.maxResults as string) };
+        const body: Record<string, unknown> = {
+          query,
+          max_results: parseMaxResults(cmdOpts.maxResults as string),
+        };
         if (cmdOpts.contentIds) body.content_ids = cmdOpts.contentIds;
         if (cmdOpts.requireScopedIds) body.require_scoped_ids = true;
         const data = await apiRequest({
@@ -146,13 +181,21 @@ export function registerSearchCommands(program: Command): void {
     });
   search
     .command("stream <query>")
-    .description("Streaming search — returns AI answer tokens in real-time via SSE, followed by source chunks. Use this for a responsive, live search experience.")
+    .description(
+      "Streaming search — returns AI answer tokens in real-time via SSE, followed by source chunks. Use this for a responsive, live search experience.",
+    )
     .option("--max-results <n>", "Maximum results (max: 20)", "5")
-    .option("--content-ids <ids...>", "Restrict search to specific content item IDs (space-separated UUIDs)")
+    .option(
+      "--content-ids <ids...>",
+      "Restrict search to specific content item IDs (space-separated UUIDs)",
+    )
     .option("--require-scoped-ids", "Only return results from the specified --content-ids")
     .action(async (query: string, cmdOpts: Record<string, string | boolean | string[]>) => {
       const opts = program.opts();
-      const body: Record<string, unknown> = { query, max_results: parseMaxResults(cmdOpts.maxResults as string) };
+      const body: Record<string, unknown> = {
+        query,
+        max_results: parseMaxResults(cmdOpts.maxResults as string),
+      };
       if (cmdOpts.contentIds) body.content_ids = cmdOpts.contentIds;
       if (cmdOpts.requireScopedIds) body.require_scoped_ids = true;
 
@@ -209,7 +252,9 @@ export function registerSearchCommands(program: Command): void {
                     for (let i = 0; i < results.length; i++) {
                       const r = results[i];
                       console.log();
-                      console.log(`  ${pc.dim(`${i + 1}.`)} ${pc.bold(r.title || "Untitled")} ${pc.dim(`(${r.content_id})`)}`);
+                      console.log(
+                        `  ${pc.dim(`${i + 1}.`)} ${pc.bold(r.title || "Untitled")} ${pc.dim(`(${r.content_id})`)}`,
+                      );
                       if (r.chunk_text) {
                         console.log(`     ${pc.dim("Snippet:")} ${r.chunk_text}`);
                       }

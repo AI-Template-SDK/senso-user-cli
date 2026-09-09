@@ -11,9 +11,7 @@ import * as log from "../utils/logger.js";
  */
 function handlePartnerError(err: unknown): never {
   if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
-    log.error(
-      "This request was rejected by the Senso API's partner authentication.",
-    );
+    log.error("This request was rejected by the Senso API's partner authentication.");
     log.info(
       "`senso industries` reads partner-scoped endpoints (/partner/*) and needs a PARTNER API key. The organization key stored by `senso login` cannot access them — logging in again will not help.",
     );
@@ -29,8 +27,7 @@ function handlePartnerError(err: unknown): never {
   process.exit(1);
 }
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function isUuid(value: string): boolean {
   return UUID_RE.test(value.trim());
@@ -81,7 +78,9 @@ async function resolveIndustryId(
 export function registerIndustriesCommands(program: Command): void {
   const industries = program
     .command("industries")
-    .description("Explore industry-level competitive intelligence across a partner network — brand share-of-voice, domain citations, and per-prompt metrics. The <industry> argument accepts either a UUID or a name (e.g. \"Automotive\"). REQUIRES A PARTNER API KEY: these commands read /partner/* endpoints, which reject the organization key stored by `senso login`. For metrics about your own organization, use `senso analytics`.");
+    .description(
+      'Explore industry-level competitive intelligence across a partner network — brand share-of-voice, domain citations, and per-prompt metrics. The <industry> argument accepts either a UUID or a name (e.g. "Automotive"). REQUIRES A PARTNER API KEY: these commands read /partner/* endpoints, which reject the organization key stored by `senso login`. For metrics about your own organization, use `senso analytics`.',
+    );
 
   industries
     .command("list")
@@ -104,7 +103,9 @@ export function registerIndustriesCommands(program: Command): void {
 
   industries
     .command("summary <industry>")
-    .description("One-call, slide-ready overview of an industry: brand counts, share-of-voice, and citation totals over a time window.")
+    .description(
+      "One-call, slide-ready overview of an industry: brand counts, share-of-voice, and citation totals over a time window.",
+    )
     .option("--from <date>", "Start date (YYYY-MM-DD)")
     .option("--to <date>", "End date (YYYY-MM-DD)")
     .option("--location <code>", "2-letter location code (e.g. US)")
@@ -127,7 +128,9 @@ export function registerIndustriesCommands(program: Command): void {
 
   industries
     .command("brand <industry> <brandName>")
-    .description("Everything about one brand within an industry, merged across surface-form spellings. Returns mentioned=false when the brand is never named.")
+    .description(
+      "Everything about one brand within an industry, merged across surface-form spellings. Returns mentioned=false when the brand is never named.",
+    )
     .option("--from <date>", "Start date (YYYY-MM-DD)")
     .option("--to <date>", "End date (YYYY-MM-DD)")
     .option("--location <code>", "2-letter location code (e.g. US)")
@@ -150,7 +153,9 @@ export function registerIndustriesCommands(program: Command): void {
 
   industries
     .command("domain <industry> <domainOrUrl>")
-    .description("Direct domain/URL citation lookup within an industry. Returns cited=false when the domain is never cited.")
+    .description(
+      "Direct domain/URL citation lookup within an industry. Returns cited=false when the domain is never cited.",
+    )
     .option("--from <date>", "Start date (YYYY-MM-DD)")
     .option("--to <date>", "End date (YYYY-MM-DD)")
     .option("--location <code>", "2-letter location code (e.g. US)")
@@ -173,7 +178,9 @@ export function registerIndustriesCommands(program: Command): void {
 
   industries
     .command("prompt-metrics <industry>")
-    .description("Pure-industry per-prompt metrics (no single-org overlay) — how each tracked prompt performs across the industry.")
+    .description(
+      "Pure-industry per-prompt metrics (no single-org overlay) — how each tracked prompt performs across the industry.",
+    )
     .option("--from <date>", "Start date (YYYY-MM-DD)")
     .option("--to <date>", "End date (YYYY-MM-DD)")
     .option("--location <code>", "2-letter location code (e.g. US)")
@@ -198,7 +205,9 @@ export function registerIndustriesCommands(program: Command): void {
 
   industries
     .command("glossary")
-    .description("Canonical metric glossary — the citable definition of every competitive-intelligence metric returned by these endpoints.")
+    .description(
+      "Canonical metric glossary — the citable definition of every competitive-intelligence metric returned by these endpoints.",
+    )
     .action(async () => {
       const opts = program.opts();
       try {

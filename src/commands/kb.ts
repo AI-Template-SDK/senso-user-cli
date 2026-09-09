@@ -63,15 +63,20 @@ async function uploadToS3(url: string, buffer: Buffer, contentType: string): Pro
 export function registerKBCommands(program: Command): void {
   const kb = program
     .command("kb")
-    .description("Manage the knowledge base. Browse nodes, upload files, create folders, create raw content, and manage the KB tree.");
+    .description(
+      "Manage the knowledge base. Browse nodes, upload files, create folders, create raw content, and manage the KB tree.",
+    );
 
-  kb
-    .command("root")
+  kb.command("root")
     .description("Get the root KB node for the org.")
     .action(async () => {
       const opts = program.opts();
       try {
-        const data = await apiRequest({ path: "/org/kb/root", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        const data = await apiRequest({
+          path: "/org/kb/root",
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
         log.error(formatApiError(err));
@@ -79,8 +84,7 @@ export function registerKBCommands(program: Command): void {
       }
     });
 
-  kb
-    .command("my-files")
+  kb.command("my-files")
     .description("List top-level files and folders in the knowledge base.")
     .option("--limit <n>", "Items per page", "50")
     .option("--offset <n>", "Pagination offset", "0")
@@ -101,8 +105,7 @@ export function registerKBCommands(program: Command): void {
       }
     });
 
-  kb
-    .command("find")
+  kb.command("find")
     .description("Search KB nodes by name.")
     .requiredOption("--query <q>", "Name search query")
     .option("--limit <n>", "Items per page", "20")
@@ -113,7 +116,12 @@ export function registerKBCommands(program: Command): void {
       try {
         const data = await apiRequest({
           path: "/org/kb/find",
-          params: { q: cmdOpts.query, limit: cmdOpts.limit, offset: cmdOpts.offset, type: cmdOpts.type },
+          params: {
+            q: cmdOpts.query,
+            limit: cmdOpts.limit,
+            offset: cmdOpts.offset,
+            type: cmdOpts.type,
+          },
           apiKey: opts.apiKey,
           baseUrl: opts.baseUrl,
         });
@@ -124,13 +132,16 @@ export function registerKBCommands(program: Command): void {
       }
     });
 
-  kb
-    .command("sync-status")
+  kb.command("sync-status")
     .description("Get the vector sync status for the org's knowledge base.")
     .action(async () => {
       const opts = program.opts();
       try {
-        const data = await apiRequest({ path: "/org/kb/sync-status", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        const data = await apiRequest({
+          path: "/org/kb/sync-status",
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
         log.error(formatApiError(err));
@@ -138,13 +149,16 @@ export function registerKBCommands(program: Command): void {
       }
     });
 
-  kb
-    .command("get <id>")
+  kb.command("get <id>")
     .description("Get a KB node by ID.")
     .action(async (id: string) => {
       const opts = program.opts();
       try {
-        const data = await apiRequest({ path: `/org/kb/nodes/${id}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        const data = await apiRequest({
+          path: `/org/kb/nodes/${id}`,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
         log.error(formatApiError(err));
@@ -152,8 +166,7 @@ export function registerKBCommands(program: Command): void {
       }
     });
 
-  kb
-    .command("children <id>")
+  kb.command("children <id>")
     .description("List children of a KB folder node.")
     .option("--limit <n>", "Items per page", "50")
     .option("--offset <n>", "Pagination offset", "0")
@@ -174,13 +187,16 @@ export function registerKBCommands(program: Command): void {
       }
     });
 
-  kb
-    .command("ancestors <id>")
+  kb.command("ancestors <id>")
     .description("Get the ancestor chain (breadcrumb) for a KB node.")
     .action(async (id: string) => {
       const opts = program.opts();
       try {
-        const data = await apiRequest({ path: `/org/kb/nodes/${id}/ancestors`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        const data = await apiRequest({
+          path: `/org/kb/nodes/${id}/ancestors`,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
         log.error(formatApiError(err));
@@ -188,8 +204,7 @@ export function registerKBCommands(program: Command): void {
       }
     });
 
-  kb
-    .command("get-content <id>")
+  kb.command("get-content <id>")
     .description("Get the content detail for a KB content node.")
     .option("--version <version>", "Specific version to retrieve")
     .action(async (id: string, cmdOpts: { version?: string }) => {
@@ -208,8 +223,7 @@ export function registerKBCommands(program: Command): void {
       }
     });
 
-  kb
-    .command("download-url <id>")
+  kb.command("download-url <id>")
     .description("Get a presigned S3 download URL for a KB file node.")
     .option("--version <version>", "Specific version to download")
     .action(async (id: string, cmdOpts: { version?: string }) => {
@@ -228,8 +242,7 @@ export function registerKBCommands(program: Command): void {
       }
     });
 
-  kb
-    .command("create-folder")
+  kb.command("create-folder")
     .description("Create a new folder in the knowledge base.")
     .requiredOption("--name <name>", "Folder name")
     .option("--parent-id <id>", "Parent folder node ID (omit to create at root)")
@@ -238,7 +251,13 @@ export function registerKBCommands(program: Command): void {
       try {
         const body: Record<string, unknown> = { name: cmdOpts.name };
         if (cmdOpts.parentId) body.parent_id = cmdOpts.parentId;
-        const data = await apiRequest({ method: "POST", path: "/org/kb/folders", body, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        const data = await apiRequest({
+          method: "POST",
+          path: "/org/kb/folders",
+          body,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         log.success(`Folder "${cmdOpts.name}" created.`);
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
@@ -247,14 +266,19 @@ export function registerKBCommands(program: Command): void {
       }
     });
 
-  kb
-    .command("rename <id>")
+  kb.command("rename <id>")
     .description("Rename a KB node.")
     .requiredOption("--name <name>", "New name")
     .action(async (id: string, cmdOpts: { name: string }) => {
       const opts = program.opts();
       try {
-        const data = await apiRequest({ method: "PATCH", path: `/org/kb/nodes/${id}/rename`, body: { name: cmdOpts.name }, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        const data = await apiRequest({
+          method: "PATCH",
+          path: `/org/kb/nodes/${id}/rename`,
+          body: { name: cmdOpts.name },
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         log.success(`Node ${id} renamed to "${cmdOpts.name}".`);
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
@@ -263,14 +287,19 @@ export function registerKBCommands(program: Command): void {
       }
     });
 
-  kb
-    .command("move <id>")
+  kb.command("move <id>")
     .description("Move a KB node to a different parent folder.")
     .requiredOption("--parent-id <parentId>", "Target parent folder node ID")
     .action(async (id: string, cmdOpts: { parentId: string }) => {
       const opts = program.opts();
       try {
-        const data = await apiRequest({ method: "PATCH", path: `/org/kb/nodes/${id}/move`, body: { new_parent_id: cmdOpts.parentId }, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        const data = await apiRequest({
+          method: "PATCH",
+          path: `/org/kb/nodes/${id}/move`,
+          body: { new_parent_id: cmdOpts.parentId },
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         log.success(`Node ${id} moved.`);
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
@@ -279,13 +308,17 @@ export function registerKBCommands(program: Command): void {
       }
     });
 
-  kb
-    .command("delete <id>")
+  kb.command("delete <id>")
     .description("Delete a KB node (soft delete).")
     .action(async (id: string) => {
       const opts = program.opts();
       try {
-        await apiRequest({ method: "DELETE", path: `/org/kb/nodes/${id}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        await apiRequest({
+          method: "DELETE",
+          path: `/org/kb/nodes/${id}`,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         log.success(`Node ${id} deleted.`);
       } catch (err) {
         log.error(formatApiError(err));
@@ -293,15 +326,23 @@ export function registerKBCommands(program: Command): void {
       }
     });
 
-  kb
-    .command("create-raw")
+  kb.command("create-raw")
     .description("Create a raw (text/markdown) content item in the knowledge base.")
-    .requiredOption("--data <json>", 'JSON: { "title": "My doc", "text": "# Hello", "kb_folder_node_id": "<uuid>", "tag_ids": ["<uuid>"] }')
+    .requiredOption(
+      "--data <json>",
+      'JSON: { "title": "My doc", "text": "# Hello", "kb_folder_node_id": "<uuid>", "tag_ids": ["<uuid>"] }',
+    )
     .action(async (cmdOpts: { data: string }) => {
       const opts = program.opts();
       try {
         const body = JSON.parse(cmdOpts.data);
-        const data = await apiRequest({ method: "POST", path: "/org/kb/raw", body, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        const data = await apiRequest({
+          method: "POST",
+          path: "/org/kb/raw",
+          body,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         log.success("Raw content node created.");
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
@@ -310,15 +351,23 @@ export function registerKBCommands(program: Command): void {
       }
     });
 
-  kb
-    .command("update-raw <id>")
+  kb.command("update-raw <id>")
     .description("Fully replace the text content of a raw KB node (creates a new version).")
-    .requiredOption("--data <json>", 'JSON: { "title": "Title", "text": "# Updated content", "tag_ids": ["<uuid>"] }')
+    .requiredOption(
+      "--data <json>",
+      'JSON: { "title": "Title", "text": "# Updated content", "tag_ids": ["<uuid>"] }',
+    )
     .action(async (id: string, cmdOpts: { data: string }) => {
       const opts = program.opts();
       try {
         const body = JSON.parse(cmdOpts.data);
-        const data = await apiRequest({ method: "PUT", path: `/org/kb/nodes/${id}/raw`, body, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        const data = await apiRequest({
+          method: "PUT",
+          path: `/org/kb/nodes/${id}/raw`,
+          body,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         log.success(`Node ${id} content replaced.`);
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
@@ -327,15 +376,23 @@ export function registerKBCommands(program: Command): void {
       }
     });
 
-  kb
-    .command("patch-raw <id>")
+  kb.command("patch-raw <id>")
     .description("Partially update the text content of a raw KB node.")
-    .requiredOption("--data <json>", 'JSON: { "title": "New title", "text": "Updated text", "summary": "...", "tag_ids": ["<uuid>"] }')
+    .requiredOption(
+      "--data <json>",
+      'JSON: { "title": "New title", "text": "Updated text", "summary": "...", "tag_ids": ["<uuid>"] }',
+    )
     .action(async (id: string, cmdOpts: { data: string }) => {
       const opts = program.opts();
       try {
         const body = JSON.parse(cmdOpts.data);
-        const data = await apiRequest({ method: "PATCH", path: `/org/kb/nodes/${id}/raw`, body, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        const data = await apiRequest({
+          method: "PATCH",
+          path: `/org/kb/nodes/${id}/raw`,
+          body,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         log.success(`Node ${id} content patched.`);
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
@@ -344,9 +401,10 @@ export function registerKBCommands(program: Command): void {
       }
     });
 
-  kb
-    .command("upload <files...>")
-    .description("Upload files to the knowledge base (up to 10). Files are hashed, uploaded to S3, then parsed and embedded by a background worker.")
+  kb.command("upload <files...>")
+    .description(
+      "Upload files to the knowledge base (up to 10). Files are hashed, uploaded to S3, then parsed and embedded by a background worker.",
+    )
     .option("--folder-id <id>", "Parent folder node ID to place files in (omit for root)")
     .action(async (files: string[], cmdOpts: { folderId?: string }) => {
       const opts = program.opts();
@@ -403,14 +461,19 @@ export function registerKBCommands(program: Command): void {
       }
     });
 
-  kb
-    .command("update-file <id> <file>")
+  kb.command("update-file <id> <file>")
     .description("Replace the file on an existing KB file node with a new version.")
     .action(async (id: string, file: string) => {
       const opts = program.opts();
       try {
         const { meta, buffer } = await getFileMetadata(file);
-        const item = await apiRequest<{ status: string; upload_url?: string; error?: string; content_id?: string; ingestion_run_id?: string }>({
+        const item = await apiRequest<{
+          status: string;
+          upload_url?: string;
+          error?: string;
+          content_id?: string;
+          ingestion_run_id?: string;
+        }>({
           method: "PUT",
           path: `/org/kb/nodes/${id}/file`,
           body: { file: meta },
@@ -419,7 +482,9 @@ export function registerKBCommands(program: Command): void {
         });
         if (item.status === "upload_pending" && item.upload_url) {
           await uploadToS3(item.upload_url, buffer, meta.content_type);
-          log.success(`Uploaded ${meta.filename} for node ${id}. Background re-processing started.`);
+          log.success(
+            `Uploaded ${meta.filename} for node ${id}. Background re-processing started.`,
+          );
         } else {
           log.warn(`Skipped: ${item.status}${item.error ? ` — ${item.error}` : ""}`);
         }
@@ -432,7 +497,9 @@ export function registerKBCommands(program: Command): void {
 
   const tags = kb
     .command("tags")
-    .description("Manage tags attached to a KB node. KB content is auto-tagged on creation (raw content on create, uploaded files once ingestion finishes) — use these commands to override, add, or remove tags afterwards. Tags can only be applied to content nodes, not folders. Names are resolved against the org's tag library; unknown names are created.");
+    .description(
+      "Manage tags attached to a KB node. KB content is auto-tagged on creation (raw content on create, uploaded files once ingestion finishes) — use these commands to override, add, or remove tags afterwards. Tags can only be applied to content nodes, not folders. Names are resolved against the org's tag library; unknown names are created.",
+    );
 
   tags
     .command("list <id>")
@@ -440,7 +507,11 @@ export function registerKBCommands(program: Command): void {
     .action(async (id: string) => {
       const opts = program.opts();
       try {
-        const data = await apiRequest({ path: `/org/kb/nodes/${id}/tags`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        const data = await apiRequest({
+          path: `/org/kb/nodes/${id}/tags`,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
         log.error(formatApiError(err));
@@ -450,7 +521,9 @@ export function registerKBCommands(program: Command): void {
 
   tags
     .command("set <id>")
-    .description("Replace the KB node's full tag collection. Provide --names (comma-separated) and/or --ids. Unknown names are created.")
+    .description(
+      "Replace the KB node's full tag collection. Provide --names (comma-separated) and/or --ids. Unknown names are created.",
+    )
     .option("--names <list>", "Comma-separated tag names (created if missing)")
     .option("--ids <list>", "Comma-separated existing tag UUIDs")
     .action(async (id: string, cmdOpts: { names?: string; ids?: string }) => {

@@ -8,11 +8,15 @@ import * as log from "../utils/logger.js";
 export function registerContentCommands(program: Command): void {
   const content = program
     .command("content")
-    .description("Manage content items in the knowledge base. List, inspect, delete, unpublish, and manage the verification workflow and ownership of content.");
+    .description(
+      "Manage content items in the knowledge base. List, inspect, delete, unpublish, and manage the verification workflow and ownership of content.",
+    );
 
   content
     .command("list")
-    .description("List top-level files and folders in the knowledge base. Use 'kb my-files' for the same result with richer KB node output.")
+    .description(
+      "List top-level files and folders in the knowledge base. Use 'kb my-files' for the same result with richer KB node output.",
+    )
     .option("--limit <n>", "Items per page", "10")
     .option("--offset <n>", "Pagination offset", "0")
     .action(async (cmdOpts: Record<string, string>) => {
@@ -25,7 +29,7 @@ export function registerContentCommands(program: Command): void {
           baseUrl: opts.baseUrl,
         });
         const format: OutputFormat = opts.output || "plain";
-        const rows = Array.isArray(data) ? data : (data as Record<string, unknown[]>).nodes ?? [];
+        const rows = Array.isArray(data) ? data : ((data as Record<string, unknown[]>).nodes ?? []);
         output(format, {
           json: data,
           table: {
@@ -52,11 +56,17 @@ export function registerContentCommands(program: Command): void {
 
   content
     .command("get <id>")
-    .description("Get a content item by ID. Returns the full content detail including versions, metadata, and publish status.")
+    .description(
+      "Get a content item by ID. Returns the full content detail including versions, metadata, and publish status.",
+    )
     .action(async (id: string) => {
       const opts = program.opts();
       try {
-        const data = await apiRequest({ path: `/org/content/${id}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        const data = await apiRequest({
+          path: `/org/content/${id}`,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
         log.error(formatApiError(err));
@@ -66,11 +76,18 @@ export function registerContentCommands(program: Command): void {
 
   content
     .command("delete <id>")
-    .description("Delete a content item from the knowledge base and any external publish destinations. This cannot be undone.")
+    .description(
+      "Delete a content item from the knowledge base and any external publish destinations. This cannot be undone.",
+    )
     .action(async (id: string) => {
       const opts = program.opts();
       try {
-        await apiRequest({ method: "DELETE", path: `/org/content/${id}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        await apiRequest({
+          method: "DELETE",
+          path: `/org/content/${id}`,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         log.success(`Content ${id} deleted.`);
       } catch (err) {
         log.error(formatApiError(err));
@@ -80,8 +97,13 @@ export function registerContentCommands(program: Command): void {
 
   content
     .command("unpublish <id>")
-    .description("Unpublish a content item. Without --publish-record-ids, removes the content from every destination it's live on and sets its status back to draft. With --publish-record-ids, only the specified publish records are retracted — use this to unpublish from a subset of destinations while leaving the rest live. The content status only flips back to draft once no publish records remain live.")
-    .option("--publish-record-ids <ids...>", "Restrict unpublish to specific publish_record UUIDs. Use 'content get <id>' to find publish record IDs for a content item.")
+    .description(
+      "Unpublish a content item. Without --publish-record-ids, removes the content from every destination it's live on and sets its status back to draft. With --publish-record-ids, only the specified publish records are retracted — use this to unpublish from a subset of destinations while leaving the rest live. The content status only flips back to draft once no publish records remain live.",
+    )
+    .option(
+      "--publish-record-ids <ids...>",
+      "Restrict unpublish to specific publish_record UUIDs. Use 'content get <id>' to find publish record IDs for a content item.",
+    )
     .action(async (id: string, cmdOpts: { publishRecordIds?: string[] }) => {
       const opts = program.opts();
       try {
@@ -112,18 +134,29 @@ export function registerContentCommands(program: Command): void {
 
   content
     .command("verification")
-    .description("List content items in the verification workflow. Filter by editorial status (draft, review, rejected, published) to manage the review pipeline.")
+    .description(
+      "List content items in the verification workflow. Filter by editorial status (draft, review, rejected, published) to manage the review pipeline.",
+    )
     .option("--limit <n>", "Maximum items to return")
     .option("--offset <n>", "Number of items to skip (for pagination)")
     .option("--search <query>", "Filter by title")
     .option("--status <status>", "Filter by status: all, draft, review, rejected, published")
-    .option("--substatus <substatus>", "Narrow further (only valid with --status published): pending_draft")
+    .option(
+      "--substatus <substatus>",
+      "Narrow further (only valid with --status published): pending_draft",
+    )
     .action(async (cmdOpts: Record<string, string>) => {
       const opts = program.opts();
       try {
         const data = await apiRequest({
           path: "/org/content/verification",
-          params: { limit: cmdOpts.limit, offset: cmdOpts.offset, search: cmdOpts.search, status: cmdOpts.status, substatus: cmdOpts.substatus },
+          params: {
+            limit: cmdOpts.limit,
+            offset: cmdOpts.offset,
+            search: cmdOpts.search,
+            status: cmdOpts.status,
+            substatus: cmdOpts.substatus,
+          },
           apiKey: opts.apiKey,
           baseUrl: opts.baseUrl,
         });
@@ -136,7 +169,9 @@ export function registerContentCommands(program: Command): void {
 
   content
     .command("verification-counts")
-    .description("Get counts of content by editorial status (draft, published, rejected, pending published-draft) plus per-destination published-domain summaries. A lightweight alternative to paging through 'content verification'.")
+    .description(
+      "Get counts of content by editorial status (draft, published, rejected, pending published-draft) plus per-destination published-domain summaries. A lightweight alternative to paging through 'content verification'.",
+    )
     .action(async () => {
       const opts = program.opts();
       try {
@@ -154,7 +189,9 @@ export function registerContentCommands(program: Command): void {
 
   content
     .command("versions <id>")
-    .description("List the version history for a content item, newest first. The current version is flagged with is_current.")
+    .description(
+      "List the version history for a content item, newest first. The current version is flagged with is_current.",
+    )
     .action(async (id: string) => {
       const opts = program.opts();
       try {
@@ -172,13 +209,21 @@ export function registerContentCommands(program: Command): void {
 
   content
     .command("reject <versionId>")
-    .description("Reject a content version in the verification workflow. Optionally provide a reason for the rejection.")
+    .description(
+      "Reject a content version in the verification workflow. Optionally provide a reason for the rejection.",
+    )
     .option("--reason <text>", "Reason for rejection")
     .action(async (versionId: string, cmdOpts: { reason?: string }) => {
       const opts = program.opts();
       try {
         const body = cmdOpts.reason ? { reason: cmdOpts.reason } : undefined;
-        await apiRequest({ method: "POST", path: `/org/content/versions/${versionId}/reject`, body, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        await apiRequest({
+          method: "POST",
+          path: `/org/content/versions/${versionId}/reject`,
+          body,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         log.success(`Version ${versionId} rejected.`);
       } catch (err) {
         log.error(formatApiError(err));
@@ -192,7 +237,12 @@ export function registerContentCommands(program: Command): void {
     .action(async (versionId: string) => {
       const opts = program.opts();
       try {
-        await apiRequest({ method: "POST", path: `/org/content/versions/${versionId}/restore`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        await apiRequest({
+          method: "POST",
+          path: `/org/content/versions/${versionId}/restore`,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         log.success(`Version ${versionId} restored to draft.`);
       } catch (err) {
         log.error(formatApiError(err));
@@ -202,11 +252,17 @@ export function registerContentCommands(program: Command): void {
 
   content
     .command("owners <id>")
-    .description("List the owners assigned to a content item. Owners are responsible for reviewing and approving content.")
+    .description(
+      "List the owners assigned to a content item. Owners are responsible for reviewing and approving content.",
+    )
     .action(async (id: string) => {
       const opts = program.opts();
       try {
-        const data = await apiRequest({ path: `/org/content/${id}/owners`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        const data = await apiRequest({
+          path: `/org/content/${id}/owners`,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
         log.error(formatApiError(err));
@@ -241,7 +297,12 @@ export function registerContentCommands(program: Command): void {
     .action(async (id: string, userId: string) => {
       const opts = program.opts();
       try {
-        await apiRequest({ method: "DELETE", path: `/org/content/${id}/owners/${userId}`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        await apiRequest({
+          method: "DELETE",
+          path: `/org/content/${id}/owners/${userId}`,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         log.success(`Owner ${userId} removed from content ${id}.`);
       } catch (err) {
         log.error(formatApiError(err));
@@ -251,7 +312,9 @@ export function registerContentCommands(program: Command): void {
 
   const tags = content
     .command("tags")
-    .description("Manage tags attached to a content item (both KB-ingested and generated). Content is auto-tagged on creation (KB uploads get tagged once ingestion finishes, raw content is tagged on create) — use these commands to override, add, or remove tags afterwards. Tag names are resolved against the org's tag library; unknown names are created automatically.");
+    .description(
+      "Manage tags attached to a content item (both KB-ingested and generated). Content is auto-tagged on creation (KB uploads get tagged once ingestion finishes, raw content is tagged on create) — use these commands to override, add, or remove tags afterwards. Tag names are resolved against the org's tag library; unknown names are created automatically.",
+    );
 
   tags
     .command("list <id>")
@@ -259,7 +322,11 @@ export function registerContentCommands(program: Command): void {
     .action(async (id: string) => {
       const opts = program.opts();
       try {
-        const data = await apiRequest({ path: `/org/content/${id}/tags`, apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        const data = await apiRequest({
+          path: `/org/content/${id}/tags`,
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
         log.error(formatApiError(err));
@@ -269,7 +336,9 @@ export function registerContentCommands(program: Command): void {
 
   tags
     .command("set <id>")
-    .description("Replace the content item's full tag collection. Provide --names (comma-separated) and/or --ids (comma-separated UUIDs). Unknown names are created.")
+    .description(
+      "Replace the content item's full tag collection. Provide --names (comma-separated) and/or --ids (comma-separated UUIDs). Unknown names are created.",
+    )
     .option("--names <list>", "Comma-separated tag names (created if missing)")
     .option("--ids <list>", "Comma-separated existing tag UUIDs")
     .action(async (id: string, cmdOpts: { names?: string; ids?: string }) => {

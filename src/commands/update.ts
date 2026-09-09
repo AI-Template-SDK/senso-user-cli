@@ -38,9 +38,7 @@ export function registerUpdateCommand(program: Command): void {
         log.success(`Updated to v${latest}.`);
       } catch {
         log.error("Update failed. Please reinstall manually:");
-        console.log(
-          `  ${pc.cyan(`npm install -g ${NPM_PACKAGE}`)}`,
-        );
+        console.log(`  ${pc.cyan(`npm install -g ${NPM_PACKAGE}`)}`);
         process.exit(1);
       }
     });

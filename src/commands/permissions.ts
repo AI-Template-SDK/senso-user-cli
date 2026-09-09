@@ -9,11 +9,17 @@ export function registerPermissionsCommands(program: Command): void {
 
   perms
     .command("list")
-    .description("List all available permission keys with their names, descriptions, and categories. Useful for building role management UIs.")
+    .description(
+      "List all available permission keys with their names, descriptions, and categories. Useful for building role management UIs.",
+    )
     .action(async () => {
       const opts = program.opts();
       try {
-        const data = await apiRequest({ path: "/org/permissions", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+        const data = await apiRequest({
+          path: "/org/permissions",
+          apiKey: opts.apiKey,
+          baseUrl: opts.baseUrl,
+        });
         console.log(JSON.stringify(data, null, 2));
       } catch (err) {
         log.error(formatApiError(err));

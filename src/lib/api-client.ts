@@ -44,14 +44,10 @@ interface RequestOptions {
   baseUrl?: string;
 }
 
-export async function apiRequest<T = unknown>(
-  opts: RequestOptions,
-): Promise<T> {
+export async function apiRequest<T = unknown>(opts: RequestOptions): Promise<T> {
   const apiKey = getApiKey({ apiKey: opts.apiKey });
   if (!apiKey) {
-    throw new Error(
-      "No API key found. Run `senso login` or set SENSO_API_KEY.",
-    );
+    throw new Error("No API key found. Run `senso login` or set SENSO_API_KEY.");
   }
 
   const baseUrl = getBaseUrl({ baseUrl: opts.baseUrl });
@@ -125,14 +121,10 @@ export interface UploadResponse {
   results: UploadResultItem[];
 }
 
-export async function apiStreamRequest(
-  opts: RequestOptions,
-): Promise<Response> {
+export async function apiStreamRequest(opts: RequestOptions): Promise<Response> {
   const apiKey = getApiKey({ apiKey: opts.apiKey });
   if (!apiKey) {
-    throw new Error(
-      "No API key found. Run `senso login` or set SENSO_API_KEY.",
-    );
+    throw new Error("No API key found. Run `senso login` or set SENSO_API_KEY.");
   }
 
   const baseUrl = getBaseUrl({ baseUrl: opts.baseUrl });
@@ -211,7 +203,12 @@ export function printUploadSummary(
 }
 
 export function handleUploadError(err: unknown): void {
-  if (err instanceof ApiError && err.body && typeof err.body === "object" && "results" in err.body) {
+  if (
+    err instanceof ApiError &&
+    err.body &&
+    typeof err.body === "object" &&
+    "results" in err.body
+  ) {
     const errorResponse = err.body as UploadResponse;
     for (const item of errorResponse.results ?? []) {
       const reason = uploadStatusToReason(item.status, item.error);
@@ -247,10 +244,7 @@ export function formatApiError(err: unknown): string {
     if (err.name === "AbortError") {
       return "Request timed out. Try again later.";
     }
-    if (
-      err.message.includes("fetch failed") ||
-      err.message.includes("ECONNREFUSED")
-    ) {
+    if (err.message.includes("fetch failed") || err.message.includes("ECONNREFUSED")) {
       return "Could not connect to Senso API. Check your internet connection.";
     }
     return err.message;

@@ -5,11 +5,14 @@ import * as log from "../utils/logger.js";
 export function registerPublishRecordsCommands(program: Command): void {
   const pr = program
     .command("publish-records")
-    .description("Inspect and retry publish records. A publish_record is the unit that tracks one content item's publication to one destination — published/live, pending, failed, unpublished, etc. When a publish fails for a single destination, retry it here without redoing the whole publish.");
+    .description(
+      "Inspect and retry publish records. A publish_record is the unit that tracks one content item's publication to one destination — published/live, pending, failed, unpublished, etc. When a publish fails for a single destination, retry it here without redoing the whole publish.",
+    );
 
-  pr
-    .command("retry <publishRecordId>")
-    .description("Retry a failed publish record. Re-runs the publish for that specific content+destination pair and flips the record's state based on the new attempt. Only works on records currently in the 'failed' state.")
+  pr.command("retry <publishRecordId>")
+    .description(
+      "Retry a failed publish record. Re-runs the publish for that specific content+destination pair and flips the record's state based on the new attempt. Only works on records currently in the 'failed' state.",
+    )
     .action(async (publishRecordId: string) => {
       const opts = program.opts();
       try {

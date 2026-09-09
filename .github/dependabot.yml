@@ -1,0 +1,47 @@
+# Monthly rather than weekly: this is a CLI with a small dependency surface, and
+# a weekly cadence produces more pull requests than anyone reviews, which ends
+# with all of them being ignored.
+#
+# Minor and patch bumps arrive grouped as one pull request per ecosystem so the
+# review is one job rather than six. Majors get their own pull request, because a
+# major bump deserves an individual test run and a human decision — commander,
+# clack and vitest have all changed behavior across a major in this repo's
+# lifetime.
+
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    assignees: [Chippers255]
+    labels: [dependencies]
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+    ignore:
+      # Node's major is pinned in four places (.nvmrc, the `engines` floor,
+      # NODE_VERSION in testing.yml, and tsup's `target`). Moving off it is a
+      # deliberate decision made across all four — a policy test fails if they
+      # drift — not a bump to merge.
+      - dependency-name: "@types/node"
+        update-types: [version-update:semver-major]
+      # typescript-eslint's peer range is what pins the TypeScript major here.
+      # TypeScript 7 was tried on 2026-09-09 and reverted for exactly this
+      # reason; see docs/plans/2026-09-09-repo-hardening.md. Take this bump
+      # deliberately, with the linter, not on its own.
+      - dependency-name: "typescript"
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    assignees: [Chippers255]
+    labels: [dependencies]
+    groups:
+      actions:
+        patterns: ["*"]

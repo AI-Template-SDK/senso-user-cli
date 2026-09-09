@@ -76,11 +76,15 @@ async function uploadToS3(url: string, buffer: Buffer, contentType: string): Pro
 export function registerIngestCommands(program: Command): void {
   const ingest = program
     .command("ingest")
-    .description("Ingest files into the knowledge base. Upload documents (PDF, TXT, DOCX, etc.) to be parsed, chunked, and embedded for semantic search.");
+    .description(
+      "Ingest files into the knowledge base. Upload documents (PDF, TXT, DOCX, etc.) to be parsed, chunked, and embedded for semantic search.",
+    );
 
   ingest
     .command("upload <files...>")
-    .description("Upload files to the knowledge base. Accepts local file paths (up to 10). Files are hashed, uploaded to S3, then parsed and embedded by a background worker. Poll 'senso content get <content-id>' until processing_status is 'complete' before searching the uploaded content.")
+    .description(
+      "Upload files to the knowledge base. Accepts local file paths (up to 10). Files are hashed, uploaded to S3, then parsed and embedded by a background worker. Poll 'senso content get <content-id>' until processing_status is 'complete' before searching the uploaded content.",
+    )
     .option("--folder-id <id>", "Destination folder ID (skip interactive prompt)")
     .action(async (files: string[], cmdOpts: { folderId?: string }) => {
       const opts = program.opts();
@@ -112,8 +116,10 @@ export function registerIngestCommands(program: Command): void {
           const fileList = files.map((f) => basename(f)).join(", ");
           const answer = await p.text({
             message: `You want to upload ${pc.bold(`"${fileList}"`)} to the folder ${pc.bold(pc.cyan(`"${folder.folderName}"`))}? Type 'yes' or 'no' to continue:`,
+            // `val` is optional: submitting an empty prompt passes undefined, and
+            // calling .trim() on it threw a TypeError instead of re-prompting.
             validate: (val) => {
-              const v = val.trim().toLowerCase();
+              const v = (val ?? "").trim().toLowerCase();
               if (v !== "yes" && v !== "no") return "Please type 'yes' or 'no'";
             },
           });
@@ -132,7 +138,9 @@ export function registerIngestCommands(program: Command): void {
         const emptyFiles = fileData.filter((f) => f.meta.file_size_bytes < 1);
         if (emptyFiles.length > 0) {
           for (const f of emptyFiles) {
-            log.error(`File "${f.meta.filename}" is empty. Please select a valid file with content.`);
+            log.error(
+              `File "${f.meta.filename}" is empty. Please select a valid file with content.`,
+            );
           }
           process.exit(1);
         }
@@ -152,7 +160,9 @@ export function registerIngestCommands(program: Command): void {
         });
 
         const items = response.results ?? [];
-        const pendingCount = items.filter((i) => i.status === "upload_pending" && i.upload_url).length;
+        const pendingCount = items.filter(
+          (i) => i.status === "upload_pending" && i.upload_url,
+        ).length;
         prepSpin.stop(`${pendingCount} file(s) ready for upload`);
 
         // 3. Upload accepted files to S3
@@ -202,7 +212,9 @@ export function registerIngestCommands(program: Command): void {
 
   ingest
     .command("reprocess <nodeId> <file>")
-    .description("Re-ingest an existing document with a new file version. Provide the KB node ID (kb_node_id) and the path to the replacement file.")
+    .description(
+      "Re-ingest an existing document with a new file version. Provide the KB node ID (kb_node_id) and the path to the replacement file.",
+    )
     .action(async (nodeId: string, file: string) => {
       const opts = program.opts();
       try {
@@ -218,7 +230,9 @@ export function registerIngestCommands(program: Command): void {
 
         if (item.status === "upload_pending" && item.upload_url) {
           await uploadToS3(item.upload_url, buffer, meta.content_type);
-          log.success(`Uploaded ${meta.filename} for node ${nodeId}. Background re-processing started.`);
+          log.success(
+            `Uploaded ${meta.filename} for node ${nodeId}. Background re-processing started.`,
+          );
         } else {
           log.warn(`Skipped: ${item.status}${item.error ? ` — ${item.error}` : ""}`);
         }
