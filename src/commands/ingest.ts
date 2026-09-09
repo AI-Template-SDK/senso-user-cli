@@ -66,7 +66,7 @@ async function uploadToS3(url: string, buffer: Buffer, contentType: string): Pro
   const res = await fetch(url, {
     method: "PUT",
     headers: { "Content-Type": contentType },
-    body: buffer,
+    body: new Uint8Array(buffer),
   });
   if (!res.ok) {
     throw new Error(`S3 upload failed: ${res.status} ${res.statusText}`);

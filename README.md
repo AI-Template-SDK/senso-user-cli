@@ -375,7 +375,7 @@ cnt_def456   Variable Rate Products   draft
 
 ## Auto-Update
 
-The CLI checks for new versions once every 24 hours (via GitHub releases) and shows a notice on stderr if an update is available:
+The CLI checks for new versions once every 24 hours (via the npm registry) and shows a notice on stderr if an update is available:
 
 ```
 ╭──────────────────────────────────────────────╮
@@ -450,7 +450,7 @@ src/
 └── utils/
     ├── logger.ts          # Colored log helpers (picocolors)
     ├── branding.ts        # ASCII logo, gradient banner, boxed panels
-    └── updater.ts         # GitHub releases version check
+    └── updater.ts         # npm registry version check
 ```
 
 ### Tech Stack
@@ -469,7 +469,7 @@ src/
 
 ### Releasing a New Version
 
-This project uses [semantic versioning](https://semver.org/). The CLI's auto-update checker compares the installed version against the latest GitHub release using semver, so pre-release tags and version ordering are handled correctly.
+This project uses [semantic versioning](https://semver.org/). Publishing to npm is automated: pushing a `v*` tag runs `.github/workflows/publish.yml`, which builds the CLI and publishes it via [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) (GitHub Actions OIDC, no token secrets). Every pull request and push to `main` runs `.github/workflows/ci.yml` (typecheck, build, tests, smoke test).
 
 ```bash
 # 1. Bump the version in package.json, commit, and create a git tag
@@ -477,14 +477,11 @@ npm version patch   # 0.1.0 → 0.1.1 (bug fixes)
 npm version minor   # 0.1.0 → 0.2.0 (new features, backwards-compatible)
 npm version major   # 0.1.0 → 1.0.0 (breaking changes)
 
-# 2. Push the commit and tag
-git push origin main --tags
-
-# 3. Create a GitHub release (this is what the auto-updater checks)
-gh release create v0.2.0 --title "v0.2.0" --notes "Release notes here"
+# 2. Push the commit and tag — the tag triggers the publish workflow
+git push --follow-tags
 ```
 
-After step 3, users running the CLI will see the update notice within 24 hours (or immediately via `senso update`).
+The publish workflow refuses to run if the tag does not match the version in `package.json`. Once it finishes, users running the CLI will see the update notice within 24 hours (or immediately via `senso update`).
 
 ---
 

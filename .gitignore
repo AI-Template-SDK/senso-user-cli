@@ -136,3 +136,6 @@ out
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Build output (built in CI / on publish)
+dist/
