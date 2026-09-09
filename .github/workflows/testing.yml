@@ -135,12 +135,20 @@ jobs:
       - name: Report bundle size
         run: ls -lh dist/cli.js | awk '{print "dist/cli.js " $5}'
 
-  # The matrix is here and not earlier because it is the expensive job, and
-  # because what it protects is specifically cross-platform: path handling in
-  # `ingest upload`, the config directory location, and whether the packed
-  # tarball installs and runs at all. Node 18 is the `engines` floor and 24 is
-  # the newest release — if either end breaks, users find out here rather than
-  # in an issue.
+  # Two jobs cover "does it work everywhere we say it does", and the split is
+  # forced by a real constraint rather than taste.
+  #
+  # vitest 5 requires Node 22 or newer. package.json promises `node >= 18`. So
+  # the end-to-end suite physically cannot execute on the floor of what this CLI
+  # supports — a matrix that tried failed on every Node 18 runner, and testing a
+  # floor with a tool that does not run there is not testing the floor.
+  #
+  #   e2e     the full behavioral suite, on the versions vitest supports
+  #   compat  the published tarball, on every version `engines` promises,
+  #           checked by a plain ESM script with no dependencies
+  #
+  # Between them: rich assertions where they are possible, and a real check of
+  # the promise where they are not.
   e2e:
     name: End-to-end (${{ matrix.os }}, Node ${{ matrix.node }})
     needs: build
@@ -148,17 +156,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        node: ["18", "20", "22", "24"]
-        # One OS carries the full version sweep; the other two check the
-        # supported floor and the version we develop on. A full 3x4 grid would
-        # be twelve jobs to catch a class of bug that is almost always either
-        # version-specific or platform-specific, not both.
-        exclude:
-          - { os: macos-latest, node: "20" }
-          - { os: macos-latest, node: "24" }
-          - { os: windows-latest, node: "20" }
-          - { os: windows-latest, node: "24" }
+        # Node 22 is the floor vitest runs on; 24 is the current release. Ubuntu
+        # carries both, the other two platforms carry 22 — a full grid would be
+        # six jobs to catch a class of bug that is almost always either
+        # version-specific or platform-specific, never both.
+        include:
+          - { os: ubuntu-latest, node: "22" }
+          - { os: ubuntu-latest, node: "24" }
+          - { os: macos-latest, node: "22" }
+          - { os: windows-latest, node: "22" }
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v6
@@ -168,6 +174,45 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npx vitest run --project e2e
+
+  compat:
+    name: Compat (${{ matrix.os }}, Node ${{ matrix.node }})
+    needs: build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        # Every version `engines` promises: the floor, the two LTS lines above
+        # it, and the current release. If one of these breaks, a user finds out
+        # here rather than in an issue.
+        node: ["18", "20", "22", "24"]
+    steps:
+      - uses: actions/checkout@v5
+
+      # Built on a modern Node, then run on the target version. That is exactly
+      # how the package reaches a user — compiled once by us, executed on
+      # whatever they happen to have — and it is why the build toolchain needing
+      # Node 22 does not constrain what the CLI itself supports.
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Pack the tarball
+        shell: bash
+        run: |
+          echo "TARBALL=$(npm pack --silent)" >> "$GITHUB_ENV"
+
+      - name: Switch to Node ${{ matrix.node }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Install the tarball and exercise it
+        shell: bash
+        run: node scripts/compat-check.mjs "$TARBALL"
 
   smoke:
     name: Smoke

@@ -386,9 +386,17 @@ export async function runSenso(args: string[], opts: RunOptions = {}): Promise<R
         return;
       }
 
+      // Line endings are normalized once, here, rather than in every assertion.
+      // A spawned child on Windows terminates its lines with \r\n, so an exact
+      // comparison like `toBe(`${version}\n`)` fails there and nowhere else —
+      // and writing every test to tolerate both would be a tax on all of them
+      // for one platform's convention.
+      const stdoutText = stdout.replace(/\r\n/g, "\n");
+      const stderrText = stderr.replace(/\r\n/g, "\n");
+
       resolve({
-        stdout,
-        stderr,
+        stdout: stdoutText,
+        stderr: stderrText,
         // null only when a signal killed the child, which the timeout branch
         // above has already handled; -1 keeps the type honest for the rest.
         code: code ?? -1,
@@ -397,9 +405,9 @@ export async function runSenso(args: string[], opts: RunOptions = {}): Promise<R
         configFile: join(configDir, "config.json"),
         json: (): unknown => {
           try {
-            return JSON.parse(stdout);
+            return JSON.parse(stdoutText);
           } catch {
-            throw new Error(`stdout was not valid JSON:\n${stdout || "(empty)"}`);
+            throw new Error(`stdout was not valid JSON:\n${stdoutText || "(empty)"}`);
           }
         },
       });

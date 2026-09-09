@@ -71,7 +71,10 @@ export default defineConfig(
         // putting them in tsconfig's `include` would drag a .mjs file into a
         // build that has no reason to know about it.
         projectService: {
-          allowDefaultProject: ["*.mjs", "*.js"],
+          // Config files at the root, and scripts/*.mjs — plain ESM that has to
+          // run on the Node floor (18), which is older than the test runner
+          // supports, so it cannot be TypeScript compiled by this project.
+          allowDefaultProject: ["*.mjs", "*.js", "scripts/*.mjs"],
         },
         tsconfigRootDir: import.meta.dirname,
       },
@@ -129,6 +132,30 @@ export default defineConfig(
         "error",
         { allowNumber: true, allowBoolean: true, allowNullish: true },
       ],
+    },
+  },
+
+  {
+    /**
+     * Plain ESM scripts, which are not part of the TypeScript program.
+     *
+     * scripts/compat-check.mjs has to run on Node 18 — the floor `engines`
+     * promises — which is older than vitest supports. It is therefore hand-
+     * written JavaScript rather than TypeScript run through tsx, and there is no
+     * type information for the type-aware rules to use.
+     */
+    files: ["scripts/*.mjs"],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: {
+      globals: {
+        process: "readonly",
+        console: "readonly",
+        URL: "readonly",
+      },
+    },
+    rules: {
+      "no-restricted-syntax": "off",
+      "no-restricted-properties": "off",
     },
   },
 

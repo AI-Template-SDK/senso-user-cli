@@ -137,10 +137,33 @@ describe("the Node version is pinned consistently", () => {
       `node${floor}`,
     );
 
-    // The e2e matrix must actually test the floor, or the promise is untested.
-    expect(ci, `the CI matrix does not include the supported floor, Node ${floor}`).toMatch(
-      new RegExp(`node:.*"${floor}"`),
-    );
+    // Something in CI must actually exercise the floor, or `engines` is a
+    // promise nobody checks. It cannot be the e2e job: vitest requires Node 22,
+    // so the suite cannot run on 18 at all — which is why the `compat` job
+    // exists and runs a plain ESM script against the packed tarball instead.
+    const compatJob = ci.slice(ci.indexOf("  compat:"));
+    expect(
+      compatJob,
+      `no CI job exercises the supported floor, Node ${floor} — see the compat job`,
+    ).toMatch(new RegExp(`node:.*"${floor}"`));
+  });
+
+  it("does not ask vitest to run on a Node version it does not support", () => {
+    // The bug this pins: the e2e matrix included Node 18 and 20, and every one
+    // of those runners failed because vitest 5 requires ^22.12.0 || ^24 || >=26.
+    // A matrix entry the runner cannot execute is not coverage, it is a red X
+    // that teaches people to ignore red Xs.
+    const vitestFloor = 22;
+    const workflow = read(".github/workflows/testing.yml");
+    const e2eJob = workflow.slice(workflow.indexOf("  e2e:"), workflow.indexOf("  compat:"));
+    const versions = [...e2eJob.matchAll(/node:\s*"(\d+)"/g)].map((m) => Number(m[1]));
+
+    expect(versions.length, "the e2e matrix names no Node versions").toBeGreaterThan(0);
+    const tooOld = versions.filter((v) => v < vitestFloor);
+    expect(
+      tooOld,
+      `the e2e job would run vitest on Node ${tooOld.join(", ")}, which it does not support`,
+    ).toEqual([]);
   });
 });
 

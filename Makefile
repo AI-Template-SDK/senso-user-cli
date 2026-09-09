@@ -90,6 +90,15 @@ build: ## Bundle the CLI with tsup
 smoke: ## Pack the tarball, install it clean, and run the installed binary
 	./scripts/smoke-test.sh
 
+# Runs on whatever Node you have. CI runs it on all four versions `engines`
+# promises, on three operating systems, against a tarball built on a modern Node
+# — because vitest cannot run on Node 18 and testing the floor with a tool that
+# does not run there is not testing the floor. See the compat job in
+# .github/workflows/testing.yml.
+compat: ## Pack the tarball and check the published CLI runs on this Node
+	$(NPM) run build
+	node scripts/compat-check.mjs "$$($(NPM) pack --silent)"
+
 reference: ## Regenerate docs/reference/commands.md from the command tree
 	$(NPX) tsx scripts/gen-reference.ts
 

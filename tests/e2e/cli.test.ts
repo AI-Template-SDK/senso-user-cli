@@ -388,9 +388,15 @@ describe("the built bundle itself", () => {
     const head = readFileSync(CLI_PATH, "utf8").slice(0, 32);
     expect(head.startsWith("#!/usr/bin/env node")).toBe(true);
 
-    // And it survived as a file the shell may run, not merely as text.
-    const mode = statSync(CLI_PATH).mode;
-    expect(mode & 0o111).not.toBe(0);
+    // And on a POSIX system it survived as a file the shell may run, not merely
+    // as text. Windows has no execute permission bit — NTFS decides by file
+    // extension and npm installs a .cmd shim rather than relying on the mode —
+    // so `mode & 0o111` is always 0 there and asserting it would fail for a
+    // reason that says nothing about the package.
+    if (process.platform !== "win32") {
+      const mode = statSync(CLI_PATH).mode;
+      expect(mode & 0o111).not.toBe(0);
+    }
   });
 
   it("sends the key as X-API-Key and identifies itself, over a real socket", async () => {
