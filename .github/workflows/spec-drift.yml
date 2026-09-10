@@ -1,0 +1,88 @@
+name: API drift
+
+# Compares the CLI's command surface against the published OpenAPI spec, and
+# refreshes the vendored snapshots the offline policy tests compare against.
+#
+# Deliberately NOT a pull request gate. It fetches the live spec over the
+# network, and a gate that depends on a third party being reachable fails for
+# reasons that have nothing to do with the change under review. Pull requests get
+# the offline half instead: tests/policy compares the CLI against
+# tests/fixtures/api-paths.json, which this workflow keeps current.
+#
+# Weekly, because the API ships more often than this CLI does and finding out
+# months later — which is what happened, 18 endpoints deep — is the failure mode
+# this exists to prevent.
+
+on:
+  schedule:
+    - cron: "23 6 * * 1" # Mondays, early
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  drift:
+    name: Check for drift
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+
+      - name: Compare the CLI against the published spec
+        id: drift
+        run: |
+          set +e
+          npx tsx scripts/spec-drift.ts > drift.txt 2>&1
+          echo "status=$?" >> "$GITHUB_OUTPUT"
+          cat drift.txt
+
+      # The skills list drifted once already: senso-onboarding was published from
+      # senso-contextos and never added here, so `skills install --all` quietly
+      # installed six of seven for a release. tests/policy compares the CLI's
+      # list against this fixture; refreshing it here is what makes that
+      # comparison mean "matches the registry" rather than "matches itself".
+      - name: Refresh the published skills fixture
+        continue-on-error: true
+        run: |
+          npx tsx scripts/spec-drift.ts --update || true
+          git diff --stat tests/fixtures/ || true
+
+      - name: Publish the report to the run summary
+        if: always()
+        run: |
+          {
+            echo '### API drift'
+            echo ''
+            echo '```'
+            cat drift.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # One issue, reopened and updated rather than a new one every Monday. A
+      # weekly issue for a gap nobody has had time to close yet is how a repo
+      # ends up with 40 identical issues and a team that stops reading them.
+      - name: Open or update the drift issue
+        if: steps.drift.outputs.status != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TITLE="API drift: endpoints without commands"
+          BODY="$(printf 'The weekly drift check found a gap between the published Senso API spec and this CLI.\n\nEndpoints listed here either need a command, or need an entry in `docs/reference/excluded-endpoints.md` explaining why they are deliberately not exposed.\n\n```\n%s\n```\n\nRe-run: `npx tsx scripts/spec-drift.ts`\n' "$(cat drift.txt)")"
+
+          EXISTING="$(gh issue list --state open --search "$TITLE in:title" --json number --jq '.[0].number')"
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "$BODY"
+          else
+            gh issue create --title "$TITLE" --body "$BODY" --label dependencies
+          fi

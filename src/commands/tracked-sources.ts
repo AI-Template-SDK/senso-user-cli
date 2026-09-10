@@ -1,10 +1,19 @@
 import { Command } from "commander";
-import { apiRequest, formatApiError } from "../lib/api-client.js";
+import { apiRequest } from "../lib/api-client.js";
+import { parseEnumFlag, parseIntFlag } from "../lib/enum-arg.js";
+import { emit, emitConfirmation } from "../lib/output.js";
+import { runAction } from "../lib/run-action.js";
 import * as log from "../utils/logger.js";
 
 const MATCH_TYPES = "domain | host | path_prefix | exact_url";
 const TIERS = "primary (Owned) | tracked | secondary (External)";
 const CATEGORIES = "affiliated_domain | published_content | social | press";
+
+// The values behind the help strings above, for validation. MATCH_TYPES and
+// TIERS stay as they are because they are prose the user reads (TIERS glosses
+// two of the tiers with their UI names).
+const MATCH_TYPE_VALUES = ["domain", "host", "path_prefix", "exact_url"] as const;
+const TIER_VALUES = ["primary", "tracked", "secondary"] as const;
 
 interface SourceFlags {
   pattern?: string;
@@ -19,11 +28,15 @@ interface SourceFlags {
 function buildSourceBody(cmdOpts: SourceFlags): Record<string, unknown> {
   const body: Record<string, unknown> = {};
   if (cmdOpts.pattern !== undefined) body.pattern = cmdOpts.pattern;
-  if (cmdOpts.matchType !== undefined) body.match_type = cmdOpts.matchType;
-  if (cmdOpts.tier !== undefined) body.tier = cmdOpts.tier;
+  if (cmdOpts.matchType !== undefined)
+    body.match_type = parseEnumFlag("--match-type", cmdOpts.matchType, MATCH_TYPE_VALUES);
+  if (cmdOpts.tier !== undefined) body.tier = parseEnumFlag("--tier", cmdOpts.tier, TIER_VALUES);
   if (cmdOpts.category !== undefined) body.category = cmdOpts.category;
   if (cmdOpts.label !== undefined) body.label = cmdOpts.label;
-  if (cmdOpts.priority !== undefined) body.priority = Number(cmdOpts.priority);
+  // Checked rather than coerced: `Number("high")` is NaN and JSON.stringify
+  // writes NaN as null, so an unchecked typo told the API to CLEAR the priority
+  // instead of failing.
+  if (cmdOpts.priority !== undefined) body.priority = parseIntFlag("--priority", cmdOpts.priority);
   if (cmdOpts.active !== undefined) body.active = cmdOpts.active;
   return body;
 }
@@ -31,98 +44,101 @@ function buildSourceBody(cmdOpts: SourceFlags): Record<string, unknown> {
 export function registerTrackedSourcesCommands(program: Command): void {
   const sources = program
     .command("tracked-sources")
-    .description("Manage citation-classification rules that tier each cited URL as Owned (primary), Tracked, or External (secondary). Tracked sources drive share-of-voice and citation analytics. Rules created from published content are read-only.");
+    .description(
+      "Manage citation-classification rules that tier each cited URL as Owned (primary), Tracked, or External (secondary). Tracked sources drive share-of-voice and citation analytics. Rules created from published content are read-only.",
+    );
 
   sources
     .command("list")
     .description("List every tracked source rule for the current organization.")
-    .action(async () => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx) => {
         const data = await apiRequest({
           path: "/org/tracked-sources",
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        // The columns are the rule fields the add/update flags write.
+        emit(ctx, data, {
+          columns: ["source_id", "pattern", "match_type", "tier", "category", "active"],
+        });
+      }),
+    );
 
   sources
     .command("add")
     .description("Add a tracked source rule. New rules are always created active.")
-    .requiredOption("--pattern <pattern>", "Value to match cited URLs against, interpreted per --match-type")
+    .requiredOption(
+      "--pattern <pattern>",
+      "Value to match cited URLs against, interpreted per --match-type",
+    )
     .requiredOption("--match-type <type>", `Match strategy: ${MATCH_TYPES}`)
     .requiredOption("--tier <tier>", `Classification tier: ${TIERS}`)
-    .option("--category <category>", `Optional sub-category (only meaningful for the 'tracked' tier): ${CATEGORIES}`)
+    .option(
+      "--category <category>",
+      `Optional sub-category (only meaningful for the 'tracked' tier): ${CATEGORIES}`,
+    )
     .option("--label <label>", "Optional human-readable label")
     .option("--priority <n>", "Optional ordering priority (integer)")
-    .action(async (cmdOpts: SourceFlags) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, cmdOpts: SourceFlags) => {
         const data = await apiRequest({
           method: "POST",
           path: "/org/tracked-sources",
           body: buildSourceBody(cmdOpts),
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success(`Tracked source "${cmdOpts.pattern}" added.`);
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        if (!ctx.quiet) log.success(`Tracked source "${cmdOpts.pattern}" added.`);
+        emit(ctx, data);
+      }),
+    );
 
   sources
     .command("update <sourceId>")
-    .description("Replace a tracked source rule (PUT). Pattern, match type, and tier are required. Published rules are read-only.")
-    .requiredOption("--pattern <pattern>", "Value to match cited URLs against, interpreted per --match-type")
+    .description(
+      "Replace a tracked source rule (PUT). Pattern, match type, and tier are required. Published rules are read-only.",
+    )
+    .requiredOption(
+      "--pattern <pattern>",
+      "Value to match cited URLs against, interpreted per --match-type",
+    )
     .requiredOption("--match-type <type>", `Match strategy: ${MATCH_TYPES}`)
     .requiredOption("--tier <tier>", `Classification tier: ${TIERS}`)
-    .option("--category <category>", `Optional sub-category (only meaningful for the 'tracked' tier): ${CATEGORIES}`)
+    .option(
+      "--category <category>",
+      `Optional sub-category (only meaningful for the 'tracked' tier): ${CATEGORIES}`,
+    )
     .option("--label <label>", "Optional human-readable label")
     .option("--priority <n>", "Optional ordering priority (integer)")
     .option("--active", "Mark the rule active")
     .option("--no-active", "Mark the rule inactive")
-    .action(async (sourceId: string, cmdOpts: SourceFlags) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, sourceId: string, cmdOpts: SourceFlags) => {
         const data = await apiRequest({
           method: "PUT",
           path: `/org/tracked-sources/${sourceId}`,
           body: buildSourceBody(cmdOpts),
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success(`Tracked source ${sourceId} updated.`);
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        if (!ctx.quiet) log.success(`Tracked source ${sourceId} updated.`);
+        emit(ctx, data);
+      }),
+    );
 
   sources
     .command("delete <sourceId>")
     .description("Remove a tracked source rule.")
-    .action(async (sourceId: string) => {
-      const opts = program.opts();
-      try {
+    .action(
+      runAction(program, async (ctx, sourceId: string) => {
         await apiRequest({
           method: "DELETE",
           path: `/org/tracked-sources/${sourceId}`,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success(`Tracked source ${sourceId} removed.`);
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        emitConfirmation(ctx, `Tracked source ${sourceId} removed.`);
+      }),
+    );
 }

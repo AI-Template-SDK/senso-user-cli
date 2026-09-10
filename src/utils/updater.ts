@@ -11,17 +11,12 @@ interface NpmPackageInfo {
 }
 
 export async function checkForUpdate(quiet: boolean): Promise<void> {
-  if (
-    process.env.SENSO_NO_UPDATE_CHECK === "1" ||
-    quiet
-  ) {
+  if (process.env.SENSO_NO_UPDATE_CHECK === "1" || quiet) {
     return;
   }
 
   const config = readConfig();
-  const lastCheck = config.lastUpdateCheck
-    ? new Date(config.lastUpdateCheck).getTime()
-    : 0;
+  const lastCheck = config.lastUpdateCheck ? new Date(config.lastUpdateCheck).getTime() : 0;
 
   if (Date.now() - lastCheck < CHECK_INTERVAL_MS) {
     // Show cached result if we have one
@@ -49,18 +44,25 @@ export async function checkForUpdate(quiet: boolean): Promise<void> {
   }
 }
 
+// 3s, not 10. The check is fired without being awaited, and an outstanding
+// fetch keeps the event loop alive — so this timeout is the worst-case delay
+// between a command printing its output and the process exiting. It is paid at
+// most once a day (the 24h gate below serves every other run from cache), and
+// the cost of missing a check is that the notice appears tomorrow instead.
+const REGISTRY_TIMEOUT_MS = 3_000;
+
 export async function getLatestVersion(): Promise<string | null> {
   try {
-    const res = await fetch(
-      `https://registry.npmjs.org/${NPM_PACKAGE}`,
-      {
-        headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(10_000),
-      },
-    );
+    const res = await fetch(`https://registry.npmjs.org/${NPM_PACKAGE}`, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(REGISTRY_TIMEOUT_MS),
+    });
     if (!res.ok) return null;
     const data = (await res.json()) as NpmPackageInfo;
-    return data["dist-tags"]?.latest ?? null;
+    // The cast above is an assertion about an untyped response body, so the
+    // optional chain is load-bearing even though the type says otherwise: a
+    // registry response without dist-tags would throw here without it.
+    return (data as Partial<NpmPackageInfo>)["dist-tags"]?.latest ?? null;
   } catch {
     return null;
   }

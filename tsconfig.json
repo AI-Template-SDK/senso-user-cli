@@ -1,17 +1,28 @@
 {
+  // tsc never emits here — tsup/esbuild produces the bundle. This file exists to
+  // typecheck (`make typecheck`) and to give typescript-eslint the program it
+  // needs for type-aware rules, which is why tests/ and scripts/ are included
+  // even though only src/cli.ts is ever bundled.
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
+    // Beyond `strict`: these three catch the mistakes this codebase actually
+    // makes — reading an array index that may not exist, leaving a variable
+    // unused after a refactor, and forgetting a `case` fallthrough.
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "declaration": false,
-    "outDir": "dist",
-    "rootDir": "src"
+    // TypeScript 7 no longer picks up @types/node implicitly.
+    "types": ["node"],
+    "noEmit": true
   },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src", "tests", "scripts", "tsup.config.ts", "vitest.config.ts"],
+  "exclude": ["node_modules", "dist", "coverage"]
 }

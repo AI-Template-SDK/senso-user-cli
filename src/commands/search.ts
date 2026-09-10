@@ -1,252 +1,342 @@
 import { Command } from "commander";
 import pc from "picocolors";
-import { apiRequest, apiStreamRequest, formatApiError } from "../lib/api-client.js";
-import { output, type OutputFormat } from "../lib/output.js";
+import { apiRequest, apiStreamRequest } from "../lib/api-client.js";
+import { CliError, EXIT } from "../lib/errors.js";
+import { emit, writeStdout } from "../lib/output.js";
+import { runAction, type Ctx } from "../lib/run-action.js";
 import * as log from "../utils/logger.js";
 
-function parseMaxResults(value: string): number {
-  const n = parseInt(value);
-  if (isNaN(n) || n < 1) return 5;
-  return Math.min(n, 20);
+const MAX_RESULTS_CEILING = 20;
+const DEFAULT_MAX_RESULTS = 5;
+
+function parseMaxResults(value: string | undefined): number {
+  const n = Number.parseInt(value ?? "", 10);
+  if (Number.isNaN(n) || n < 1) return DEFAULT_MAX_RESULTS;
+  return Math.min(n, MAX_RESULTS_CEILING);
+}
+
+/** The options every search subcommand shares. */
+interface SearchOptions {
+  maxResults?: string;
+  contentIds?: string[];
+  requireScopedIds?: boolean;
+}
+
+function buildSearchBody(query: string, cmdOpts: SearchOptions): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    query,
+    max_results: parseMaxResults(cmdOpts.maxResults),
+  };
+  if (cmdOpts.contentIds) body.content_ids = cmdOpts.contentIds;
+  if (cmdOpts.requireScopedIds) body.require_scoped_ids = true;
+  return body;
+}
+
+interface SearchResult {
+  content_id?: string;
+  title?: string;
+  chunk_text?: string;
+  [key: string]: unknown;
+}
+
+interface SearchResponse {
+  answer?: string;
+  results?: SearchResult[];
+}
+
+/** Columns worth seeing when a search result set is rendered as a table. */
+const RESULT_COLUMNS = ["content_id", "title", "chunk_text"];
+
+/**
+ * Reads an option that both the subcommand and its parent declare.
+ *
+ * `senso search <query>` has its own action and its own `--max-results`, and so
+ * does every subcommand under it. When a flag name exists on both, Commander
+ * binds the value to the parent — so `senso search context "q" --max-results 17
+ * --content-ids a b` reached the subcommand with the DEFAULTS, silently
+ * searching the whole knowledge base with 5 results instead of the two documents
+ * the caller named. The request went out looking perfectly well-formed, which is
+ * why nothing noticed.
+ *
+ * `getOptionValueSource` is what makes the fix exact rather than a guess: it
+ * distinguishes a value the user typed ("cli") from one that is merely the
+ * declared default, so the subcommand still wins when it was given something.
+ */
+function resolveOption<T>(command: Command, key: string): T | undefined {
+  if (command.getOptionValueSource(key) === "cli") {
+    return command.getOptionValue(key) as T;
+  }
+  const parent = command.parent;
+  if (parent?.getOptionValueSource(key) === "cli") {
+    return parent.getOptionValue(key) as T;
+  }
+  return command.getOptionValue(key) as T | undefined;
+}
+
+/** The shared options, resolved against both the subcommand and its parent. */
+function resolveSearchOptions(command: Command): SearchOptions {
+  return {
+    maxResults: resolveOption<string>(command, "maxResults"),
+    contentIds: resolveOption<string[]>(command, "contentIds"),
+    requireScopedIds: resolveOption<boolean>(command, "requireScopedIds"),
+  };
+}
+
+/**
+ * Registers one of the non-streaming search variants.
+ *
+ * `context`, `content` and `full` differ only in their endpoint and their help
+ * text — they take the same options and render the same shape — so they are
+ * declared once here rather than copied four times, which is what let the dead
+ * `outputByFormat` branch sit unnoticed in three of them.
+ */
+function addSearchVariant(
+  parent: Command,
+  program: Command,
+  name: string,
+  path: string,
+  description: string,
+): void {
+  parent
+    .command(`${name} <query>`)
+    .description(description)
+    .option("--max-results <n>", `Maximum results (max: ${MAX_RESULTS_CEILING})`, "5")
+    .option(
+      "--content-ids <ids...>",
+      "Restrict search to specific content item IDs (space-separated UUIDs)",
+    )
+    .option("--require-scoped-ids", "Only return results from the specified --content-ids")
+    .action(
+      runAction(
+        program,
+        async (ctx: Ctx, query: string, _cmdOpts: SearchOptions, command: Command) => {
+          const data = await apiRequest<SearchResponse>({
+            method: "POST",
+            path,
+            body: buildSearchBody(query, resolveSearchOptions(command)),
+            apiKey: ctx.apiKey,
+            baseUrl: ctx.baseUrl,
+          });
+          emit(ctx, data, { columns: RESULT_COLUMNS });
+        },
+      ),
+    );
 }
 
 export function registerSearchCommands(program: Command): void {
   const search = program
     .command("search")
-    .description("Search the knowledge base with natural language queries. Returns AI-generated answers synthesised from matching content chunks, or raw chunks/content IDs.");
+    .description(
+      "Search the knowledge base with natural language queries. Returns AI-generated answers synthesized from matching content chunks, or raw chunks/content IDs.",
+    );
 
   // Default: senso search <query> → POST /org/search (answer + results)
   search
     .argument("<query>", "Search query")
-    .option("--max-results <n>", "Maximum number of results (max: 20)", "5")
-    .option("--content-ids <ids...>", "Restrict search to specific content item IDs (space-separated UUIDs)")
-    .option("--require-scoped-ids", "Only return results from the specified --content-ids (omit to allow fallback to all content)")
-    .action(async (query: string, cmdOpts: Record<string, string | boolean | string[]>) => {
-      const opts = program.opts();
-      try {
-        const body: Record<string, unknown> = { query, max_results: parseMaxResults(cmdOpts.maxResults as string) };
-        if (cmdOpts.contentIds) body.content_ids = cmdOpts.contentIds;
-        if (cmdOpts.requireScopedIds) body.require_scoped_ids = true;
-        const data = await apiRequest({
+    .option("--max-results <n>", `Maximum number of results (max: ${MAX_RESULTS_CEILING})`, "5")
+    .option(
+      "--content-ids <ids...>",
+      "Restrict search to specific content item IDs (space-separated UUIDs)",
+    )
+    .option(
+      "--require-scoped-ids",
+      "Only return results from the specified --content-ids (omit to allow fallback to all content)",
+    )
+    .action(
+      runAction(program, async (ctx: Ctx, query: string, cmdOpts: SearchOptions) => {
+        const data = await apiRequest<SearchResponse>({
           method: "POST",
           path: "/org/search",
-          body,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          body: buildSearchBody(query, cmdOpts),
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
 
-        const format: OutputFormat = opts.output || "plain";
-        const res = data as { answer?: string; results?: Array<Record<string, unknown>> };
-
-        output(format, {
-          json: data,
-          table: res.results
-            ? {
-                rows: res.results.map((r) => ({
-                  id: r.content_id,
-                  title: r.title,
-                  text: String(r.chunk_text || "").slice(0, 80),
-                })),
-                columns: ["id", "title", "text"],
-              }
-            : undefined,
+        const results = data.results ?? [];
+        emit(ctx, data, {
+          table: {
+            rows: results.map((r) => ({
+              content_id: r.content_id,
+              title: r.title,
+              chunk_text: r.chunk_text,
+            })),
+            columns: RESULT_COLUMNS,
+          },
           plain: [
             "",
-            res.answer ? `  ${pc.bold("Answer:")} ${res.answer}` : "",
-            "",
-            ...(res.results || []).map(
+            ...(data.answer ? [`  ${pc.bold("Answer:")} ${data.answer}`, ""] : []),
+            ...results.map(
               (r, i) =>
-                `  ${pc.dim(`${i + 1}.`)} ${pc.bold(String(r.title || "Untitled"))}\n     ${String(r.chunk_text || "").slice(0, 120)}\n     ${pc.dim(`ID: ${r.content_id}`)}`,
+                `  ${pc.dim(`${i + 1}.`)} ${pc.bold(r.title ?? "Untitled")}\n     ${r.chunk_text ?? ""}\n     ${pc.dim(`ID: ${r.content_id ?? "unknown"}`)}`,
             ),
             "",
-          ].filter(Boolean),
+          ],
         });
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+      }),
+    );
 
-  search
-    .command("context <query>")
-    .description("Search the knowledge base — returns matching content chunks only, without AI answer generation. Use this to feed verified chunks into your own LLM pipeline instead of using Senso's generated answer.")
-    .option("--max-results <n>", "Maximum results (max: 20)", "5")
-    .option("--content-ids <ids...>", "Restrict search to specific content item IDs (space-separated UUIDs)")
-    .option("--require-scoped-ids", "Only return results from the specified --content-ids")
-    .action(async (query: string, cmdOpts: Record<string, string | boolean | string[]>) => {
-      const opts = program.opts();
-      try {
-        const body: Record<string, unknown> = { query, max_results: parseMaxResults(cmdOpts.maxResults as string) };
-        if (cmdOpts.contentIds) body.content_ids = cmdOpts.contentIds;
-        if (cmdOpts.requireScopedIds) body.require_scoped_ids = true;
-        const data = await apiRequest({
-          method: "POST",
-          path: "/org/search/context",
-          body,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
-        });
-        outputByFormat(opts.output, data);
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+  addSearchVariant(
+    search,
+    program,
+    "context",
+    "/org/search/context",
+    "Search the knowledge base — returns matching content chunks only, without AI answer generation. Use this to feed verified chunks into your own LLM pipeline instead of using Senso's generated answer.",
+  );
 
-  search
-    .command("content <query>")
-    .description("Search the knowledge base — returns deduplicated content IDs and titles only. Use this to discover which documents are relevant before fetching full content with 'content get <id>'.")
-    .option("--max-results <n>", "Maximum results (max: 20)", "5")
-    .option("--content-ids <ids...>", "Restrict search to specific content item IDs (space-separated UUIDs)")
-    .option("--require-scoped-ids", "Only return results from the specified --content-ids")
-    .action(async (query: string, cmdOpts: Record<string, string | boolean | string[]>) => {
-      const opts = program.opts();
-      try {
-        const body: Record<string, unknown> = { query, max_results: parseMaxResults(cmdOpts.maxResults as string) };
-        if (cmdOpts.contentIds) body.content_ids = cmdOpts.contentIds;
-        if (cmdOpts.requireScopedIds) body.require_scoped_ids = true;
-        const data = await apiRequest({
-          method: "POST",
-          path: "/org/search/content",
-          body,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
-        });
-        outputByFormat(opts.output, data);
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+  addSearchVariant(
+    search,
+    program,
+    "content",
+    "/org/search/content",
+    "Search the knowledge base — returns deduplicated content IDs and titles only. Use this to discover which documents are relevant before fetching full content with 'content get <id>'.",
+  );
 
-  search
-    .command("full <query>")
-    .description("Alias for the default search — returns AI answer plus matching chunks. Equivalent to 'senso search <query>'.")
-    .option("--max-results <n>", "Maximum results (max: 20)", "5")
-    .option("--content-ids <ids...>", "Restrict search to specific content item IDs (space-separated UUIDs)")
-    .option("--require-scoped-ids", "Only return results from the specified --content-ids")
-    .action(async (query: string, cmdOpts: Record<string, string | boolean | string[]>) => {
-      const opts = program.opts();
-      try {
-        const body: Record<string, unknown> = { query, max_results: parseMaxResults(cmdOpts.maxResults as string) };
-        if (cmdOpts.contentIds) body.content_ids = cmdOpts.contentIds;
-        if (cmdOpts.requireScopedIds) body.require_scoped_ids = true;
-        const data = await apiRequest({
-          method: "POST",
-          path: "/org/search/full",
-          body,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
-        });
-        outputByFormat(opts.output, data);
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+  addSearchVariant(
+    search,
+    program,
+    "full",
+    "/org/search/full",
+    "Alias for the default search — returns AI answer plus matching chunks. Equivalent to 'senso search <query>'.",
+  );
+
   search
     .command("stream <query>")
-    .description("Streaming search — returns AI answer tokens in real-time via SSE, followed by source chunks. Use this for a responsive, live search experience.")
-    .option("--max-results <n>", "Maximum results (max: 20)", "5")
-    .option("--content-ids <ids...>", "Restrict search to specific content item IDs (space-separated UUIDs)")
+    .description(
+      "Streaming search — returns AI answer tokens in real-time via SSE, followed by source chunks. Use this for a responsive, live search experience.",
+    )
+    .option("--max-results <n>", `Maximum results (max: ${MAX_RESULTS_CEILING})`, "5")
+    .option(
+      "--content-ids <ids...>",
+      "Restrict search to specific content item IDs (space-separated UUIDs)",
+    )
     .option("--require-scoped-ids", "Only return results from the specified --content-ids")
-    .action(async (query: string, cmdOpts: Record<string, string | boolean | string[]>) => {
-      const opts = program.opts();
-      const body: Record<string, unknown> = { query, max_results: parseMaxResults(cmdOpts.maxResults as string) };
-      if (cmdOpts.contentIds) body.content_ids = cmdOpts.contentIds;
-      if (cmdOpts.requireScopedIds) body.require_scoped_ids = true;
+    .action(
+      runAction(
+        program,
+        async (ctx: Ctx, query: string, _cmdOpts: SearchOptions, command: Command) => {
+          const res = await apiStreamRequest({
+            method: "POST",
+            path: "/org/search/stream",
+            body: buildSearchBody(query, resolveSearchOptions(command)),
+            apiKey: ctx.apiKey,
+            baseUrl: ctx.baseUrl,
+          });
 
-      try {
-        const res = await apiStreamRequest({
-          method: "POST",
-          path: "/org/search/stream",
-          body,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
-        });
-
-        if (!res.body) {
-          log.error("No response body received.");
-          process.exit(1);
-        }
-
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-        let eventType: string | null = null;
-        let answerStarted = false;
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-
-          for (const line of lines) {
-            if (line.startsWith("event: ")) {
-              eventType = line.slice(7).trim();
-            } else if (line.startsWith("data: ") && eventType) {
-              const data = JSON.parse(line.slice(6));
-
-              switch (eventType) {
-                case "token":
-                  if (!answerStarted) {
-                    answerStarted = true;
-                    process.stdout.write(`\n  ${pc.bold("Answer:")} `);
-                  }
-                  process.stdout.write(data.token);
-                  break;
-
-                case "sources": {
-                  if (answerStarted) process.stdout.write("\n");
-                  console.log();
-
-                  const results = data.results || [];
-                  if (results.length > 0) {
-                    console.log(`  ${pc.bold("Sources:")} (${results.length})`);
-                    for (let i = 0; i < results.length; i++) {
-                      const r = results[i];
-                      console.log();
-                      console.log(`  ${pc.dim(`${i + 1}.`)} ${pc.bold(r.title || "Untitled")} ${pc.dim(`(${r.content_id})`)}`);
-                      if (r.chunk_text) {
-                        console.log(`     ${pc.dim("Snippet:")} ${r.chunk_text}`);
-                      }
-                    }
-                  } else {
-                    console.log(`  ${pc.dim("No sources found.")}`);
-                  }
-                  console.log();
-
-                  if (opts.output === "json") {
-                    console.log(JSON.stringify(data, null, 2));
-                  }
-                  break;
-                }
-
-                case "error":
-                  log.error(`Stream error: ${data.error}`);
-                  break;
-
-                case "done":
-                  break;
-              }
-              eventType = null;
-            }
+          if (!res.body) {
+            throw new CliError("The server returned no response body for the stream.", EXIT.ERROR);
           }
-        }
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+
+          await renderStream(ctx, res.body);
+        },
+      ),
+    );
 }
 
-function outputByFormat(format: string | undefined, data: unknown): void {
-  if (format === "json") {
-    console.log(JSON.stringify(data, null, 2));
-  } else {
-    console.log(JSON.stringify(data, null, 2));
+/**
+ * Renders a server-sent-event stream.
+ *
+ * The token stream is the one place in this CLI where partial output on stdout
+ * is the product rather than a leak, so tokens are written to stdout as they
+ * arrive — but only in `plain`. Under `--output json` a half-written answer
+ * would make the stream unparseable, so nothing is printed until the final
+ * `sources` event carries the whole payload.
+ */
+async function renderStream(ctx: Ctx, body: ReadableStream<Uint8Array>): Promise<void> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  const streamTokens = ctx.format === "plain";
+  let buffer = "";
+  let eventType: string | null = null;
+  let answerStarted = false;
+  let answer = "";
+  let sources: unknown = null;
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    // The last element is whatever came after the final newline: an incomplete
+    // line that must be carried into the next chunk. A `data:` payload split
+    // across a chunk boundary is normal, not an edge case.
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      if (line.startsWith("event: ")) {
+        eventType = line.slice(7).trim();
+        continue;
+      }
+      if (!line.startsWith("data: ") || !eventType) continue;
+
+      let payload: { token?: string; results?: unknown[]; error?: string };
+      try {
+        payload = JSON.parse(line.slice(6)) as typeof payload;
+      } catch {
+        // A malformed frame is the server's problem, not a reason to abandon an
+        // answer that is otherwise arriving correctly.
+        log.warn("Skipped an unparseable event from the stream.");
+        eventType = null;
+        continue;
+      }
+
+      switch (eventType) {
+        case "token": {
+          const token = payload.token ?? "";
+          answer += token;
+          if (streamTokens) {
+            if (!answerStarted) {
+              answerStarted = true;
+              writeStdout(`\n  ${pc.bold("Answer:")} `);
+            }
+            writeStdout(token);
+          }
+          break;
+        }
+
+        case "sources": {
+          sources = payload.results ?? [];
+          if (streamTokens) {
+            if (answerStarted) writeStdout("\n");
+            renderSources(payload.results ?? []);
+          }
+          break;
+        }
+
+        case "error":
+          throw new CliError(payload.error ?? "The search stream reported an error.", EXIT.ERROR);
+
+        default:
+          break;
+      }
+      eventType = null;
+    }
   }
+
+  // Emitted once, at the end, so the JSON caller gets one parseable document
+  // containing everything the stream carried.
+  if (ctx.format !== "plain") {
+    emit(ctx, { answer, results: sources ?? [] }, { columns: RESULT_COLUMNS });
+  }
+}
+
+function renderSources(results: unknown[]): void {
+  writeStdout("\n");
+  if (results.length === 0) {
+    writeStdout(`  ${pc.dim("No sources found.")}\n\n`);
+    return;
+  }
+
+  writeStdout(`  ${pc.bold("Sources:")} (${results.length})\n`);
+  results.forEach((raw, i) => {
+    const r = raw as SearchResult;
+    writeStdout("\n");
+    writeStdout(
+      `  ${pc.dim(`${i + 1}.`)} ${pc.bold(r.title ?? "Untitled")} ${pc.dim(`(${r.content_id ?? "unknown"})`)}\n`,
+    );
+    if (r.chunk_text) {
+      writeStdout(`     ${pc.dim("Snippet:")} ${r.chunk_text}\n`);
+    }
+  });
+  writeStdout("\n");
 }

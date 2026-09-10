@@ -1,74 +1,83 @@
 import { Command } from "commander";
-import { apiRequest, formatApiError } from "../lib/api-client.js";
+import { apiRequest } from "../lib/api-client.js";
+import { CliError, EXIT } from "../lib/errors.js";
+import { parseJsonFlag } from "../lib/json-arg.js";
+import { emit } from "../lib/output.js";
+import { runAction } from "../lib/run-action.js";
 import * as log from "../utils/logger.js";
 
 export function registerOrgCommands(program: Command): void {
   const org = program
     .command("org")
-    .description("View and update organization profile and settings. Includes name, slug, logo, websites, locations, and tier information.");
+    .description(
+      "View and update organization profile and settings. Includes name, slug, logo, websites, locations, and tier information.",
+    );
 
   org
     .command("get")
-    .description("Get full organization details including name, slug, tier, websites, locations, configured AI models, publishers, and schedule.")
-    .action(async () => {
-      const opts = program.opts();
-      try {
-        const data = await apiRequest({ path: "/org/me", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+    .description(
+      "Get full organization details including name, slug, tier, websites, locations, configured AI models, publishers, and schedule.",
+    )
+    .action(
+      runAction(program, async (ctx) => {
+        const data = await apiRequest({
+          path: "/org/me",
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
+        });
+        emit(ctx, data);
+      }),
+    );
 
   org
     .command("update")
-    .description("Update organization details. All fields are optional — only provided fields are changed. Pass an empty array for websites/locations to clear them.")
-    .requiredOption("--data <json>", 'JSON: { "name": "...", "slug": "...", "logo_url": "...", "websites": [...], "locations": [...] }')
-    .action(async (cmdOpts: { data: string }) => {
-      const opts = program.opts();
-      try {
-        const body = JSON.parse(cmdOpts.data);
+    .description(
+      "Update organization details. All fields are optional — only provided fields are changed. Pass an empty array for websites/locations to clear them.",
+    )
+    .requiredOption(
+      "--data <json>",
+      'JSON: { "name": "...", "slug": "...", "logo_url": "...", "websites": [...], "locations": [...] }',
+    )
+    .action(
+      runAction(program, async (ctx, cmdOpts: { data: string }) => {
+        const body = parseJsonFlag(cmdOpts.data);
         const data = await apiRequest({
           method: "PUT",
           path: "/org/me",
           body,
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success("Organization updated.");
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(err instanceof SyntaxError ? "Invalid JSON in --data" : formatApiError(err));
-        process.exit(1);
-      }
-    });
+        if (!ctx.quiet) log.success("Organization updated.");
+        emit(ctx, data);
+      }),
+    );
 
   org
     .command("set-runs")
-    .description("Toggle the org-wide runs master switch. Pause every scheduled prompt run and content-generation run, or re-enable them.")
+    .description(
+      "Toggle the org-wide runs master switch. Pause every scheduled prompt run and content-generation run, or re-enable them.",
+    )
     .requiredOption("--enabled <bool>", "Set to true or false")
-    .action(async (cmdOpts: { enabled: string }) => {
-      const opts = program.opts();
-      const raw = cmdOpts.enabled.toLowerCase();
-      if (raw !== "true" && raw !== "false") {
-        log.error("--enabled must be `true` or `false`.");
-        process.exit(1);
-      }
-      const enable = raw === "true";
-      try {
+    .action(
+      runAction(program, async (ctx, cmdOpts: { enabled: string }) => {
+        const raw = cmdOpts.enabled.toLowerCase();
+        if (raw !== "true" && raw !== "false") {
+          throw new CliError("--enabled must be `true` or `false`.", EXIT.USAGE, {
+            code: "usage",
+            hint: "Pass --enabled true or --enabled false.",
+          });
+        }
+        const enable = raw === "true";
         const data = await apiRequest({
           method: "PATCH",
           path: "/org/me/runs-enabled",
           body: { enable_runs: enable },
-          apiKey: opts.apiKey,
-          baseUrl: opts.baseUrl,
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
         });
-        log.success(`Org-wide runs ${enable ? "enabled" : "disabled"}.`);
-        console.log(JSON.stringify(data, null, 2));
-      } catch (err) {
-        log.error(formatApiError(err));
-        process.exit(1);
-      }
-    });
+        if (!ctx.quiet) log.success(`Org-wide runs ${enable ? "enabled" : "disabled"}.`);
+        emit(ctx, data);
+      }),
+    );
 }

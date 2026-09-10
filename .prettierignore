@@ -1,0 +1,7 @@
+dist/
+node_modules/
+coverage/
+package-lock.json
+# Generated from the command tree by scripts/gen-reference.ts. Formatting it
+# here would fight the generator, and the policy test compares bytes.
+docs/reference/commands.md
