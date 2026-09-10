@@ -68,6 +68,21 @@ describe("the generated command reference", () => {
     );
   });
 
+  it("does not contain the package version, so a release cannot make it stale", () => {
+    // It used to. `npm version` bumped package.json, the reference still named
+    // the old version, and "is current" failed CI on a commit that changed no
+    // command — on every release.
+    const { version } = JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf-8")) as {
+      version: string;
+    };
+
+    expect(
+      generateReference().includes(version),
+      `scripts/gen-reference.ts writes the package version (${version}) into the reference. ` +
+        "Leave it out: the reference should change when a command does, not on every release.",
+    ).toBe(false);
+  });
+
   it("documents every command in the tree", () => {
     // Belt to the braces above: if the generator itself started skipping
     // commands, a byte-identical comparison would still pass.
