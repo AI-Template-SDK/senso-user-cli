@@ -34,6 +34,7 @@ function buildSearchBody(query: string, cmdOpts: SearchOptions): Record<string, 
 
 interface SearchResult {
   content_id?: string;
+  kb_node_id?: string;
   title?: string;
   chunk_text?: string;
   [key: string]: unknown;
@@ -42,10 +43,28 @@ interface SearchResult {
 interface SearchResponse {
   answer?: string;
   results?: SearchResult[];
+  /** `search content` returns its hits under `contents` rather than `results`. */
+  contents?: SearchResult[];
 }
 
-/** Columns worth seeing when a search result set is rendered as a table. */
-const RESULT_COLUMNS = ["content_id", "title", "chunk_text"];
+/**
+ * Columns worth seeing when a search result set is rendered as a table.
+ *
+ * `kb_node_id` leads because it is the id the rest of the CLI takes: every
+ * `kb` command addresses a node, and `content_id` is a different id space that
+ * 404s against `kb get`. `content_id` stays because it is what `--content-ids`
+ * accepts, so the two ids answer different follow-up questions — what to read
+ * next, and what to scope the next search to.
+ */
+const RESULT_COLUMNS = ["kb_node_id", "content_id", "title", "chunk_text"];
+
+/** A content-item hit carries no chunk, so its table drops that column. */
+const CONTENT_COLUMNS = ["kb_node_id", "content_id", "title"];
+
+/** One table row: just the declared columns, in their declared order. */
+function pickColumns(item: SearchResult, columns: string[]): Record<string, unknown> {
+  return Object.fromEntries(columns.map((c) => [c, item[c]]));
+}
 
 /**
  * Reads an option that both the subcommand and its parent declare.
@@ -96,6 +115,7 @@ function addSearchVariant(
   name: string,
   path: string,
   description: string,
+  columns: string[] = RESULT_COLUMNS,
 ): void {
   parent
     .command(`${name} <query>`)
@@ -117,7 +137,15 @@ function addSearchVariant(
             apiKey: ctx.apiKey,
             baseUrl: ctx.baseUrl,
           });
-          emit(ctx, data, { columns: RESULT_COLUMNS });
+          // Explicit rows rather than letting `emit` find the list: a search
+          // payload carries `query` and `search_type` beside its hits, and
+          // findRows deliberately refuses anything that is not a list plus
+          // pagination metadata — so without this the variants rendered their
+          // whole response as one key/value blob under `--output table`.
+          const items = data.results ?? data.contents ?? [];
+          emit(ctx, data, {
+            table: { rows: items.map((item) => pickColumns(item, columns)), columns },
+          });
         },
       ),
     );
@@ -156,6 +184,7 @@ export function registerSearchCommands(program: Command): void {
         emit(ctx, data, {
           table: {
             rows: results.map((r) => ({
+              kb_node_id: r.kb_node_id,
               content_id: r.content_id,
               title: r.title,
               chunk_text: r.chunk_text,
@@ -167,7 +196,7 @@ export function registerSearchCommands(program: Command): void {
             ...(data.answer ? [`  ${pc.bold("Answer:")} ${data.answer}`, ""] : []),
             ...results.map(
               (r, i) =>
-                `  ${pc.dim(`${i + 1}.`)} ${pc.bold(r.title ?? "Untitled")}\n     ${r.chunk_text ?? ""}\n     ${pc.dim(`ID: ${r.content_id ?? "unknown"}`)}`,
+                `  ${pc.dim(`${i + 1}.`)} ${pc.bold(r.title ?? "Untitled")}\n     ${r.chunk_text ?? ""}\n     ${pc.dim(`kb_node_id: ${r.kb_node_id ?? "unknown"}   content_id: ${r.content_id ?? "unknown"}`)}`,
             ),
             "",
           ],
@@ -188,7 +217,8 @@ export function registerSearchCommands(program: Command): void {
     program,
     "content",
     "/org/search/content",
-    "Search the knowledge base — returns deduplicated content IDs and titles only. Use this to discover which documents are relevant before fetching full content with 'content get <id>'.",
+    "Search the knowledge base — returns deduplicated matches with no chunks: each carries the KB node ID to read it with 'kb get <id>', and the content ID to scope a later search with --content-ids.",
+    CONTENT_COLUMNS,
   );
 
   addSearchVariant(
@@ -332,7 +362,7 @@ function renderSources(results: unknown[]): void {
     const r = raw as SearchResult;
     writeStdout("\n");
     writeStdout(
-      `  ${pc.dim(`${i + 1}.`)} ${pc.bold(r.title ?? "Untitled")} ${pc.dim(`(${r.content_id ?? "unknown"})`)}\n`,
+      `  ${pc.dim(`${i + 1}.`)} ${pc.bold(r.title ?? "Untitled")} ${pc.dim(`(${r.kb_node_id ?? r.content_id ?? "unknown"})`)}\n`,
     );
     if (r.chunk_text) {
       writeStdout(`     ${pc.dim("Snippet:")} ${r.chunk_text}\n`);

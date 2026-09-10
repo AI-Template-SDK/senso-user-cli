@@ -9,7 +9,48 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
+### Added
+
+- **`kb my-files`, `kb find` and `kb children` accept the filters the API has
+  always offered.** Five of the eight shared query parameters were never wired
+  up: `--status`, `--sort-by`, `--sort-order`, `--tag-ids` and `--role`. The
+  absences were not cosmetic — without `--status` there was
+  no way to list the documents whose ingestion failed, and without `--sort-by`
+  no way to order a page at all. The closed sets are validated locally, so
+  `--status archived` now exits 2 naming the valid values instead of spending a
+  round trip on a 400. `--limit` is checked for being a whole number of at least
+  1 but deliberately not capped at 50: the API documents higher values as capped
+  rather than rejected, and it silently read a non-numeric limit as 50.
+
+- **Search results now show the KB node ID, so a hit can be acted on.** The
+  search endpoints return `kb_node_id` alongside `content_id`, and the CLI
+  surfaces it first in every rendering. It is the id the rest of the CLI takes:
+  `kb get`, `kb rename`, `kb move` and `kb delete` all address a node, and
+  `content_id` is a different id space that 404s against them. `content_id` is
+  still shown, because it is what `--content-ids` accepts — the two ids answer
+  different questions: what to read next, and what to scope the next search to.
+  `senso search <query>`'s plain output previously labelled `content_id` as
+  plain `ID:`, which is the one id that does not work with any `kb` command.
+
 ### Fixed
+
+- **`search context`, `search full` and `search content` render a table again
+  under `--output table`.** They printed the entire response as a single
+  key/value blob, with the hits stuffed into one `value` cell as raw JSON,
+  because a search payload carries `query` and `search_type` beside its list and
+  the list-detection rule deliberately refuses anything that is not a list plus
+  pagination metadata. The three variants now pass their rows explicitly, as
+  `senso search <query>` already did.
+
+- **The raw-content `--data` help no longer promises tagging that does not
+  happen.** All three commands advertised `tag_ids`. On `kb create-raw` the API
+  accepts the field and discards it — the document is auto-tagged from its
+  content instead — so the flag silently did nothing and the help now says so.
+  On `kb update-raw` and `kb patch-raw` it does work, but it _replaces_ the whole
+  tag set rather than adding to it; omit it to keep the current tags, pass `[]`
+  to clear them, and note that every ID must already exist or the entire update
+  is rejected. Both descriptions also now mention that re-ingestion re-runs
+  auto-tagging, which can add tags of its own after the call returns.
 
 - **A version bump no longer fails CI.** The generated command reference named
   the package version, so every `npm version` left it stale and the release

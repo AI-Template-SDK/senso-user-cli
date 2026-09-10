@@ -10,7 +10,7 @@ import {
   uploadStatusToReason,
   type UploadResponse,
 } from "../lib/api-client.js";
-import { parseEnumFlag } from "../lib/enum-arg.js";
+import { parseEnumFlag, parseIntFlag } from "../lib/enum-arg.js";
 import { CliError, EXIT } from "../lib/errors.js";
 import { assertFilesExist, assertFilesNotEmpty } from "../lib/file-args.js";
 import { parseJsonFlag } from "../lib/json-arg.js";
@@ -27,6 +27,75 @@ const GRANTEE_TYPES = ["user", "group"] as const;
 
 /** The fields worth seeing when a KB endpoint returns `{ nodes: [...] }`. */
 const NODE_COLUMNS = ["kb_node_id", "name", "type"];
+
+/** Node types a KB list endpoint can be narrowed to. */
+const NODE_TYPES = ["folder", "content"] as const;
+
+/** Ingestion states a document node can be in. Folders have none. */
+const INGESTION_STATUSES = ["pending", "processing", "complete", "failed"] as const;
+
+/** Roles a caller can hold on a node, for the `--role` filter. */
+const NODE_ROLES = ["editor", "viewer"] as const;
+
+/** Fields the KB list endpoints can sort by. */
+const NODE_SORT_FIELDS = ["name", "updated_at", "created_at", "type", "status", "role"] as const;
+
+const SORT_ORDERS = ["asc", "desc"] as const;
+
+/**
+ * The filter, sort and paging flags every KB list endpoint accepts.
+ *
+ * `my-files`, `find` and `children` take one shared parameter set in the API,
+ * and only three of its eight members were wired up. The missing ones were not
+ * cosmetic: without `--status` there was no way to list the documents whose
+ * ingestion failed, and without `--sort-by` no way to order a page at all.
+ *
+ * Registered from one place so the three commands cannot drift apart again.
+ */
+function addListOptions(cmd: Command, defaultLimit: string): Command {
+  return cmd
+    .option("--limit <n>", "Items per page, 1-50 (the API caps higher values at 50)", defaultLimit)
+    .option("--offset <n>", "Pagination offset", "0")
+    .option("--type <type>", `Only nodes of this type: ${NODE_TYPES.join(" | ")}`)
+    .option(
+      "--status <status>",
+      `Only documents in this ingestion state: ${INGESTION_STATUSES.join(" | ")}. Ignored with --type folder`,
+    )
+    .option(
+      "--role <role>",
+      `Only nodes where the caller holds this role: ${NODE_ROLES.join(" | ")}. Ignored for org-admin keys, which already reach everything`,
+    )
+    .option("--sort-by <field>", `Sort by: ${NODE_SORT_FIELDS.join(" | ")}`)
+    .option("--sort-order <dir>", `Sort direction: ${SORT_ORDERS.join(" | ")}`)
+    .option("--tag-ids <ids>", "Comma-separated tag IDs; only nodes carrying at least one of them");
+}
+
+/**
+ * Validates the shared list flags and maps them onto query parameters.
+ *
+ * The closed sets are checked here rather than at the API. `--status archived`
+ * and `--sort-by whenever` are both 400s from the server, so catching them
+ * locally exits 2 with the valid values named instead of spending a round trip
+ * to be told the same thing less clearly.
+ *
+ * `--limit` is deliberately not range-checked at the top end: the API documents
+ * values above 50 as capped rather than rejected, so forwarding 500 is correct
+ * and yields a 50-item page. Only a non-integer or a value below 1 is a mistake
+ * worth stopping for — and those the API silently reads as "50", which is the
+ * failure mode this catches.
+ */
+function listParams(cmdOpts: Record<string, string>): Record<string, string | number | undefined> {
+  return {
+    limit: parseIntFlag("--limit", cmdOpts.limit, { min: 1 }),
+    offset: parseIntFlag("--offset", cmdOpts.offset, { min: 0 }),
+    type: parseEnumFlag("--type", cmdOpts.type, NODE_TYPES),
+    status: parseEnumFlag("--status", cmdOpts.status, INGESTION_STATUSES),
+    role: parseEnumFlag("--role", cmdOpts.role, NODE_ROLES),
+    sort_by: parseEnumFlag("--sort-by", cmdOpts.sortBy, NODE_SORT_FIELDS),
+    sort_order: parseEnumFlag("--sort-order", cmdOpts.sortOrder, SORT_ORDERS),
+    tag_ids: cmdOpts.tagIds,
+  };
+}
 
 const MIME_TYPES: Record<string, string> = {
   ".pdf": "application/pdf",
@@ -110,48 +179,43 @@ export function registerKBCommands(program: Command): void {
       }),
     );
 
-  kb.command("my-files")
-    .description("List top-level files and folders in the knowledge base.")
-    .option("--limit <n>", "Items per page", "50")
-    .option("--offset <n>", "Pagination offset", "0")
-    .option("--type <type>", "Filter by node type (folder or content)")
-    .action(
-      runAction(program, async (ctx, cmdOpts: Record<string, string>) => {
-        const data = await apiRequest({
-          path: "/org/kb/my-files",
-          params: { limit: cmdOpts.limit, offset: cmdOpts.offset, type: cmdOpts.type },
-          apiKey: ctx.apiKey,
-          baseUrl: ctx.baseUrl,
-        });
-        emit(ctx, data, { columns: NODE_COLUMNS });
-      }),
-    );
+  addListOptions(
+    kb.command("my-files").description("List top-level files and folders in the knowledge base."),
+    "50",
+  ).action(
+    runAction(program, async (ctx, cmdOpts: Record<string, string>) => {
+      const data = await apiRequest({
+        path: "/org/kb/my-files",
+        params: listParams(cmdOpts),
+        apiKey: ctx.apiKey,
+        baseUrl: ctx.baseUrl,
+      });
+      emit(ctx, data, { columns: NODE_COLUMNS });
+    }),
+  );
 
-  kb.command("find")
-    .description("Search KB nodes by name.")
-    .requiredOption("--query <q>", "Name search query")
-    .option("--limit <n>", "Items per page", "20")
-    .option("--offset <n>", "Pagination offset", "0")
-    .option("--type <type>", "Filter by node type (folder or content)")
-    .action(
-      runAction(program, async (ctx, cmdOpts: Record<string, string>) => {
-        const data = await apiRequest({
-          path: "/org/kb/find",
-          params: {
-            q: cmdOpts.query,
-            limit: cmdOpts.limit,
-            offset: cmdOpts.offset,
-            type: cmdOpts.type,
-          },
-          apiKey: ctx.apiKey,
-          baseUrl: ctx.baseUrl,
-        });
-        emit(ctx, data, { columns: NODE_COLUMNS });
-      }),
-    );
+  addListOptions(
+    kb
+      .command("find")
+      .description("Search KB nodes by name.")
+      .requiredOption("--query <q>", "Name search query"),
+    "20",
+  ).action(
+    runAction(program, async (ctx, cmdOpts: Record<string, string>) => {
+      const data = await apiRequest({
+        path: "/org/kb/find",
+        params: { q: cmdOpts.query, ...listParams(cmdOpts) },
+        apiKey: ctx.apiKey,
+        baseUrl: ctx.baseUrl,
+      });
+      emit(ctx, data, { columns: NODE_COLUMNS });
+    }),
+  );
 
   kb.command("sync-status")
-    .description("Get the vector sync status for the org's knowledge base.")
+    .description(
+      "Report whether queued move and delete operations are still propagating across the org's knowledge base. This is not an ingestion signal — to check whether a newly added document is queryable, run 'kb get <id>' and read content.processing_status.",
+    )
     .action(
       runAction(program, async (ctx) => {
         const data = await apiRequest({
@@ -176,22 +240,20 @@ export function registerKBCommands(program: Command): void {
       }),
     );
 
-  kb.command("children <id>")
-    .description("List children of a KB folder node.")
-    .option("--limit <n>", "Items per page", "50")
-    .option("--offset <n>", "Pagination offset", "0")
-    .option("--type <type>", "Filter by node type (folder or content)")
-    .action(
-      runAction(program, async (ctx, id: string, cmdOpts: Record<string, string>) => {
-        const data = await apiRequest({
-          path: `/org/kb/nodes/${id}/children`,
-          params: { limit: cmdOpts.limit, offset: cmdOpts.offset, type: cmdOpts.type },
-          apiKey: ctx.apiKey,
-          baseUrl: ctx.baseUrl,
-        });
-        emit(ctx, data, { columns: NODE_COLUMNS });
-      }),
-    );
+  addListOptions(
+    kb.command("children <id>").description("List children of a KB folder node."),
+    "50",
+  ).action(
+    runAction(program, async (ctx, id: string, cmdOpts: Record<string, string>) => {
+      const data = await apiRequest({
+        path: `/org/kb/nodes/${id}/children`,
+        params: listParams(cmdOpts),
+        apiKey: ctx.apiKey,
+        baseUrl: ctx.baseUrl,
+      });
+      emit(ctx, data, { columns: NODE_COLUMNS });
+    }),
+  );
 
   kb.command("ancestors <id>")
     .description("Get the ancestor chain (breadcrumb) for a KB node.")
@@ -299,7 +361,7 @@ export function registerKBCommands(program: Command): void {
     );
 
   kb.command("delete <id>")
-    .description("Delete a KB node (soft delete).")
+    .description("Delete a KB node.")
     .action(
       runAction(program, async (ctx, id: string) => {
         await apiRequest({
@@ -338,10 +400,12 @@ export function registerKBCommands(program: Command): void {
     );
 
   kb.command("create-raw")
-    .description("Create a raw (text/markdown) content item in the knowledge base.")
+    .description(
+      "Create a raw (text/markdown) content item in the knowledge base. Senso auto-tags the document in the background once ingestion finishes; use 'kb tags set' to override those tags afterwards.",
+    )
     .requiredOption(
       "--data <json>",
-      'JSON: { "title": "My doc", "text": "# Hello", "kb_folder_node_id": "<uuid>", "tag_ids": ["<uuid>"] }',
+      'JSON: { "text": "# Hello", "title": "My doc", "summary": "...", "kb_folder_node_id": "<uuid>" }. Only "text" is required. Tags cannot be set on creation — the API ignores "tag_ids" here without reporting it.',
     )
     .action(
       runAction(program, async (ctx, cmdOpts: { data: string }) => {
@@ -359,10 +423,12 @@ export function registerKBCommands(program: Command): void {
     );
 
   kb.command("update-raw <id>")
-    .description("Fully replace the text content of a raw KB node (creates a new version).")
+    .description(
+      "Fully replace the text content of a raw KB node (creates a new version). Re-ingestion re-runs auto-tagging, which may add tags of its own after this call.",
+    )
     .requiredOption(
       "--data <json>",
-      'JSON: { "title": "Title", "text": "# Updated content", "tag_ids": ["<uuid>"] }',
+      'JSON: { "title": "Title", "text": "# Updated content", "summary": "...", "tag_ids": ["<uuid>"] }. "title" and "text" are both required. "tag_ids" REPLACES the whole tag set — omit it to keep the current tags, pass [] to clear them. Every ID must already exist in the org, or the entire update is rejected.',
     )
     .action(
       runAction(program, async (ctx, id: string, cmdOpts: { data: string }) => {
@@ -380,10 +446,12 @@ export function registerKBCommands(program: Command): void {
     );
 
   kb.command("patch-raw <id>")
-    .description("Partially update the text content of a raw KB node.")
+    .description(
+      "Partially update the text content of a raw KB node. Re-ingestion re-runs auto-tagging, which may add tags of its own after this call.",
+    )
     .requiredOption(
       "--data <json>",
-      'JSON: { "title": "New title", "text": "Updated text", "summary": "...", "tag_ids": ["<uuid>"] }',
+      'JSON: { "title": "New title", "text": "Updated text", "summary": "...", "tag_ids": ["<uuid>"] }. Supply at least one of title/summary/text — "tag_ids" on its own is rejected. "tag_ids" REPLACES the whole tag set — omit it to keep the current tags, pass [] to clear them.',
     )
     .action(
       runAction(program, async (ctx, id: string, cmdOpts: { data: string }) => {
@@ -590,14 +658,23 @@ export function registerKBCommands(program: Command): void {
             hint: "--name creates the tag if it does not exist; --id takes an existing tag UUID.",
           });
         }
-        await apiRequest({
+        // Two shapes, by design: attaching by name returns 201 with the tag —
+        // created if it did not exist, so this is the only place its id is
+        // reported — while attaching by id returns 204 and nothing to print.
+        // apiRequest gives undefined for the 204, which is what separates them.
+        const data = await apiRequest({
           method: "POST",
           path: `/org/kb/nodes/${id}/tags`,
           body,
           apiKey: ctx.apiKey,
           baseUrl: ctx.baseUrl,
         });
-        emitConfirmation(ctx, `Tag attached to KB node ${id}.`);
+        if (data === undefined) {
+          emitConfirmation(ctx, `Tag attached to KB node ${id}.`);
+          return;
+        }
+        if (!ctx.quiet) log.success(`Tag attached to KB node ${id}.`);
+        emit(ctx, data, { columns: ["tag_id", "name", "created_at"] });
       }),
     );
 
