@@ -1,7 +1,7 @@
 {
   "name": "@senso-ai/cli",
-  "version": "0.12.0",
-  "description": "Senso CLI \u2014 Infrastructure for the Agentic Web. Manage your Senso knowledge base, content and GEO analytics from the terminal.",
+  "version": "0.13.0",
+  "description": "Senso CLI — Infrastructure for the Agentic Web. Manage your Senso knowledge base, content and GEO analytics from the terminal.",
   "type": "module",
   "bin": {
     "senso": "./dist/cli.js"
