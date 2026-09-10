@@ -183,10 +183,10 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        # Every version `engines` promises: the floor, the two LTS lines above
-        # it, and the current release. If one of these breaks, a user finds out
-        # here rather than in an issue.
-        node: ["18", "20", "22", "24"]
+        # Every version `engines` promises: the floor, the active LTS, and the
+        # current release. If one of these breaks, a user finds out here rather
+        # than in an issue.
+        node: ["20", "22", "24"]
     steps:
       - uses: actions/checkout@v5
 

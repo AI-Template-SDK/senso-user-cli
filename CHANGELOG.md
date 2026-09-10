@@ -11,6 +11,22 @@ mattered, and what you need to do differently.
 
 ### Changed — breaking for anything that reads output or exit codes
 
+- **The minimum Node version is now 20.12.** It was advertised as 18, but that
+  had already stopped being true: upgrading dependencies raised the real floor
+  to 22.12 without anything noticing, because the only thing that would have
+  noticed was a test on the floor and the test runner cannot run there. Node 18
+  reached end of life on 2025-04-30 and receives no security fixes, so the floor
+  moves up rather than pinning dependencies back to support it — `commander` is
+  held one major back at 14 so the floor is 20 rather than 22, which keeps Node
+  20 users, who are still in maintenance until 2026-04-30.
+
+  `engines` now says `>=20.12.0` precisely, not `>=20`: `@clack/prompts` imports
+  `styleText` from `node:util`, added in 20.12, and it loads on every
+  invocation. Verified against Node 20.11 (fails) and 20.12 (works). A policy
+  test now compares the declared floor against every runtime dependency's own
+  requirement, so an `engines` field that promises more than the dependencies
+  deliver fails the build.
+
 - **stdout now carries the payload and nothing else.** The banner, progress
   spinners, success ticks, warnings and errors all moved to stderr. In
   particular the banner used to be printed to stdout, so

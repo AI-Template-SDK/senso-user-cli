@@ -5,7 +5,7 @@ test goes, and how to see what a command is actually sending.
 
 ## Getting set up
 
-Node 22, per `.nvmrc`. The published package supports Node 18 and up; 22 is what
+Node 22, per `.nvmrc`. The published package supports Node 20.12 and up; 22 is what
 this is developed and released on.
 
 ```bash

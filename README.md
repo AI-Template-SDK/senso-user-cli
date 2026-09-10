@@ -18,7 +18,7 @@ and failures exit with a code that says what went wrong.
 
 ## Install
 
-Requires **Node.js 18 or newer**. Works on Linux, macOS and Windows.
+Requires **Node.js 20.12 or newer**. Works on Linux, macOS and Windows.
 
 ```bash
 npm install -g @senso-ai/cli

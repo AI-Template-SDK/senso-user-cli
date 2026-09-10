@@ -14,6 +14,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { satisfies } from "semver";
 import { createProgram } from "../../src/program.js";
 
 const REPO_ROOT = join(import.meta.dirname, "../..");
@@ -146,6 +147,49 @@ describe("the Node version is pinned consistently", () => {
       compatJob,
       `no CI job exercises the supported floor, Node ${floor} — see the compat job`,
     ).toMatch(new RegExp(`node:.*"${floor}"`));
+  });
+
+  it("promises a Node floor that every runtime dependency actually supports", () => {
+    /**
+     * The bug this exists for, and it is the expensive kind.
+     *
+     * A routine "upgrade every dependency to its current major" raised the real
+     * Node floor of this CLI to 22.12 while package.json still advertised
+     * `>=18`. Three dependencies did it at once — commander wanted >=22.12,
+     * @clack/prompts >=20.12, env-paths >=20 — and nothing noticed, because the
+     * only thing that would have noticed was a test on the floor, and the test
+     * runner cannot run there.
+     *
+     * An `engines` field that is wrong is worse than none: npm tells users the
+     * package will work, they install it, and it dies on an import. So this
+     * reads what every runtime dependency actually requires and asserts the
+     * lowest Node we claim to support satisfies all of them.
+     */
+    const floor = /(\d+)(?:\.(\d+))?(?:\.(\d+))?/.exec(pkg.engines.node);
+    expect(floor, "package.json engines.node has no numeric floor").toBeTruthy();
+    const lowest = `${floor?.[1] ?? "0"}.${floor?.[2] ?? "0"}.${floor?.[3] ?? "0"}`;
+
+    const tooNew: string[] = [];
+    for (const dep of Object.keys(pkg.dependencies)) {
+      const manifestPath = join(REPO_ROOT, "node_modules", dep, "package.json");
+      if (!existsSync(manifestPath)) continue;
+      const manifest = JSON.parse(readFileSync(manifestPath, "utf-8")) as {
+        version: string;
+        engines?: { node?: string };
+      };
+      const required = manifest.engines?.node;
+      if (!required) continue;
+      if (!satisfies(lowest, required, { includePrerelease: true })) {
+        tooNew.push(`${dep}@${manifest.version} needs node ${required}`);
+      }
+    }
+
+    expect(
+      tooNew,
+      `package.json promises node ${pkg.engines.node}, but these dependencies need more:\n  ` +
+        tooNew.join("\n  ") +
+        `\n\nEither raise engines.node, or pin the dependency to a version that supports the floor.`,
+    ).toEqual([]);
   });
 
   it("does not ask vitest to run on a Node version it does not support", () => {
