@@ -31,7 +31,7 @@
   "dependencies": {
     "@clack/prompts": "1.8.0",
     "boxen": "8.0.1",
-    "commander": "14.0.1",
+    "commander": "15.0.0",
     "env-paths": "4.0.0",
     "figlet": "1.11.4",
     "gradient-string": "3.0.0",
