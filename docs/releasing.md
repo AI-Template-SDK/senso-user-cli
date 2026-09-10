@@ -10,11 +10,12 @@ A release is triggered by pushing a tag matching `v*`.
 
 ## Cutting a release
 
-### 1. Write the changelog section
+### 1. Describe the release under `[Unreleased]`
 
-Move everything under `## [Unreleased]` in `CHANGELOG.md` into a new heading for
-the version you are about to cut, and add the compare link at the bottom of the
-file:
+Make sure `## [Unreleased]` in `CHANGELOG.md` says what this release changes. You
+do not move the entries yourself: `npm version` runs the `version` npm script
+(`scripts/changelog-release.ts`), which moves them under a heading for the new
+version and adds the compare link, in the same commit as the bump:
 
 ```markdown
 ## [0.13.0] — 2026-09-20
@@ -25,10 +26,11 @@ file:
 [0.13.0]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.12.0...v0.13.0
 ```
 
-This step is manual. The publish workflow refuses to run without a
-`## [0.13.0]` section, but nothing writes one for you — the `version` npm script
-the hardening plan describes, which would move the `[Unreleased]` entries as part
-of `npm version`, does not exist in `package.json` today.
+The script refuses to run while `[Unreleased]` is empty, and the publish workflow
+refuses to publish a version with no section of its own.
+
+Nothing else in the repository names the version. In particular
+`docs/reference/commands.md` deliberately does not, so a bump never makes it stale.
 
 Entries are written for the person who has to act on them: what changed, why it
 mattered, and what they need to do differently. Anything a user or an agent would

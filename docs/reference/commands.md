@@ -2,7 +2,7 @@
 
 **This file is generated.** Run `make reference` after changing a command; a policy test fails if it is stale.
 
-Generated from the command tree of `@senso-ai/cli` v0.12.0. Every command accepts the [global options](#global-options).
+Generated from the command tree of `@senso-ai/cli`. Every command accepts the [global options](#global-options).
 
 ## Contents
 

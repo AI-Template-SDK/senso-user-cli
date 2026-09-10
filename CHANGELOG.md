@@ -9,6 +9,13 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A version bump no longer fails CI.** The generated command reference named
+  the package version, so every `npm version` left it stale and the release
+  commit failed the test that keeps it current. That is what stopped 0.13.0 from
+  publishing. The reference no longer names a version.
+
 ## [0.13.0] — 2026-09-10
 
 ### Changed — breaking for anything that reads output or exit codes

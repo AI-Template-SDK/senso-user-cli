@@ -55,7 +55,11 @@ function escapeCell(s: string): string {
   return s.replaceAll("|", "\\|").replaceAll("\n", " ");
 }
 
-function render(entries: Entry[], version: string): string {
+// No version number in the output. The policy test fails when this file is
+// stale, so a version here made every `npm version` bump fail CI on a commit that
+// changed no command. The file should change when the command tree does, and only
+// then.
+function render(entries: Entry[]): string {
   const lines: string[] = [];
 
   lines.push("# Command reference");
@@ -65,7 +69,7 @@ function render(entries: Entry[], version: string): string {
   );
   lines.push("");
   lines.push(
-    `Generated from the command tree of \`@senso-ai/cli\` v${version}. Every command accepts the [global options](#global-options).`,
+    "Generated from the command tree of `@senso-ai/cli`. Every command accepts the [global options](#global-options).",
   );
   lines.push("");
 
@@ -160,7 +164,7 @@ export function generateReference(): string {
   const program = createProgram();
   const entries: Entry[] = [];
   collect(program, "", 0, entries);
-  return render(entries, program.version() ?? "0.0.0");
+  return render(entries);
 }
 
 // Written only when this file is the entry point, so the policy test can import
