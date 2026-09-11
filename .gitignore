@@ -25,3 +25,8 @@ coverage/
 # Logs
 *.log
 npm-debug.log*
+
+# Agent skills installed into this working copy by `senso skills` (which shells
+# out to shipables). A local artifact of running the CLI here, not source.
+.claude/skills/
+.cursor/skills/

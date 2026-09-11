@@ -356,7 +356,7 @@ senso search context [options] <query>
 
 ### senso search content
 
-Search the knowledge base — returns deduplicated content IDs and titles only. Use this to discover which documents are relevant before fetching full content with 'content get <id>'.
+Search the knowledge base — returns deduplicated matches with no chunks: each carries the KB node ID to read it with 'kb get <id>', and the content ID to scope a later search with --content-ids.
 
 ```
 senso search content [options] <query>
@@ -1454,9 +1454,14 @@ senso kb my-files [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--limit <n>` | Items per page | `50` |
+| `--limit <n>` | Items per page, 1-50 (the API caps higher values at 50) | `50` |
 | `--offset <n>` | Pagination offset | `0` |
-| `--type <type>` | Filter by node type (folder or content) |  |
+| `--type <type>` | Only nodes of this type: folder \| content |  |
+| `--status <status>` | Only documents in this ingestion state: pending \| processing \| complete \| failed. Ignored with --type folder |  |
+| `--role <role>` | Only nodes where the caller holds this role: editor \| viewer. Ignored for org-admin keys, which already reach everything |  |
+| `--sort-by <field>` | Sort by: name \| updated_at \| created_at \| type \| status \| role |  |
+| `--sort-order <dir>` | Sort direction: asc \| desc |  |
+| `--tag-ids <ids>` | Comma-separated tag IDs; only nodes carrying at least one of them |  |
 
 ### senso kb find
 
@@ -1469,13 +1474,18 @@ senso kb find [options]
 | Option | Description | Default |
 |---|---|---|
 | `--query <q>` | Name search query |  |
-| `--limit <n>` | Items per page | `20` |
+| `--limit <n>` | Items per page, 1-50 (the API caps higher values at 50) | `20` |
 | `--offset <n>` | Pagination offset | `0` |
-| `--type <type>` | Filter by node type (folder or content) |  |
+| `--type <type>` | Only nodes of this type: folder \| content |  |
+| `--status <status>` | Only documents in this ingestion state: pending \| processing \| complete \| failed. Ignored with --type folder |  |
+| `--role <role>` | Only nodes where the caller holds this role: editor \| viewer. Ignored for org-admin keys, which already reach everything |  |
+| `--sort-by <field>` | Sort by: name \| updated_at \| created_at \| type \| status \| role |  |
+| `--sort-order <dir>` | Sort direction: asc \| desc |  |
+| `--tag-ids <ids>` | Comma-separated tag IDs; only nodes carrying at least one of them |  |
 
 ### senso kb sync-status
 
-Get the vector sync status for the org's knowledge base.
+Report whether queued move and delete operations are still propagating across the org's knowledge base. This is not an ingestion signal — to check whether a newly added document is queryable, run 'kb get <id>' and read content.processing_status.
 
 ```
 senso kb sync-status [options]
@@ -1499,9 +1509,14 @@ senso kb children [options] <id>
 
 | Option | Description | Default |
 |---|---|---|
-| `--limit <n>` | Items per page | `50` |
+| `--limit <n>` | Items per page, 1-50 (the API caps higher values at 50) | `50` |
 | `--offset <n>` | Pagination offset | `0` |
-| `--type <type>` | Filter by node type (folder or content) |  |
+| `--type <type>` | Only nodes of this type: folder \| content |  |
+| `--status <status>` | Only documents in this ingestion state: pending \| processing \| complete \| failed. Ignored with --type folder |  |
+| `--role <role>` | Only nodes where the caller holds this role: editor \| viewer. Ignored for org-admin keys, which already reach everything |  |
+| `--sort-by <field>` | Sort by: name \| updated_at \| created_at \| type \| status \| role |  |
+| `--sort-order <dir>` | Sort direction: asc \| desc |  |
+| `--tag-ids <ids>` | Comma-separated tag IDs; only nodes carrying at least one of them |  |
 
 ### senso kb ancestors
 
@@ -1574,7 +1589,7 @@ senso kb move [options] <id>
 
 ### senso kb delete
 
-Delete a KB node (soft delete).
+Delete a KB node.
 
 ```
 senso kb delete [options] <id>
@@ -1590,7 +1605,7 @@ senso kb bulk-delete [options] <nodeIds...>
 
 ### senso kb create-raw
 
-Create a raw (text/markdown) content item in the knowledge base.
+Create a raw (text/markdown) content item in the knowledge base. Senso auto-tags the document in the background once ingestion finishes; use 'kb tags set' to override those tags afterwards.
 
 ```
 senso kb create-raw [options]
@@ -1598,11 +1613,11 @@ senso kb create-raw [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "title": "My doc", "text": "# Hello", "kb_folder_node_id": "<uuid>", "tag_ids": ["<uuid>"] } |  |
+| `--data <json>` | JSON: { "text": "# Hello", "title": "My doc", "summary": "...", "kb_folder_node_id": "<uuid>" }. Only "text" is required. Tags cannot be set on creation — the API ignores "tag_ids" here without reporting it. |  |
 
 ### senso kb update-raw
 
-Fully replace the text content of a raw KB node (creates a new version).
+Fully replace the text content of a raw KB node (creates a new version). Re-ingestion re-runs auto-tagging, which may add tags of its own after this call.
 
 ```
 senso kb update-raw [options] <id>
@@ -1610,11 +1625,11 @@ senso kb update-raw [options] <id>
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "title": "Title", "text": "# Updated content", "tag_ids": ["<uuid>"] } |  |
+| `--data <json>` | JSON: { "title": "Title", "text": "# Updated content", "summary": "...", "tag_ids": ["<uuid>"] }. "title" and "text" are both required. "tag_ids" REPLACES the whole tag set — omit it to keep the current tags, pass [] to clear them. Every ID must already exist in the org, or the entire update is rejected. |  |
 
 ### senso kb patch-raw
 
-Partially update the text content of a raw KB node.
+Partially update the text content of a raw KB node. Re-ingestion re-runs auto-tagging, which may add tags of its own after this call.
 
 ```
 senso kb patch-raw [options] <id>
@@ -1622,7 +1637,7 @@ senso kb patch-raw [options] <id>
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "title": "New title", "text": "Updated text", "summary": "...", "tag_ids": ["<uuid>"] } |  |
+| `--data <json>` | JSON: { "title": "New title", "text": "Updated text", "summary": "...", "tag_ids": ["<uuid>"] }. Supply at least one of title/summary/text — "tag_ids" on its own is rejected. "tag_ids" REPLACES the whole tag set — omit it to keep the current tags, pass [] to clear them. |  |
 
 ### senso kb upload
 
