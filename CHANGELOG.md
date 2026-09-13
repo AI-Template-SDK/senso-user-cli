@@ -9,6 +9,8 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
+## [0.15.0] — 2026-09-13
+
 ### Added
 
 - **`senso website-import start` and `senso website-import status`.** One call
@@ -373,7 +375,8 @@ get` showed the organization's locations and silently dropped its name, slug
 - First published release: authentication, search, content, ingestion,
   organization administration, and self-update.
 
-[Unreleased]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.11.1...v0.12.0
