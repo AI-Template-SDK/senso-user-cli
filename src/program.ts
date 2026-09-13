@@ -21,6 +21,7 @@ import { registerUserCommands } from "./commands/users.js";
 import { registerApiKeyCommands } from "./commands/api-keys.js";
 import { registerSearchCommands } from "./commands/search.js";
 import { registerIngestCommands } from "./commands/ingest.js";
+import { registerWebsiteImportCommands } from "./commands/website-import.js";
 import { registerContentCommands } from "./commands/content.js";
 import { registerCtaCommands } from "./commands/ctas.js";
 import { registerGenerateCommands } from "./commands/generate.js";
@@ -139,6 +140,7 @@ export function createProgram(): Command {
   registerApiKeyCommands(program);
   registerSearchCommands(program);
   registerIngestCommands(program);
+  registerWebsiteImportCommands(program);
   registerContentCommands(program);
   registerCtaCommands(program);
   registerGenerateCommands(program);

@@ -86,6 +86,7 @@ function accepted(filename: string, url = S3_URL) {
     status: "upload_pending",
     upload_url: url,
     content_id: `c-${filename}`,
+    kb_node_id: `n-${filename}`,
   };
 }
 

@@ -32,11 +32,11 @@ export function registerOrgCommands(program: Command): void {
   org
     .command("update")
     .description(
-      "Update organization details. All fields are optional — only provided fields are changed. Pass an empty array for websites/locations to clear them.",
+      "Update organization details. Only the fields you pass are changed; omitting a field leaves it alone. But 'websites' and 'locations' REPLACE their whole list when passed — sending one website deletes the rest. To add to either list, run 'org get' first and send back every entry you want to keep.",
     )
     .requiredOption(
       "--data <json>",
-      'JSON: { "name": "...", "slug": "...", "logo_url": "...", "websites": [...], "locations": [...] }',
+      'JSON: { "name": "Acme", "slug": "acme", "logo_url": "https://acme.com/logo.png", "websites": [{"url": "https://acme.com"}], "locations": [{"country_code": "US", "region_name": "California"}] }. Every field is optional. "websites" and "locations" REPLACE the existing list rather than adding to it — include every entry you want to keep, or pass [] to clear the list. A website entry takes only "url"; sending the "org_website_id" from \'org get\' is rejected. Send "logo_url": "" to clear the logo.',
     )
     .action(
       runAction(program, async (ctx, cmdOpts: { data: string }) => {

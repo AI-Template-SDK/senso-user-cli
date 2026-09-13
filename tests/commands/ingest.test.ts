@@ -114,6 +114,7 @@ function accepted(filename: string, url = S3_URL) {
     status: "upload_pending",
     upload_url: url,
     content_id: `c-${filename}`,
+    kb_node_id: `n-${filename}`,
     ingestion_run_id: `run-${filename}`,
   };
 }
@@ -794,6 +795,28 @@ describe("ingest upload, on success", () => {
     expect(res.stdout).toContain("a.txt");
     expect(res.stdout).toContain("duplicate");
     expect(res.stdout).toContain("c-a.txt");
+  });
+
+  // The command's description tells the caller to poll `senso kb get
+  // <kb-node-id>`. It previously rendered only `content_id`, so the id that
+  // instruction needs was not in the table at all — and `senso content get`
+  // answers 400 for knowledge-base content, which is all this command creates.
+  it("renders kb_node_id, the id the documented poll takes", async () => {
+    serveUpload([accepted("a.txt")]);
+
+    const res = await runCli([
+      "ingest",
+      "upload",
+      tempFile("a.txt", "alpha"),
+      "--folder-id",
+      "f-1",
+      "--output",
+      "table",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain("kb_node_id");
+    expect(res.stdout).toContain("n-a.txt");
   });
 
   it("writes nothing to stdout in plain mode, because the summary is the rendering", async () => {

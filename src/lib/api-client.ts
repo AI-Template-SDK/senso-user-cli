@@ -158,6 +158,11 @@ export async function apiRequest<T = unknown>(opts: RequestOptions): Promise<T> 
 export interface UploadResultItem {
   ingestion_run_id?: string;
   content_id?: string;
+  /**
+   * The created or replaced document node — the id to poll with `senso kb get`.
+   * Absent on skipped items (any status other than `upload_pending`).
+   */
+  kb_node_id?: string;
   filename: string;
   status: "upload_pending" | "conflict" | "duplicate" | "invalid";
   upload_url?: string;

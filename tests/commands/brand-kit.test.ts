@@ -108,25 +108,159 @@ describe("brand-kit get, when the request fails", () => {
 });
 
 describe("brand-kit set, when the write is rejected", () => {
-  it("surfaces the API's field-level complaint about an unknown key", async () => {
-    // The endpoint rejects keys outside the defined set. That message is the
-    // only thing telling the user which key was wrong, so it must reach stderr
-    // rather than being flattened into a generic failure.
+  it("still surfaces an API complaint the CLI could not have predicted", async () => {
+    // The shape checks below run first, so reaching the API means the body was
+    // well formed. Whatever the server objects to at that point is something
+    // only it knows, and its message is the only thing the user has to go on.
     server.use(
       http.put(apiUrl("/org/brand-kit"), () =>
         HttpResponse.json(
-          { errors: [{ field: "guidelines.mascot", message: "unknown key" }] },
+          { errors: [{ field: "guidelines.brand_domain", message: "must be an absolute URL" }] },
           { status: 400 },
         ),
       ),
     );
 
-    const res = await runCli(["brand-kit", "set", "--data", '{"guidelines":{"mascot":"a goat"}}']);
+    const res = await runCli([
+      "brand-kit",
+      "set",
+      "--data",
+      '{"guidelines":{"brand_domain":"acme"}}',
+    ]);
 
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("guidelines.mascot");
-    expect(res.stderr).toContain("unknown key");
+    expect(res.stderr).toContain("guidelines.brand_domain");
+    expect(res.stderr).toContain("must be an absolute URL");
+  });
+});
+
+/**
+ * The API holds a six-key allowlist for `guidelines` and rejects anything else,
+ * but the two endpoints report it differently: PATCH passes the validator's
+ * message through, PUT flattens every failure to "Invalid guidelines data" with
+ * the field name discarded. Each of these used to cost a round trip to find out.
+ *
+ * No MSW handler is registered in this block on purpose — `onUnhandledRequest:
+ * 'error'` means any test that reaches the network fails, which is the point:
+ * these must be caught before the request.
+ */
+describe("brand-kit set and patch, when the guidelines are malformed", () => {
+  it("exits 2 and names the field when a key is not on the allowlist", async () => {
+    const res = await runCli(["brand-kit", "set", "--data", '{"guidelines":{"mascot":"a goat"}}']);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stdout).toBe("");
+    expect(res.stderr).toContain('does not accept the field "mascot"');
+    expect(res.stderr).toContain("brand_name");
+  });
+
+  it("suggests the intended field when the key is a near miss", async () => {
+    const res = await runCli([
+      "brand-kit",
+      "patch",
+      "--data",
+      '{"guidelines":{"voice_and_tones":"Warm"}}',
+    ]);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stderr).toContain('Did you mean "voice_and_tone"');
+  });
+
+  it("offers no suggestion for a key that resembles nothing", async () => {
+    const res = await runCli(["brand-kit", "patch", "--data", '{"guidelines":{"mascot":"goat"}}']);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stderr).not.toContain("Did you mean");
+  });
+
+  it("exits 2 when a string field is given a number", async () => {
+    const res = await runCli(["brand-kit", "patch", "--data", '{"guidelines":{"brand_name":42}}']);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stderr).toContain('"brand_name" must be a string, not a number');
+  });
+
+  it("exits 2 when a field is null, and says how to remove one instead", async () => {
+    const res = await runCli(["brand-kit", "set", "--data", '{"guidelines":{"brand_name":null}}']);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stderr).toContain('"brand_name" must be a string, not null');
+    expect(res.stderr).toContain("No field may be null");
+  });
+
+  it("exits 2 when global_writing_rules is not an array", async () => {
+    const res = await runCli([
+      "brand-kit",
+      "patch",
+      "--data",
+      '{"guidelines":{"global_writing_rules":"be nice"}}',
+    ]);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stderr).toContain("must be an array of strings, not a string");
+  });
+
+  it("exits 2 naming the offending index when a rule is not a string", async () => {
+    // The API accepts a null here and stores it, so this is the CLI being
+    // stricter on purpose — a null rule is a templating slip, not a rule.
+    const res = await runCli([
+      "brand-kit",
+      "patch",
+      "--data",
+      '{"guidelines":{"global_writing_rules":["fine",null]}}',
+    ]);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stderr).toContain('"global_writing_rules[1]" must be a string, not null');
+  });
+
+  it("exits 2 when guidelines is an array rather than an object", async () => {
+    const res = await runCli(["brand-kit", "set", "--data", '{"guidelines":["Acme"]}']);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stderr).toContain('"guidelines" must be a JSON object, not an array');
+  });
+
+  it("exits 2 when the guidelines envelope is missing entirely", async () => {
+    const res = await runCli(["brand-kit", "set", "--data", '{"brand_name":"Acme"}']);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stderr).toContain('must have a "guidelines" object');
+  });
+
+  it("exits 2 on a field left beside the envelope, which the API would drop", async () => {
+    const res = await runCli([
+      "brand-kit",
+      "set",
+      "--data",
+      '{"guidelines":{"brand_name":"Acme"},"voice_and_tone":"Warm"}',
+    ]);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stderr).toContain('outside "guidelines": voice_and_tone');
+  });
+
+  it("exits 2 when patch is given nothing to change", async () => {
+    const res = await runCli(["brand-kit", "patch", "--data", '{"guidelines":{}}']);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stderr).toContain("at least one field");
+  });
+
+  it("reports the failure as JSON on stderr under --output json", async () => {
+    const res = await runCli([
+      "brand-kit",
+      "patch",
+      "--data",
+      '{"guidelines":{"mascot":"goat"}}',
+      "--output",
+      "json",
+    ]);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stdout).toBe("");
+    expect(JSON.parse(res.stderr)).toMatchObject({ error: { code: "usage" } });
   });
 });
 
@@ -201,6 +335,38 @@ describe("brand-kit set, on the wire", () => {
     expect(seen?.method).toBe("PUT");
     expect(new URL(seen?.url ?? "").pathname).toBe("/api/v1/org/brand-kit");
     expect(seen?.headers.get("content-type")).toBe("application/json");
+    await expect(seen?.json()).resolves.toEqual(BRAND_KIT);
+  });
+
+  it("accepts an empty string, which the API treats as a real value", async () => {
+    // The shape checks must not get ahead of the server: "" is a legitimate way
+    // to blank a field on a PUT, and rejecting it here would block a valid write.
+    let seen: Request | undefined;
+    server.use(
+      http.put(apiUrl("/org/brand-kit"), ({ request }) => {
+        seen = request.clone();
+        return HttpResponse.json(BRAND_KIT);
+      }),
+    );
+
+    const res = await runCli(["brand-kit", "set", "--data", '{"guidelines":{"brand_name":""}}']);
+
+    expect(res.exitCode).toBe(0);
+    await expect(seen?.json()).resolves.toEqual({ guidelines: { brand_name: "" } });
+  });
+
+  it("accepts every allowlisted field at once, unchanged", async () => {
+    let seen: Request | undefined;
+    server.use(
+      http.put(apiUrl("/org/brand-kit"), ({ request }) => {
+        seen = request.clone();
+        return HttpResponse.json(BRAND_KIT);
+      }),
+    );
+
+    const res = await runCli(["brand-kit", "set", "--data", JSON.stringify(BRAND_KIT)]);
+
+    expect(res.exitCode).toBe(0);
     await expect(seen?.json()).resolves.toEqual(BRAND_KIT);
   });
 
