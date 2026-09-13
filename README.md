@@ -118,7 +118,7 @@ argument and flag, generated from the CLI itself.
 | ------------------------------------------------------------------------ | ------------------------------------------------------------------- |
 | `login` `logout` `whoami`                                                | Authentication and the current organization                         |
 | `search`                                                                 | Ask the knowledge base, with an AI answer, raw chunks, or streaming |
-| `kb` `ingest` `content`                                                  | The knowledge base: upload, browse, organize, verify                |
+| `kb` `ingest` `content` `website-import`                                 | The knowledge base: upload, browse, organize, verify                |
 | `ctas`                                                                   | Call-to-action cards on published pages                             |
 | `generate` `engine` `generated-content` `destinations` `publish-records` | Generate content and publish it                                     |
 | `analytics`                                                              | GEO metrics for your own organization                               |

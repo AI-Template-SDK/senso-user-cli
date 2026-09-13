@@ -88,7 +88,7 @@ export function registerIngestCommands(program: Command): void {
   ingest
     .command("upload <files...>")
     .description(
-      "Upload files to the knowledge base. Accepts local file paths (up to 10). Files are hashed, uploaded to S3, then parsed and embedded by a background worker. Poll 'senso content get <content-id>' until processing_status is 'complete' before searching the uploaded content.",
+      "Upload files to the knowledge base. Accepts local file paths (up to 10). Files are hashed, uploaded to S3, then parsed and embedded by a background worker. Poll 'senso kb get <kb-node-id>' until content.processing_status is 'complete' before searching the uploaded content.",
     )
     .option("--folder-id <id>", "Destination folder ID (skip interactive prompt)")
     .action(
@@ -232,9 +232,13 @@ export function registerIngestCommands(program: Command): void {
             rows: items.map((i) => ({
               filename: i.filename,
               status: i.status,
+              // The id `senso kb get` takes. `content_id` is not interchangeable
+              // with it: polling a KB upload through `senso content get` hits an
+              // endpoint that serves non-KB content only and answers 400.
+              kb_node_id: i.kb_node_id,
               content_id: i.content_id,
             })),
-            columns: ["filename", "status", "content_id"],
+            columns: ["filename", "status", "kb_node_id", "content_id"],
           },
           plain: [],
         });

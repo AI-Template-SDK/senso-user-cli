@@ -60,6 +60,13 @@ tags:
       Your org-wide identity config — voice, tone, persona, and writing rules. The brand kit ensures every piece of generated content sounds like you, not like generic AI output.
 
       Set it once, and it applies to all content generation calls. Without a brand kit, generated content has no identity guidance.
+  - name: Website Import
+    description: |
+      One call that seeds your organization from its own public website: it fetches your home page plus the pages linked from it, ingests them into your knowledge base as documents, and — if you have no brand kit yet — drafts one from what it read.
+
+      The site it imports is the website on file for your organization (`GET /org/me`), not something you pass in. Set it with `PUT /org/me` before the first import.
+
+      An import runs in the background. Trigger it, then poll the status endpoint until `current` is `null` and read the outcome from `latest_completed`. Only one import can be in flight per organization at a time.
   - name: Content Types
     description: |
       Output templates that control the format, structure, and rules for each kind of generated content. Think of them as compilation targets — the shape your knowledge base gets compiled into.
@@ -4544,6 +4551,98 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+
+  # ──────────────────────────────────────────────
+  # Website Import — /org/website-import
+  # ──────────────────────────────────────────────
+  /org/website-import:
+    post:
+      tags: [Website Import]
+      summary: Import your website
+      description: >-
+        Starts an import of your organization's website: it fetches your home page plus
+        up to 10 pages linked from it, ingests each one into your knowledge base as a
+        document under a folder named `Website`, and generates a brand kit from what it
+        read if your organization does not have one yet. A brand kit that already has
+        content is never overwritten — the import still runs, and reports
+        `brand_kit_generated: false` with `brand_kit_skip_reason: already_populated`.
+
+
+        The site imported is the website on file for your organization, not a value you
+        pass — this request takes no body. When several websites are on file, the most
+        recently added one is used; see `GET /org/me` for the current list and
+        `PUT /org/me` to change it. With no usable website on file the call returns `422`.
+
+
+        Returns immediately with a run to poll — the import itself continues in the
+        background and typically finishes within a minute. Only one import can be in
+        flight per organization: triggering while one is running returns `409` carrying
+        that run, so a duplicate call becomes "poll this one" rather than an error.
+        Requires the GEO product.
+      operationId: orgTriggerWebsiteImport
+      responses:
+        "202":
+          description: The import was accepted and is now running. Poll the status endpoint.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebsiteImportRunResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: >-
+            An import is already running for this organization. `current` is that run —
+            poll it rather than retrying the trigger.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebsiteImportConflictResponse"
+        "422":
+          description: >-
+            No usable website is on file for this organization. Set one with
+            `PUT /org/me` and trigger again.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebsiteImportErrorResponse"
+              example:
+                status: 422
+                message: No website on file for this organization
+                error_code: NO_WEBSITE
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /org/website-import/status:
+    get:
+      tags: [Website Import]
+      summary: Get website import status
+      description: >-
+        Returns your organization's in-flight import as `current` and its most recently
+        finished import as `latest_completed`. Both are independently `null`: an
+        organization that has never imported has neither, one mid-import has `current`
+        set, and one that has finished has only `latest_completed`.
+
+
+        `current` only ever holds a `queued` or `running` import. When an import ends it
+        leaves `current` and appears as `latest_completed`, so read the outcome — success
+        and failure alike — from `latest_completed` and check its `status`. Poll while
+        `current` is non-null. Requires the GEO product.
+      operationId: orgGetWebsiteImportStatus
+      responses:
+        "200":
+          description: The organization's current and most recently finished imports.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebsiteImportStatusResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
 
   # ──────────────────────────────────────────────
   # Content Types — /org/content-types
@@ -16341,6 +16440,158 @@ components:
       properties:
         guidelines:
           $ref: "#/components/schemas/BrandKitGuidelines"
+    WebsiteImportRunResponse:
+      type: object
+      description: >-
+        One website import. The same shape describes a run that is still going and one
+        that has finished; the fields only a finished run has are absent while it runs.
+      additionalProperties: false
+      required:
+        - run_id
+        - status
+        - source_url
+        - pages_fetched
+        - pages_ingested
+        - brand_kit_generated
+        - created_at
+      properties:
+        run_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          description: >-
+            Lifecycle state. `queued` and `running` mean the import is still in flight;
+            `completed` and `failed` are final and never change.
+          enum:
+            - queued
+            - running
+            - completed
+            - failed
+        source_url:
+          type: string
+          description: The website this import read, resolved from your organization's website on file.
+        pages_fetched:
+          type: integer
+          description: Pages successfully read from the site, including the home page. `0` until the fetch stage finishes.
+        pages_ingested:
+          type: integer
+          description: >-
+            Pages written into the knowledge base as new documents. Lower than
+            `pages_fetched` when a page's content was already in the knowledge base
+            unchanged — the normal case when re-importing the same site — or when an
+            individual page could not be stored. The import only fails outright if no
+            page at all could be stored.
+        brand_kit_generated:
+          type: boolean
+          description: >-
+            Whether this import wrote a brand kit. `false` both while the import is still
+            running and when generation was deliberately skipped — `brand_kit_skip_reason`
+            distinguishes the two.
+        brand_kit_skip_reason:
+          type: string
+          description: >-
+            Why brand kit generation was skipped. Present only on a finished import that
+            skipped it; a skip is a success, not a failure.
+          enum:
+            - already_populated
+        error_code:
+          type: string
+          description: >-
+            Why the import failed. Present only on a `failed` import. `NO_WEBSITE`: no
+            usable website was on file. `HOMEPAGE_FETCH_FAILED`: the home page could not
+            be read. `INGESTION_FAILED`: every page failed to reach the knowledge base.
+            `GENERATION_FAILED`: the brand kit could not be generated. `FEATURE_UNAVAILABLE`:
+            website import is not available for this deployment. `INTERNAL_ERROR`: an
+            unexpected failure.
+          enum:
+            - NO_WEBSITE
+            - HOMEPAGE_FETCH_FAILED
+            - INGESTION_FAILED
+            - GENERATION_FAILED
+            - FEATURE_UNAVAILABLE
+            - INTERNAL_ERROR
+        error_message:
+          type: string
+          description: A human-readable description of the failure. Present only on a `failed` import.
+        created_at:
+          type: string
+          format: date-time
+          description: When the import was requested.
+        started_at:
+          type: string
+          format: date-time
+          description: When the import began working. Absent until it leaves `queued`.
+        completed_at:
+          type: string
+          format: date-time
+          description: When the import reached `completed` or `failed`. Absent while it is still in flight.
+    WebsiteImportStatusResponse:
+      type: object
+      description: >-
+        Your organization's import state. Both fields are independently null: neither is
+        set before the first import, `current` alone during one, and `latest_completed`
+        alone once it has finished.
+      additionalProperties: false
+      required:
+        - current
+        - latest_completed
+      properties:
+        current:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/WebsiteImportRunResponse"
+          description: >-
+            The import in flight, always `queued` or `running`. Null when nothing is
+            running. Poll while this is non-null.
+        latest_completed:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/WebsiteImportRunResponse"
+          description: >-
+            The most recently finished import, whether it succeeded or failed. Null until
+            one has finished. Read every outcome here, including failures — a finished
+            import never appears in `current`.
+    WebsiteImportConflictResponse:
+      type: object
+      description: >-
+        Returned when a trigger collides with an import that is already running. Carries
+        that run so the collision becomes something to poll rather than an error to act on.
+      additionalProperties: false
+      required:
+        - status
+        - message
+        - current
+      properties:
+        status:
+          type: integer
+          description: The HTTP status code, repeated in the body.
+        message:
+          type: string
+        current:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/WebsiteImportRunResponse"
+          description: The import already in flight. Poll it instead of retrying the trigger.
+    WebsiteImportErrorResponse:
+      type: object
+      description: >-
+        A website import failure that carries a stable machine code alongside the message,
+        for the cases a client branches on rather than just displays.
+      additionalProperties: false
+      required:
+        - status
+        - message
+        - error_code
+      properties:
+        status:
+          type: integer
+          description: The HTTP status code, repeated in the body.
+        message:
+          type: string
+        error_code:
+          type: string
+          description: The stable reason code. See `error_code` on a run for the full set.
     ContentTypeConfigInput:
       type: object
       description: >-

@@ -14,6 +14,7 @@ Generated from the command tree of `@senso-ai/cli`. Every command accepts the [g
 - [`senso api-keys`](#senso-api-keys) — Manage org-scoped API keys.
 - [`senso search`](#senso-search) — Search the knowledge base with natural language queries.
 - [`senso ingest`](#senso-ingest) — Ingest files into the knowledge base.
+- [`senso website-import`](#senso-website-import) — Import your organization's website into the knowledge base.
 - [`senso content`](#senso-content) — Manage content items in the knowledge base.
 - [`senso ctas`](#senso-ctas) — Manage call-to-action (CTA) templates — the card attached to a published content-engine page — and choose which one each content item carries.
 - [`senso generate`](#senso-generate) — AI content generation.
@@ -108,7 +109,7 @@ senso org get [options]
 
 ### senso org update
 
-Update organization details. All fields are optional — only provided fields are changed. Pass an empty array for websites/locations to clear them.
+Update organization details. Only the fields you pass are changed; omitting a field leaves it alone. But 'websites' and 'locations' REPLACE their whole list when passed — sending one website deletes the rest. To add to either list, run 'org get' first and send back every entry you want to keep.
 
 ```
 senso org update [options]
@@ -116,7 +117,7 @@ senso org update [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "name": "...", "slug": "...", "logo_url": "...", "websites": [...], "locations": [...] } |  |
+| `--data <json>` | JSON: { "name": "Acme", "slug": "acme", "logo_url": "https://acme.com/logo.png", "websites": [{"url": "https://acme.com"}], "locations": [{"country_code": "US", "region_name": "California"}] }. Every field is optional. "websites" and "locations" REPLACE the existing list rather than adding to it — include every entry you want to keep, or pass [] to clear the list. A website entry takes only "url"; sending the "org_website_id" from 'org get' is rejected. Send "logo_url": "" to clear the logo. |  |
 
 ### senso org set-runs
 
@@ -406,7 +407,7 @@ senso ingest [options] [command]
 
 ### senso ingest upload
 
-Upload files to the knowledge base. Accepts local file paths (up to 10). Files are hashed, uploaded to S3, then parsed and embedded by a background worker. Poll 'senso content get <content-id>' until processing_status is 'complete' before searching the uploaded content.
+Upload files to the knowledge base. Accepts local file paths (up to 10). Files are hashed, uploaded to S3, then parsed and embedded by a background worker. Poll 'senso kb get <kb-node-id>' until content.processing_status is 'complete' before searching the uploaded content.
 
 ```
 senso ingest upload [options] <files...>
@@ -422,6 +423,34 @@ Re-ingest an existing document with a new file version. Provide the KB node ID (
 
 ```
 senso ingest reprocess [options] <nodeId> <file>
+```
+
+## senso website-import
+
+Import your organization's website into the knowledge base. Fetches the home page plus up to 10 linked pages, ingests each as a document under a folder named 'Website', and drafts a brand kit if the organization does not have one yet.
+
+```
+senso website-import [options] [command]
+```
+
+### senso website-import start
+
+Start a website import and wait for it to finish. The site imported is the one on file for your organization — see 'senso org get' — not a value you pass, so this takes no arguments. Exits 1 if the import finishes in a failed state.
+
+```
+senso website-import start [options]
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--no-wait` | Return the accepted run immediately instead of polling until the import finishes. |  |
+
+### senso website-import status
+
+Show the website import in flight and the most recently finished one. Either may be absent. This is a read: it exits 0 even when the last import failed.
+
+```
+senso website-import status [options]
 ```
 
 ## senso content
@@ -982,7 +1011,7 @@ senso publish-records retry [options] <publishRecordId>
 
 ## senso brand-kit
 
-Manage the organization's brand kit guidelines that inform AI content generation about your brand voice, tone, and style. The guidelines object accepts a defined set of keys: brand_name, brand_domain, brand_description, voice_and_tone, author_persona, and global_writing_rules (array). Unknown keys are rejected.
+Manage the organization's brand kit guidelines that inform AI content generation about your brand voice, tone, and style. The guidelines object accepts a defined set of keys: brand_name, brand_domain, brand_description, voice_and_tone, author_persona, global_writing_rules (global_writing_rules is an array of strings, the rest are strings). Unknown keys, wrong types and nulls are rejected before the request is sent.
 
 ```
 senso brand-kit [options] [command]
@@ -990,7 +1019,7 @@ senso brand-kit [options] [command]
 
 ### senso brand-kit get
 
-Get the current brand kit guidelines.
+Get the current brand kit guidelines. An organization that has never saved one gets an empty guidelines object rather than an error.
 
 ```
 senso brand-kit get [options]
@@ -998,7 +1027,7 @@ senso brand-kit get [options]
 
 ### senso brand-kit set
 
-Replace the entire brand kit (PUT). All existing fields are overwritten — run 'brand-kit get' first to preserve fields you are not changing. For a safe partial update, use 'brand-kit patch'.
+Replace the entire brand kit (PUT). All existing fields are overwritten — run 'brand-kit get' first to preserve fields you are not changing. For a safe partial update, use 'brand-kit patch'. This is also what creates the brand kit the first time.
 
 ```
 senso brand-kit set [options]
@@ -1006,11 +1035,11 @@ senso brand-kit set [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "guidelines": { "brand_name": "Acme", "voice_and_tone": "...", "author_persona": "...", "global_writing_rules": [] } } |  |
+| `--data <json>` | JSON: { "guidelines": { "brand_name": "Acme", "brand_domain": "https://acme.com", "brand_description": "...", "voice_and_tone": "...", "author_persona": "...", "global_writing_rules": ["..."] } }. Every field is optional, but anything you omit is REMOVED — pass '{"guidelines":{}}' to clear the brand kit entirely. |  |
 
 ### senso brand-kit patch
 
-Partially update the brand kit (PATCH). Only the fields you provide are changed — existing fields are preserved. Preferred over 'set' for targeted updates.
+Partially update the brand kit (PATCH). Only the fields you provide are changed — existing fields are preserved. Preferred over 'set' for targeted updates. Note that global_writing_rules is replaced wholesale, not appended to, and no field can be removed this way — use 'set' for that.
 
 ```
 senso brand-kit patch [options]
@@ -1018,7 +1047,7 @@ senso brand-kit patch [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "guidelines": { "voice_and_tone": "Warm and approachable" } } |  |
+| `--data <json>` | JSON: { "guidelines": { "voice_and_tone": "Warm and approachable" } }. At least one field is required; accepted fields are brand_name, brand_domain, brand_description, voice_and_tone, author_persona, global_writing_rules. |  |
 
 ## senso content-types
 
@@ -1641,7 +1670,7 @@ senso kb patch-raw [options] <id>
 
 ### senso kb upload
 
-Upload files to the knowledge base (up to 10). Files are hashed, uploaded to S3, then parsed and embedded by a background worker.
+Upload files to the knowledge base (up to 10). Files are hashed, uploaded to S3, then parsed and embedded by a background worker. Poll 'senso kb get <kb-node-id>' until content.processing_status is 'complete' before searching the uploaded content.
 
 ```
 senso kb upload [options] <files...>

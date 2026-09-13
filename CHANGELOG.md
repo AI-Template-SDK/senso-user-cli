@@ -9,6 +9,62 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
+### Added
+
+- **`senso website-import start` and `senso website-import status`.** One call
+  seeds the knowledge base from your organization's own public site: it fetches
+  the home page plus up to ten linked pages, ingests each as a document under a
+  folder named `Website`, and drafts a brand kit if the organization has none.
+  The site is the one on file at `senso org get`, not a value you pass, so
+  `start` takes no arguments.
+
+  `start` waits for the import to finish and exits 1 if it ends in a failed
+  state, so a caller that gets exit 0 can trust that it worked; `--no-wait`
+  returns the accepted run instead. `status` is a read and exits 0 whatever it
+  finds, including a previous failure. The completion signal is the status
+  endpoint's `current` going null rather than a terminal status on the run
+  itself — a finished import leaves `current` and reappears as
+  `latest_completed`, so waiting on `current.status` would wait forever. A
+  brand kit left alone because one already exists is reported as the success it
+  is, not a failure. Triggering while an import is already running keeps the
+  CLI's standard 409 handling — exit 1 — with a hint pointing at `status`.
+
+  Both endpoints are in this repository's copy of the spec but not yet in the
+  published one, so `scripts/spec-drift.ts` reports them until that lands;
+  `docs/reference/excluded-endpoints.md` carries a row saying so.
+
+### Fixed
+
+- **`org update` now says that `websites` and `locations` replace the list.**
+  The help described the body as "only provided fields are changed", which is
+  true field by field and dangerously incomplete list by list: `PUT /org/me`
+  swaps `websites` wholesale for whatever you send, so an org with three
+  websites that is sent one is left with one — no error, exit 0. That is the
+  worst shape of failure for this CLI's primary consumer, an agent, which reads
+  the help and sends the single entry it was asked to add. Both the description
+  and the `--data` help now name the replace semantics, say to read `org get`
+  first and send back everything worth keeping, and note that the
+  `org_website_id` you get from `org get` is rejected on the way back in.
+
+- **`ingest upload` pointed at the one command that cannot poll it.** Its help
+  told you to poll `senso content get <content-id>` until `processing_status`
+  was `complete`. That command is `GET /org/content/{id}`, which the API spec
+  documents as serving non-knowledge-base content only and answering `400` for
+  anything in the knowledge base — which is everything `ingest upload` creates.
+  An agent following the instruction printed on the command got a hard failure,
+  and on an org without the GEO product it failed for a second, unrelated
+  reason. Both `ingest upload` and `kb upload` now name `senso kb get
+<kb-node-id>` and `content.processing_status`, which is what the spec itself
+  prescribes for a KB node.
+
+- **The upload payload now carries `kb_node_id`, the id that poll takes.**
+  `ingest upload`'s table rendered `content_id` and nothing else, so the id the
+  corrected instruction needs was absent from the output of the command that
+  produces it — the two are different id spaces, and `content_id` 404s against
+  the `kb` commands. It is now the column before `content_id` in both upload
+  commands, and declared on `UploadResultItem` rather than reaching JSON callers
+  only because `apiRequest` casts instead of validating.
+
 ## [0.14.0] — 2026-09-11
 
 ### Added
@@ -35,6 +91,20 @@ mattered, and what you need to do differently.
   plain `ID:`, which is the one id that does not work with any `kb` command.
 
 ### Fixed
+
+- **`brand-kit set` and `brand-kit patch` check the guidelines before sending
+  them.** `guidelines` is a closed six-key object at the API — `brand_name`,
+  `brand_domain`, `brand_description`, `voice_and_tone`, `author_persona` and
+  `global_writing_rules` — and every violation used to cost a round trip to
+  discover. Worse, the two endpoints report the same failure differently: PATCH
+  passes the field name through, PUT flattens everything to
+  `Invalid guidelines data`, so the one thing you needed was the one thing
+  dropped. An unknown key, a wrong type, a `null`, a missing `guidelines`
+  envelope or a patch with nothing in it now exits 2 with the field named, and a
+  near-miss key suggests the one you meant. Two checks are deliberately stricter
+  than the server, because there the leniency loses data silently: a key left
+  beside `guidelines` is accepted and ignored, and a `null` inside
+  `global_writing_rules` is accepted and stored.
 
 - **`search context`, `search full` and `search content` render a table again
   under `--output table`.** They printed the entire response as a single

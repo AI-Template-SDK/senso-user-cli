@@ -470,7 +470,7 @@ export function registerKBCommands(program: Command): void {
 
   kb.command("upload <files...>")
     .description(
-      "Upload files to the knowledge base (up to 10). Files are hashed, uploaded to S3, then parsed and embedded by a background worker.",
+      "Upload files to the knowledge base (up to 10). Files are hashed, uploaded to S3, then parsed and embedded by a background worker. Poll 'senso kb get <kb-node-id>' until content.processing_status is 'complete' before searching the uploaded content.",
     )
     .option("--folder-id <id>", "Parent folder node ID to place files in (omit for root)")
     .action(
@@ -562,7 +562,9 @@ export function registerKBCommands(program: Command): void {
         // is already served and repeating it on stdout would only be noise.
         // json and table still get the payload, so the flag is honored.
         if (ctx.format !== "plain") {
-          emit(ctx, response, { columns: ["filename", "status", "content_id", "error"] });
+          emit(ctx, response, {
+            columns: ["filename", "status", "kb_node_id", "content_id", "error"],
+          });
         }
       }),
     );
