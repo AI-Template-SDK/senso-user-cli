@@ -340,7 +340,7 @@ senso api-keys kb-permissions-delete [options] <keyId>
 
 ## senso search
 
-Search the knowledge base with natural language queries. Returns AI-generated answers synthesized from matching content chunks, or raw chunks/content IDs.
+Search the knowledge base with natural language queries. Returns AI-generated answers synthesized from matching content chunks, or raw chunks/content IDs. An answering search (`search`, `search full`, `search stream`) that finds nothing is filed in the organization's gap report as an API search gap — read them with `senso gaps list --origin api_unanswered_question --status weak --status open`. Pass --no-gap-signals, or set SENSO_GAP_SIGNALS=off, on probes and tests so they do not.
 
 ```
 senso search [options] [command] <query>
@@ -351,6 +351,7 @@ senso search [options] [command] <query>
 | `--max-results <n>` | Maximum number of results (max: 20) | `5` |
 | `--content-ids <ids...>` | Restrict search to specific content item IDs (space-separated UUIDs) |  |
 | `--require-scoped-ids` | Only return results from the specified --content-ids (omit to allow fallback to all content) |  |
+| `--no-gap-signals` | Keep this search out of the organization's gap report (sends X-Senso-Signals: off). Use it for probes, tests and monitors — a real question that finds nothing should be left eligible. The search still runs, costs credits and is recorded. Set SENSO_GAP_SIGNALS=off to do this for every search. |  |
 
 ### senso search context
 
@@ -365,6 +366,7 @@ senso search context [options] <query>
 | `--max-results <n>` | Maximum results (max: 20) | `5` |
 | `--content-ids <ids...>` | Restrict search to specific content item IDs (space-separated UUIDs) |  |
 | `--require-scoped-ids` | Only return results from the specified --content-ids |  |
+| `--no-gap-signals` | Keep this search out of the organization's gap report (sends X-Senso-Signals: off). Use it for probes, tests and monitors — a real question that finds nothing should be left eligible. The search still runs, costs credits and is recorded. Set SENSO_GAP_SIGNALS=off to do this for every search. |  |
 
 ### senso search content
 
@@ -379,6 +381,7 @@ senso search content [options] <query>
 | `--max-results <n>` | Maximum results (max: 20) | `5` |
 | `--content-ids <ids...>` | Restrict search to specific content item IDs (space-separated UUIDs) |  |
 | `--require-scoped-ids` | Only return results from the specified --content-ids |  |
+| `--no-gap-signals` | Keep this search out of the organization's gap report (sends X-Senso-Signals: off). Use it for probes, tests and monitors — a real question that finds nothing should be left eligible. The search still runs, costs credits and is recorded. Set SENSO_GAP_SIGNALS=off to do this for every search. |  |
 
 ### senso search full
 
@@ -393,6 +396,7 @@ senso search full [options] <query>
 | `--max-results <n>` | Maximum results (max: 20) | `5` |
 | `--content-ids <ids...>` | Restrict search to specific content item IDs (space-separated UUIDs) |  |
 | `--require-scoped-ids` | Only return results from the specified --content-ids |  |
+| `--no-gap-signals` | Keep this search out of the organization's gap report (sends X-Senso-Signals: off). Use it for probes, tests and monitors — a real question that finds nothing should be left eligible. The search still runs, costs credits and is recorded. Set SENSO_GAP_SIGNALS=off to do this for every search. |  |
 
 ### senso search stream
 
@@ -407,6 +411,7 @@ senso search stream [options] <query>
 | `--max-results <n>` | Maximum results (max: 20) | `5` |
 | `--content-ids <ids...>` | Restrict search to specific content item IDs (space-separated UUIDs) |  |
 | `--require-scoped-ids` | Only return results from the specified --content-ids |  |
+| `--no-gap-signals` | Keep this search out of the organization's gap report (sends X-Senso-Signals: off). Use it for probes, tests and monitors — a real question that finds nothing should be left eligible. The search still runs, costs credits and is recorded. Set SENSO_GAP_SIGNALS=off to do this for every search. |  |
 
 ## senso ingest
 

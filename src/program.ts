@@ -80,6 +80,7 @@ Environment:
   SENSO_CONFIG_DIR     Override where the config file is read and written
   SENSO_DEBUG=1        Log every request to stderr, with the key redacted
   SENSO_NO_UPDATE_CHECK=1  Never check npm for a newer version
+  SENSO_GAP_SIGNALS=off  Keep every search out of the gap report (for probes and tests)
   NO_COLOR             Disable color (any value)
 
 Output:

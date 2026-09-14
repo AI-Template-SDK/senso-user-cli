@@ -448,6 +448,79 @@ describe("search stream, on the wire", () => {
   });
 });
 
+/**
+ * The gap-signal opt-out.
+ *
+ * An answering search that finds nothing is filed in the organization's gap
+ * report. Probes and tests must be able to stay out of it, and the thing to
+ * protect is that the header reaches the API from every command and from the
+ * environment — including the subcommands, where Commander binds a flag typed
+ * after `search context` to the parent unless it is resolved explicitly.
+ */
+describe("search, keeping a probe out of the gap report", () => {
+  it("sends no X-Senso-Signals header by default, so a real question stays eligible", async () => {
+    const seen = captureSearch("/org/search");
+
+    await runCli(["search", QUERY]);
+
+    expect(seen.headers?.get("x-senso-signals")).toBeNull();
+  });
+
+  it("sends X-Senso-Signals: off with --no-gap-signals", async () => {
+    const seen = captureSearch("/org/search");
+
+    const res = await runCli(["search", QUERY, "--no-gap-signals"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(seen.headers?.get("x-senso-signals")).toBe("off");
+  });
+
+  it("sends it from every subcommand, not only the parent", async () => {
+    for (const [name, path] of [
+      ["context", "/org/search/context"],
+      ["content", "/org/search/content"],
+      ["full", "/org/search/full"],
+    ] as const) {
+      const seen = captureSearch(path);
+
+      await runCli(["search", name, QUERY, "--no-gap-signals"]);
+
+      expect(seen.headers?.get("x-senso-signals"), name).toBe("off");
+    }
+  });
+
+  it("sends it from search stream", async () => {
+    const seen = captureStream([frame("sources", { results: [] })]);
+
+    await runCli(["search", "stream", QUERY, "--no-gap-signals"]);
+
+    expect(seen.headers?.get("x-senso-signals")).toBe("off");
+  });
+
+  it("sends it for every search when SENSO_GAP_SIGNALS=off", async () => {
+    process.env.SENSO_GAP_SIGNALS = "off";
+    const seen = captureSearch("/org/search/full");
+
+    await runCli(["search", "full", QUERY]);
+
+    expect(seen.headers?.get("x-senso-signals")).toBe("off");
+  });
+
+  it("exits 2 before any request when SENSO_GAP_SIGNALS is misspelled", async () => {
+    // A typo the API would read as "eligible" would file every probe as a gap
+    // while the caller believed they had opted out.
+    process.env.SENSO_GAP_SIGNALS = "of";
+    const seen = captureSearch("/org/search");
+
+    const res = await runCli(["search", QUERY]);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stdout).toBe("");
+    expect(res.stderr).toContain("SENSO_GAP_SIGNALS");
+    expect(seen.method).toBeUndefined();
+  });
+});
+
 describe("search stream, reassembling the token stream", () => {
   it("joins a data: line that was split across two chunks", async () => {
     // The case that breaks a parser written as `chunk.split("\n")`: the JSON

@@ -100,6 +100,7 @@ interface.
 | `SENSO_CONFIG_DIR`        | Relocate the config file (per-project credentials, or tests) |
 | `SENSO_DEBUG=1`           | Log every request and its status to stderr, key redacted     |
 | `SENSO_NO_UPDATE_CHECK=1` | Never check npm for a newer version                          |
+| `SENSO_GAP_SIGNALS=off`   | Keep every search out of the gap report (probes and tests)   |
 | `NO_COLOR`                | Disable color (any value)                                    |
 
 **Teaching an agent to use Senso.** The official agent skills install in one

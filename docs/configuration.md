@@ -1,6 +1,6 @@
 # Configuration
 
-Everything that changes what the CLI does without changing its arguments: seven
+Everything that changes what the CLI does without changing its arguments: eight
 environment variables, six global flags, and one file.
 
 ## Environment variables
@@ -12,6 +12,7 @@ environment variables, six global flags, and one file.
 | `SENSO_CONFIG_DIR`      | Relocate the directory holding `config.json`                                                      | the platform config path (below) | The platform default. Set it for per-project credentials, and for tests                 |
 | `SENSO_DEBUG`           | `1` logs every request, status and duration to stderr, and prints the underlying stack on failure | unset                            | No request logging. This is the first thing to turn on when a command misbehaves        |
 | `SENSO_NO_UPDATE_CHECK` | `1` never contacts the npm registry                                                               | unset                            | The registry is asked once every 24 hours, on stderr, best-effort                       |
+| `SENSO_GAP_SIGNALS`     | `off` sends `X-Senso-Signals: off` on every search, keeping it out of the gap report              | unset                            | Searches stay eligible: an answering search that finds nothing is filed as a gap        |
 | `NO_COLOR`              | Any non-empty value disables ANSI color on both streams                                           | unset                            | Color when the stream is a TTY (see the note below)                                     |
 | `FORCE_COLOR`           | Any non-empty value enables color even when stdout is not a TTY                                   | unset                            | Color is decided by TTY detection                                                       |
 
@@ -27,6 +28,7 @@ Only `SENSO_*` and the two color variables are read. Exhaustively, the reads in
 | `src/lib/run-action.ts` `resolveContext` and its catch | `SENSO_DEBUG`           |
 | `src/cli.ts` (top-level catch)                         | `SENSO_DEBUG`           |
 | `src/utils/updater.ts` `checkForUpdate`                | `SENSO_NO_UPDATE_CHECK` |
+| `src/lib/gap-signals.ts` `envDisablesSignals`          | `SENSO_GAP_SIGNALS`     |
 
 `NO_COLOR` and `FORCE_COLOR` are not read by this codebase directly; picocolors
 reads them, and `src/utils/branding.ts` inherits the same decision through
@@ -46,6 +48,13 @@ Notes on the ones with sharp edges:
   API key is never printed, not even a prefix — a prefix identifies an
   organization, and debug output gets pasted into support threads. Only the exact
   string `1` enables it.
+- **`SENSO_GAP_SIGNALS` refuses a value it does not recognize.** `off`, `false`,
+  `0`, `no`, `skip` and `none` opt out; `on`, `true`, `1`, `yes`, `record` and an
+  empty value leave searches eligible; anything else makes every search exit 2.
+  The API reads any value that is not a "no" as eligible, so a typo accepted
+  silently would file every probe as a gap while the caller believed they had
+  opted out. It can only turn signals off — `--no-gap-signals` does the same for
+  one search, and nothing forces signals on against it.
 - **`SENSO_NO_UPDATE_CHECK` likewise only recognizes `1`.** Any other value, `0`
   included, leaves the check on.
 - **`FORCE_COLOR` is truthiness-checked by picocolors**, so `FORCE_COLOR=0` turns
