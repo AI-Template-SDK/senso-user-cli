@@ -360,3 +360,99 @@ describe("org set-runs, on success", () => {
     expect(res.stderr).toBe("");
   });
 });
+
+/**
+ * `org set-industry` is the one irreversible call in this group: the API accepts
+ * it once and answers every later attempt with a 409. The 409 therefore is not a
+ * transient conflict a caller should retry — the message has to say so, and the
+ * server's own message names the industry already in place, which is the detail
+ * worth keeping.
+ */
+describe("org set-industry", () => {
+  const INDUSTRY_UUID = "367d71d1-0fd4-4050-9f6c-a2346cbd8fbc";
+
+  it("exits 1 and passes the server's message through on a 409", async () => {
+    server.use(
+      http.put(apiUrl("/org/me/industry"), () =>
+        HttpResponse.json(
+          { message: "Your organization's industry is already set to abc and cannot be changed" },
+          { status: 409 },
+        ),
+      ),
+    );
+
+    const res = await runCli(["org", "set-industry", INDUSTRY_UUID]);
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toBe("");
+    expect(res.stderr).toContain("already set");
+    expect(res.stderr).toContain("only once");
+  });
+
+  it("exits 4 when no industry in the catalog has that id", async () => {
+    server.use(
+      http.put(apiUrl("/org/me/industry"), () =>
+        HttpResponse.json({ message: "Not found" }, { status: 404 }),
+      ),
+    );
+
+    const res = await runCli(["org", "set-industry", INDUSTRY_UUID]);
+
+    expect(res.exitCode).toBe(4);
+  });
+
+  it("exits 3 on a 401", async () => {
+    server.use(
+      http.put(apiUrl("/org/me/industry"), () =>
+        HttpResponse.json({ message: "Unauthorized" }, { status: 401 }),
+      ),
+    );
+
+    const res = await runCli(["org", "set-industry", INDUSTRY_UUID]);
+
+    expect(res.exitCode).toBe(3);
+  });
+
+  it("puts the industry id in the body as industry_id", async () => {
+    let body: unknown;
+    server.use(
+      http.put(apiUrl("/org/me/industry"), async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json({ ...ORG, industry_id: INDUSTRY_UUID });
+      }),
+    );
+
+    const res = await runCli(["org", "set-industry", INDUSTRY_UUID]);
+
+    expect(res.exitCode).toBe(0);
+    expect(body).toEqual({ industry_id: INDUSTRY_UUID });
+  });
+
+  it("confirms on stderr and prints the organization on stdout", async () => {
+    server.use(
+      http.put(apiUrl("/org/me/industry"), () =>
+        HttpResponse.json({ ...ORG, industry_name: "Airlines (Canada)" }),
+      ),
+    );
+
+    const res = await runCli(["org", "set-industry", INDUSTRY_UUID]);
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stderr).toContain("industry set");
+    expect(res.stdout).toContain("Airlines (Canada)");
+  });
+
+  it("prints the payload alone under --output json", async () => {
+    server.use(
+      http.put(apiUrl("/org/me/industry"), () =>
+        HttpResponse.json({ ...ORG, industry_name: "Airlines (Canada)" }),
+      ),
+    );
+
+    const res = await runCli(["org", "set-industry", INDUSTRY_UUID, "--output", "json"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(res.json<{ industry_name: string }>().industry_name).toBe("Airlines (Canada)");
+    expect(res.stderr).toBe("");
+  });
+});

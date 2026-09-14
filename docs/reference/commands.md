@@ -17,6 +17,7 @@ Generated from the command tree of `@senso-ai/cli`. Every command accepts the [g
 - [`senso website-import`](#senso-website-import) — Import your organization's website into the knowledge base.
 - [`senso content`](#senso-content) — Manage content items in the knowledge base.
 - [`senso ctas`](#senso-ctas) — Manage call-to-action (CTA) templates — the card attached to a published content-engine page — and choose which one each content item carries.
+- [`senso evals`](#senso-evals) — Judge text against your organization's ground truth.
 - [`senso generate`](#senso-generate) — AI content generation.
 - [`senso engine`](#senso-engine) — Publish or draft content through the content engine.
 - [`senso destinations`](#senso-destinations) — Manage publish destinations.
@@ -38,7 +39,9 @@ Generated from the command tree of `@senso-ai/cli`. Every command accepts the [g
 - [`senso tracked-sources`](#senso-tracked-sources) — Manage citation-classification rules that tier each cited URL as Owned (primary), Tracked, or External (secondary).
 - [`senso generated-content`](#senso-generated-content) — Browse AI-generated content (GEO).
 - [`senso analytics`](#senso-analytics) — GEO analytics for your organization — brand visibility, share of voice, and citations across the AI models you monitor.
-- [`senso industries`](#senso-industries) — Explore industry-level competitive intelligence across a partner network — brand share-of-voice, domain citations, and per-prompt metrics.
+- [`senso history-imports`](#senso-history-imports) — Track the run-history import jobs started by `senso industries import-prompts`.
+- [`senso industries`](#senso-industries) — Browse the public industry catalog and the competitive intelligence Senso collects for it — brand leaderboards, domain citations and the prompts each industry runs.
+- [`senso partner`](#senso-partner) — Partner-network commands.
 - [`senso update`](#senso-update) — Update CLI to the latest version
 
 ## Global options
@@ -118,6 +121,14 @@ senso org update [options]
 | Option | Description | Default |
 |---|---|---|
 | `--data <json>` | JSON: { "name": "Acme", "slug": "acme", "logo_url": "https://acme.com/logo.png", "websites": [{"url": "https://acme.com"}], "locations": [{"country_code": "US", "region_name": "California"}] }. Every field is optional. "websites" and "locations" REPLACE the existing list rather than adding to it — include every entry you want to keep, or pass [] to clear the list. A website entry takes only "url"; sending the "org_website_id" from 'org get' is rejected. Send "logo_url": "" to clear the logo. |  |
+
+### senso org set-industry
+
+Set the industry your organization belongs to, chosen from the public catalog (`senso industries list`). This can be done ONCE: afterwards the call is rejected and changing it is not self-serve. It is what `senso industries import-prompts` and `senso generate industry-draft` work from, and where an org with no models or locations of its own inherits them on activation. Nothing else happens — no prompts are created and no runs start.
+
+```
+senso org set-industry [options] <industryId>
+```
 
 ### senso org set-runs
 
@@ -799,6 +810,102 @@ senso ctas upload-url [options]
 | `--content-type <type>` | The image media type: image/png \| image/jpeg \| image/webp \| image/gif |  |
 | `--size <bytes>` | The file size in bytes, at most 10485760 (10 MiB) |  |
 
+## senso evals
+
+Judge text against your organization's ground truth. `kb_accuracy` verifies the factual claims a text makes about your brand against your knowledge base; `brand_alignment` grades it against your brand kit's writing rules. Every run records the claims it checked, the verdict and the evidence, so a score can be audited rather than trusted. Judge model spend is recorded on each run but is not billed against your credit balance.
+
+```
+senso evals [options] [command]
+```
+
+### senso evals evaluators
+
+List the evaluators available to this organization, with the version each one is currently on. Use `latest_version` here to pin `--evaluator-version` on a trigger.
+
+```
+senso evals evaluators [options]
+```
+
+### senso evals text
+
+Judge text you supply. Pass the text with --text, or --text-file to read it from a file. Returns straight away with a run handle to read later with `senso evals get`; add --wait to poll until the run finishes and print the finished run instead. A run that ends `failed` under --wait exits 1, so a caller that waited and got exit 0 can trust the score it was handed.
+
+```
+senso evals text [options]
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--evaluator <key>` | Which check to run: kb_accuracy, brand_alignment (default kb_accuracy) |  |
+| `--evaluator-version <v>` | Pin an evaluator version (see `senso evals evaluators`) |  |
+| `--judge-model <model>` | Override the model that judges the text |  |
+| `--label <text>` | Free-form tag stored on the run, for finding it later |  |
+| `--idempotency-key <key>` | Makes the trigger safe to retry — the same key returns the original run |  |
+| `--wait` | Poll until the run finishes instead of returning a handle straight away |  |
+| `--text <text>` | The text to judge |  |
+| `--text-file <path>` | Read the text to judge from a file |  |
+| `--title <title>` | Optional title, stored with the run's subject (max 255 chars) |  |
+
+### senso evals runs
+
+List eval runs, newest first. Each row carries the score and the claim counts behind it, so a run can be read without opening it.
+
+```
+senso evals runs [options]
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--from <instant>` | Only items created at or after this RFC 3339 instant, e.g. 2026-09-01T00:00:00Z |  |
+| `--to <instant>` | Only items created before this RFC 3339 instant (exclusive) |  |
+| `--evaluator <key>` | Filter by evaluator key (see `senso evals evaluators`) |  |
+| `--subject-type <type>` | Filter by subject type, e.g. inline or content |  |
+| `--limit <n>` | Page size, 1-100 (default 25) |  |
+| `--offset <n>` | Number of items to skip (default 0) |  |
+
+### senso evals get
+
+Get one eval run in full — every claim it checked, the verdict, the evidence behind it, and what the judge searched for. This is the auditable form of a score.
+
+```
+senso evals get [options] <runId>
+```
+
+### senso evals claims
+
+List the individual claims evaluators have judged, across runs. This is the grain a score is built from: each row carries the claim, the verdict, whether it counted toward the score, and the evidence the judge relied on. Narrow to one run with --run-id.
+
+```
+senso evals claims [options]
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--from <instant>` | Only items created at or after this RFC 3339 instant, e.g. 2026-09-01T00:00:00Z |  |
+| `--to <instant>` | Only items created before this RFC 3339 instant (exclusive) |  |
+| `--evaluator <key>` | Filter by evaluator key (see `senso evals evaluators`) |  |
+| `--subject-type <type>` | Filter by subject type, e.g. inline or content |  |
+| `--limit <n>` | Page size, 1-100 (default 25) |  |
+| `--offset <n>` | Number of items to skip (default 0) |  |
+| `--run-id <id>` | Only claims from this eval run |  |
+
+### senso evals content
+
+Judge a saved content item — a knowledge-base document or a generated article — by its content id. Its latest saved version is what gets judged, and only items whose latest version is raw text can be: an uploaded file or a crawled page stores a pointer rather than text of its own and is a 422. Add --wait to poll until the run finishes.
+
+```
+senso evals content [options] <contentId>
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--evaluator <key>` | Which check to run: kb_accuracy, brand_alignment (default kb_accuracy) |  |
+| `--evaluator-version <v>` | Pin an evaluator version (see `senso evals evaluators`) |  |
+| `--judge-model <model>` | Override the model that judges the text |  |
+| `--label <text>` | Free-form tag stored on the run, for finding it later |  |
+| `--idempotency-key <key>` | Makes the trigger safe to retry — the same key returns the original run |  |
+| `--wait` | Poll until the run finishes instead of returning a handle straight away |  |
+
 ## senso generate
 
 AI content generation. Configure settings, generate content samples from prompts, or trigger full content engine runs.
@@ -915,6 +1022,23 @@ senso generate runs-logs [options] <runId>
 |---|---|---|
 | `--limit <n>` | Items per page | `100` |
 | `--offset <n>` | Pagination offset | `0` |
+
+### senso generate industry-draft
+
+Draft a complete document from one of your industry's prompts in a single call. The prompt is resolved against your organization's industry, grounded in your knowledge base, and written in the requested content type with your brand kit and product lines applied. The result is NOT stored as content — it comes back as GitHub Flavored Markdown with footnote citations for you to review or store separately. Typically takes 10-30 seconds and consumes credits like an ad-hoc generation. Requires the GEO product.
+
+```
+senso generate industry-draft [options]
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--industry-prompt-id <id>` | An industry prompt id from `senso industries prompts` — NOT one of your own prompt ids |  |
+| `--content-type-id <id>` | A content type id from `senso content-types list`, giving the document its format |  |
+| `--product-line-ids <ids>` | Comma-separated product line ids (default: all, up to 100) |  |
+| `--audience <text>` | Who the document is for (max 500 chars) |  |
+| `--style-tone <text>` | Voice and tone guidance (max 500 chars) |  |
+| `--extra-instructions <text>` | Further instructions for the writer (max 4000 chars) |  |
 
 ## senso engine
 
@@ -2300,9 +2424,33 @@ The models, locations, prompt types, tags and tracked competitors that actually 
 senso analytics filters [options]
 ```
 
+## senso history-imports
+
+Track the run-history import jobs started by `senso industries import-prompts`. A `completed` import may still have copied nothing — read `prompts_count` and `historic_runs_imported` rather than the status on its own.
+
+```
+senso history-imports [options] [command]
+```
+
+### senso history-imports list
+
+List this organization's 50 most recently started history-import jobs, newest first.
+
+```
+senso history-imports list [options]
+```
+
+### senso history-imports get
+
+Get one history-import job, as returned in `history_import.import_id` by `senso industries import-prompts`.
+
+```
+senso history-imports get [options] <importId>
+```
+
 ## senso industries
 
-Explore industry-level competitive intelligence across a partner network — brand share-of-voice, domain citations, and per-prompt metrics. The <industry> argument accepts either a UUID or a name (e.g. "Automotive"). REQUIRES A PARTNER API KEY: these commands read /partner/* endpoints, which reject the organization key stored by `senso login`. For metrics about your own organization, use `senso analytics`.
+Browse the public industry catalog and the competitive intelligence Senso collects for it — brand leaderboards, domain citations and the prompts each industry runs. Works with the organization key stored by `senso login`. The <industry> argument accepts a UUID or a name (e.g. "Airlines (Canada)"). Reads accept any industry in the catalog; only `import-prompts` is restricted to your own.
 
 ```
 senso industries [options] [command]
@@ -2310,7 +2458,7 @@ senso industries [options] [command]
 
 ### senso industries list
 
-List industries visible to the partner. Use --search to filter by name.
+List the public industry catalog — the industries any organization can browse, with the prompt, model and location counts that show how much coverage each one has.
 
 ```
 senso industries list [options]
@@ -2318,26 +2466,48 @@ senso industries list [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--search <q>` | Filter industries by name |  |
+| `--search <q>` | Case-insensitive substring match against name or slug |  |
+| `--limit <n>` | Page size, 1-100 (default 50) |  |
+| `--offset <n>` | Number of industries to skip (default 0) |  |
+| `--sort <order>` | Sort order: name_asc, name_desc, created_asc, created_desc (default name_asc) |  |
+| `--live` | Only industries actively running — at least one model enabled and one active prompt |  |
 
-### senso industries summary
+### senso industries prompts
 
-One-call, slide-ready overview of an industry: brand counts, share-of-voice, and citation totals over a time window.
+List the prompts an industry runs. These are the industry's own prompts, not your organization's (`senso prompts list`) — their ids are what `industries import-prompts` and `senso generate industry-draft` accept.
 
 ```
-senso industries summary [options] <industry>
+senso industries prompts [options] <industry>
 ```
 
 | Option | Description | Default |
 |---|---|---|
-| `--from <date>` | Start date (YYYY-MM-DD) |  |
-| `--to <date>` | End date (YYYY-MM-DD) |  |
-| `--location <code>` | 2-letter location code (e.g. US) |  |
+| `--limit <n>` | Page size, 1-100 (default 50) |  |
+| `--offset <n>` | Number of prompts to skip (default 0) |  |
+
+### senso industries brands
+
+Brand leaderboard for an industry — who the AI answers named over the window, ranked by mentions, with average position, sentiment, most-cited domain and trends. Figures are counts, not rates: divide by the `totals` block to get shares. Ranks are global, so a later page still shows real ranks.
+
+```
+senso industries brands [options] <industry>
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--from <date>` | Start of the window, YYYY-MM-DD (default: 30 days ago) |  |
+| `--to <date>` | End of the window, YYYY-MM-DD (default: today) |  |
 | `--models <list>` | Comma-separated model filter |  |
+| `--location <code>` | 2-letter location code (e.g. US) |  |
+| `--limit <n>` | Page size, 1-100 (default 100) |  |
+| `--offset <n>` | Number of brands to skip (default 0) |  |
+| `--no-canonicalize` | Do not merge spelling variants — raw per-spelling rows |  |
+| `--rollup <mode>` | Set to `parent` to fold sub-brands into their parent company |  |
+| `--entity-type <list>` | Comma-separated types to keep: brand, regulator, publisher, government, generic_term, product_model, forum_social |  |
 
 ### senso industries brand
 
-Everything about one brand within an industry, merged across surface-form spellings. Returns mentioned=false when the brand is never named.
+Everything about one brand in an industry, merged across its spelling variants. Matching is fuzzy, so a brand that was never named comes back as `mentioned: false` rather than a 404. For repeat calls, take the `brand_id` from the result and use `brand-by-id`, which skips the fuzzy match.
 
 ```
 senso industries brand [options] <industry> <brandName>
@@ -2345,17 +2515,88 @@ senso industries brand [options] <industry> <brandName>
 
 | Option | Description | Default |
 |---|---|---|
-| `--from <date>` | Start date (YYYY-MM-DD) |  |
-| `--to <date>` | End date (YYYY-MM-DD) |  |
-| `--location <code>` | 2-letter location code (e.g. US) |  |
+| `--from <date>` | Start of the window, YYYY-MM-DD (default: 30 days ago) |  |
+| `--to <date>` | End of the window, YYYY-MM-DD (default: today) |  |
 | `--models <list>` | Comma-separated model filter |  |
+| `--location <code>` | 2-letter location code (e.g. US) |  |
+
+### senso industries brand-by-id
+
+Look up a brand in an industry by its stable `brand_id`, as returned by `industries brands` or `industries brand`. Same payload as `brand`, without the fuzzy name match.
+
+```
+senso industries brand-by-id [options] <industry> <brandId>
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--from <date>` | Start of the window, YYYY-MM-DD (default: 30 days ago) |  |
+| `--to <date>` | End of the window, YYYY-MM-DD (default: today) |  |
+| `--models <list>` | Comma-separated model filter |  |
+| `--location <code>` | 2-letter location code (e.g. US) |  |
 
 ### senso industries domain
 
-Direct domain/URL citation lookup within an industry. Returns cited=false when the domain is never cited.
+How often a domain was cited in an industry's answers over the window. A domain that was never cited comes back as `cited: false` rather than a 404. Pass `--url` to look up a full URL instead; the <domain> argument is still required, because the API needs it in the path.
 
 ```
-senso industries domain [options] <industry> <domainOrUrl>
+senso industries domain [options] <industry> <domain>
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--from <date>` | Start of the window, YYYY-MM-DD (default: 30 days ago) |  |
+| `--to <date>` | End of the window, YYYY-MM-DD (default: today) |  |
+| `--models <list>` | Comma-separated model filter |  |
+| `--location <code>` | 2-letter location code (e.g. US) |  |
+| `--url <url>` | Look up this full URL instead of the bare domain |  |
+
+### senso industries import-prompts
+
+Copy prompts from your organization's own industry into your organization, and start importing the run history already collected for them so their analytics open with data rather than an empty chart. Only your own industry is accepted — any other is a 403. Prompts you already hold are skipped, so re-running is safe. This ACTIVATES the organization and starts its scheduled runs, including for prompts already saved but not yet running. Follow the returned history_import.import_id with `senso history-imports get`. Requires the GEO product.
+
+```
+senso industries import-prompts [options] <industry>
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--prompt-ids <ids>` | Comma-separated industry prompt ids, 1-100, no duplicates (from `senso industries prompts`) |  |
+
+## senso partner
+
+Partner-network commands. REQUIRES A PARTNER API KEY: every command here reads a /partner/* endpoint, which rejects the organization key stored by `senso login`. For the same industry data under your own key, use `senso industries`; for metrics about your own organization, use `senso analytics`.
+
+```
+senso partner [options] [command]
+```
+
+### senso partner industries
+
+Industry-level competitive intelligence across a partner network — brand share-of-voice, domain citations, and per-prompt metrics. The <industry> argument accepts either a UUID or a name (e.g. "Automotive"). Requires a partner API key.
+
+```
+senso partner industries [options] [command]
+```
+
+### senso partner industries list
+
+List industries visible to the partner. Use --search to filter by name.
+
+```
+senso partner industries list [options]
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--search <q>` | Filter industries by name |  |
+
+### senso partner industries summary
+
+One-call, slide-ready overview of an industry: brand counts, share-of-voice, and citation totals over a time window.
+
+```
+senso partner industries summary [options] <industry>
 ```
 
 | Option | Description | Default |
@@ -2365,12 +2606,42 @@ senso industries domain [options] <industry> <domainOrUrl>
 | `--location <code>` | 2-letter location code (e.g. US) |  |
 | `--models <list>` | Comma-separated model filter |  |
 
-### senso industries prompt-metrics
+### senso partner industries brand
+
+Everything about one brand within an industry, merged across surface-form spellings. Returns mentioned=false when the brand is never named.
+
+```
+senso partner industries brand [options] <industry> <brandName>
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--from <date>` | Start date (YYYY-MM-DD) |  |
+| `--to <date>` | End date (YYYY-MM-DD) |  |
+| `--location <code>` | 2-letter location code (e.g. US) |  |
+| `--models <list>` | Comma-separated model filter |  |
+
+### senso partner industries domain
+
+Direct domain/URL citation lookup within an industry. Returns cited=false when the domain is never cited.
+
+```
+senso partner industries domain [options] <industry> <domainOrUrl>
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--from <date>` | Start date (YYYY-MM-DD) |  |
+| `--to <date>` | End date (YYYY-MM-DD) |  |
+| `--location <code>` | 2-letter location code (e.g. US) |  |
+| `--models <list>` | Comma-separated model filter |  |
+
+### senso partner industries prompt-metrics
 
 Pure-industry per-prompt metrics (no single-org overlay) — how each tracked prompt performs across the industry.
 
 ```
-senso industries prompt-metrics [options] <industry>
+senso partner industries prompt-metrics [options] <industry>
 ```
 
 | Option | Description | Default |
@@ -2382,12 +2653,12 @@ senso industries prompt-metrics [options] <industry>
 | `--limit <n>` | Maximum prompts to return |  |
 | `--offset <n>` | Number of prompts to skip (for pagination) |  |
 
-### senso industries glossary
+### senso partner glossary
 
 Canonical metric glossary — the citable definition of every competitive-intelligence metric returned by these endpoints.
 
 ```
-senso industries glossary [options]
+senso partner glossary [options]
 ```
 
 ## senso update

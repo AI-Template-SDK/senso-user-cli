@@ -223,3 +223,41 @@ describe("formatApiError", () => {
     expect(formatApiError(undefined)).toBe("undefined");
   });
 });
+
+describe("the abort budget", () => {
+  /**
+   * The default suits a request that should come back promptly, and most of
+   * this CLI wants exactly that. It does not suit an endpoint that does the
+   * work inline and charges for it — `generate industry-draft` is documented at
+   * 10-30 seconds and stores nothing, so aborting at the default would discard
+   * a document the caller already paid for. `timeoutMs` is the opt-out, and it
+   * must actually reach the abort rather than being accepted and ignored.
+   */
+  it("abandons a request that outruns an explicit timeoutMs", async () => {
+    server.use(
+      http.get(url("/org/slow"), async () => {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        return HttpResponse.json({ ok: true });
+      }),
+    );
+
+    await expect(call("/org/slow", { timeoutMs: 20 })).rejects.toThrow();
+  });
+
+  it("lets a request finish when the explicit timeoutMs is generous enough", async () => {
+    server.use(
+      http.get(url("/org/slow"), async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        return HttpResponse.json({ ok: true });
+      }),
+    );
+
+    await expect(call("/org/slow", { timeoutMs: 5_000 })).resolves.toEqual({ ok: true });
+  });
+
+  it("still applies the default when no timeoutMs is given", async () => {
+    server.use(http.get(url("/org/quick"), () => HttpResponse.json({ ok: true })));
+
+    await expect(call("/org/quick")).resolves.toEqual({ ok: true });
+  });
+});

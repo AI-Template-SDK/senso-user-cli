@@ -24,6 +24,7 @@ import { registerIngestCommands } from "./commands/ingest.js";
 import { registerWebsiteImportCommands } from "./commands/website-import.js";
 import { registerContentCommands } from "./commands/content.js";
 import { registerCtaCommands } from "./commands/ctas.js";
+import { registerEvalsCommands } from "./commands/evals.js";
 import { registerGenerateCommands } from "./commands/generate.js";
 import { registerEngineCommands } from "./commands/engine.js";
 import { registerDestinationsCommands } from "./commands/destinations.js";
@@ -45,7 +46,9 @@ import { registerCompetitorsCommands } from "./commands/competitors.js";
 import { registerTrackedSourcesCommands } from "./commands/tracked-sources.js";
 import { registerGeneratedContentCommands } from "./commands/generated-content.js";
 import { registerAnalyticsCommands } from "./commands/analytics/index.js";
+import { registerHistoryImportsCommands } from "./commands/history-imports.js";
 import { registerIndustriesCommands } from "./commands/industries.js";
+import { registerPartnerCommands } from "./commands/partner.js";
 import { registerUpdateCommand } from "./commands/update.js";
 
 /**
@@ -143,6 +146,7 @@ export function createProgram(): Command {
   registerWebsiteImportCommands(program);
   registerContentCommands(program);
   registerCtaCommands(program);
+  registerEvalsCommands(program);
   registerGenerateCommands(program);
   registerEngineCommands(program);
   registerDestinationsCommands(program);
@@ -164,7 +168,9 @@ export function createProgram(): Command {
   registerTrackedSourcesCommands(program);
   registerGeneratedContentCommands(program);
   registerAnalyticsCommands(program);
+  registerHistoryImportsCommands(program);
   registerIndustriesCommands(program);
+  registerPartnerCommands(program);
   registerUpdateCommand(program);
 
   return program;
