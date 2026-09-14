@@ -79,13 +79,28 @@ function describeFieldError(e: unknown): string {
   return typeof rec.field === "string" ? `${rec.field}: ${message}` : message;
 }
 
+/**
+ * A query value. An array is sent as the same key repeated —
+ * `statuses=weak&statuses=open` — which is how the API reads a multi-value
+ * filter. An empty array sends nothing, like `undefined`.
+ */
+type QueryValue = string | number | readonly string[] | undefined;
+
 interface RequestOptions {
   method?: string;
   path: string;
   body?: unknown;
-  params?: Record<string, string | number | undefined>;
+  params?: Record<string, QueryValue>;
   apiKey?: string;
   baseUrl?: string;
+  /**
+   * Extra request headers, for the few endpoints that read one — the search
+   * endpoints' `X-Senso-Signals`, for example.
+   *
+   * Applied BEFORE the credential and identity headers, so a caller cannot
+   * replace `X-API-Key`, `Accept` or the `User-Agent` by accident.
+   */
+  headers?: Record<string, string>;
   /**
    * Override the abort budget for this one call.
    *
@@ -98,6 +113,25 @@ interface RequestOptions {
   timeoutMs?: number;
 }
 
+/**
+ * Puts params on the query string.
+ *
+ * `set` for a scalar and `append` per element for an array. Setting an array
+ * would send `statuses=weak,open` as one value, which the API reads as a single
+ * status that does not exist and answers with nothing.
+ */
+function appendQuery(url: URL, params: Record<string, QueryValue> | undefined): void {
+  if (!params) return;
+  for (const [key, val] of Object.entries(params)) {
+    if (val === undefined) continue;
+    if (Array.isArray(val)) {
+      for (const item of val) url.searchParams.append(key, item);
+      continue;
+    }
+    url.searchParams.set(key, String(val));
+  }
+}
+
 export async function apiRequest<T = unknown>(opts: RequestOptions): Promise<T> {
   const apiKey = getApiKey({ apiKey: opts.apiKey });
   if (!apiKey) {
@@ -107,13 +141,7 @@ export async function apiRequest<T = unknown>(opts: RequestOptions): Promise<T> 
   const baseUrl = getBaseUrl({ baseUrl: opts.baseUrl });
   const url = new URL(`${baseUrl}${opts.path}`);
 
-  if (opts.params) {
-    for (const [key, val] of Object.entries(opts.params)) {
-      if (val !== undefined) {
-        url.searchParams.set(key, String(val));
-      }
-    }
-  }
+  appendQuery(url, opts.params);
 
   const method = opts.method ?? "GET";
   const controller = new AbortController();
@@ -127,6 +155,7 @@ export async function apiRequest<T = unknown>(opts: RequestOptions): Promise<T> 
     const res = await fetch(url.toString(), {
       method,
       headers: {
+        ...opts.headers,
         "X-API-Key": apiKey,
         Accept: "application/json",
         ...(opts.body ? { "Content-Type": "application/json" } : {}),
@@ -213,6 +242,7 @@ export async function apiStreamRequest(opts: RequestOptions): Promise<Response> 
   const res = await fetch(url.toString(), {
     method,
     headers: {
+      ...opts.headers,
       "X-API-Key": apiKey,
       Accept: "text/event-stream",
       ...(opts.body ? { "Content-Type": "application/json" } : {}),

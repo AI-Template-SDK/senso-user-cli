@@ -98,6 +98,49 @@ describe("the request", () => {
     // must not become two parameters.
     expect(seen?.searchParams.get("search")).toBe("a b");
   });
+
+  it("repeats the key for an array, which is how the API reads a multi-value filter", async () => {
+    // `set` would send `statuses=weak,open` as one value — a status that does not
+    // exist, so the API answers with an empty list rather than an error.
+    let seen: URL | undefined;
+    server.use(
+      http.get(url("/org/x"), ({ request }) => {
+        seen = new URL(request.url);
+        return HttpResponse.json({});
+      }),
+    );
+
+    await call("/org/x", { params: { statuses: ["weak", "open"], tag_ids: [], limit: 5 } });
+
+    expect(seen?.searchParams.getAll("statuses")).toEqual(["weak", "open"]);
+    // An empty array is "no filter", like undefined, not an empty value.
+    expect(seen?.searchParams.has("tag_ids")).toBe(false);
+    expect(seen?.searchParams.get("limit")).toBe("5");
+  });
+
+  it("sends extra headers, but never lets them replace the credential or identity", async () => {
+    let seen: Request | undefined;
+    server.use(
+      http.post(url("/org/x"), ({ request }) => {
+        seen = request;
+        return HttpResponse.json({});
+      }),
+    );
+
+    await call("/org/x", {
+      method: "POST",
+      body: { q: 1 },
+      headers: {
+        "X-Senso-Signals": "off",
+        "X-API-Key": "someone-elses-key",
+        "User-Agent": "not-the-cli",
+      },
+    });
+
+    expect(seen?.headers.get("x-senso-signals")).toBe("off");
+    expect(seen?.headers.get("x-api-key")).toBe(TEST_API_KEY);
+    expect(seen?.headers.get("user-agent")).toMatch(/^senso-cli\//);
+  });
 });
 
 describe("the response", () => {
