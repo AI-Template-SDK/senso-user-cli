@@ -100,6 +100,7 @@ interface.
 | `SENSO_CONFIG_DIR`        | Relocate the config file (per-project credentials, or tests) |
 | `SENSO_DEBUG=1`           | Log every request and its status to stderr, key redacted     |
 | `SENSO_NO_UPDATE_CHECK=1` | Never check npm for a newer version                          |
+| `SENSO_GAP_SIGNALS=off`   | Keep every search out of the gap report (probes and tests)   |
 | `NO_COLOR`                | Disable color (any value)                                    |
 
 **Teaching an agent to use Senso.** The official agent skills install in one
@@ -114,23 +115,24 @@ senso skills install --all
 **[Full command reference →](docs/reference/commands.md)** — every command,
 argument and flag, generated from the CLI itself.
 
-| Group                                                                    | What it does                                                        |
-| ------------------------------------------------------------------------ | ------------------------------------------------------------------- |
-| `login` `logout` `whoami`                                                | Authentication and the current organization                         |
-| `search`                                                                 | Ask the knowledge base, with an AI answer, raw chunks, or streaming |
-| `kb` `ingest` `content` `website-import`                                 | The knowledge base: upload, browse, organize, verify                |
-| `ctas`                                                                   | Call-to-action cards on published pages                             |
-| `generate` `engine` `generated-content` `destinations` `publish-records` | Generate content and publish it                                     |
-| `analytics`                                                              | GEO metrics for your own organization                               |
-| `industries` `history-imports`                                           | The industry catalog: brand leaderboards, citations, prompt import  |
-| `partner`                                                                | Partner-network competitive intelligence (needs a partner key)      |
-| `prompts` `questions` `competitors` `tracked-sources`                    | What gets monitored                                                 |
-| `brand-kit` `content-types` `product-lines` `tags`                       | How content is shaped                                               |
-| `evals`                                                                  | Judge text and content against your knowledge base and brand kit    |
-| `org` `users` `members` `roles` `permissions` `api-keys` `credits`       | Organization administration                                         |
-| `run-config`                                                             | Which models run, and on which days                                 |
-| `skills`                                                                 | Install the Senso agent skills                                      |
-| `update`                                                                 | Update this CLI                                                     |
+| Group                                                                    | What it does                                                                    |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| `login` `logout` `whoami`                                                | Authentication and the current organization                                     |
+| `search`                                                                 | Ask the knowledge base, with an AI answer, raw chunks, or streaming             |
+| `kb` `ingest` `content` `website-import`                                 | The knowledge base: upload, browse, organize, verify                            |
+| `ctas`                                                                   | Call-to-action cards on published pages                                         |
+| `generate` `engine` `generated-content` `destinations` `publish-records` | Generate content and publish it                                                 |
+| `analytics`                                                              | GEO metrics for your own organization                                           |
+| `industries` `history-imports`                                           | The industry catalog: brand leaderboards, citations, prompt import              |
+| `partner`                                                                | Partner-network competitive intelligence (needs a partner key)                  |
+| `prompts` `questions` `competitors` `tracked-sources`                    | What gets monitored                                                             |
+| `brand-kit` `content-types` `product-lines` `tags`                       | How content is shaped                                                           |
+| `evals`                                                                  | Judge text and content against your knowledge base and brand kit                |
+| `gaps`                                                                   | What the knowledge base could not answer or back up, and what was done about it |
+| `org` `users` `members` `roles` `permissions` `api-keys` `credits`       | Organization administration                                                     |
+| `run-config`                                                             | Which models run, and on which days                                             |
+| `skills`                                                                 | Install the Senso agent skills                                                  |
+| `update`                                                                 | Update this CLI                                                                 |
 
 A few worth knowing about:
 

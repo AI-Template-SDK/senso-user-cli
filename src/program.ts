@@ -25,6 +25,7 @@ import { registerWebsiteImportCommands } from "./commands/website-import.js";
 import { registerContentCommands } from "./commands/content.js";
 import { registerCtaCommands } from "./commands/ctas.js";
 import { registerEvalsCommands } from "./commands/evals.js";
+import { registerGapsCommands } from "./commands/gaps.js";
 import { registerGenerateCommands } from "./commands/generate.js";
 import { registerEngineCommands } from "./commands/engine.js";
 import { registerDestinationsCommands } from "./commands/destinations.js";
@@ -80,6 +81,7 @@ Environment:
   SENSO_CONFIG_DIR     Override where the config file is read and written
   SENSO_DEBUG=1        Log every request to stderr, with the key redacted
   SENSO_NO_UPDATE_CHECK=1  Never check npm for a newer version
+  SENSO_GAP_SIGNALS=off  Keep every search out of the gap report (for probes and tests)
   NO_COLOR             Disable color (any value)
 
 Output:
@@ -147,6 +149,7 @@ export function createProgram(): Command {
   registerContentCommands(program);
   registerCtaCommands(program);
   registerEvalsCommands(program);
+  registerGapsCommands(program);
   registerGenerateCommands(program);
   registerEngineCommands(program);
   registerDestinationsCommands(program);

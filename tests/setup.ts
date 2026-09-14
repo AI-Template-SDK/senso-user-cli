@@ -56,6 +56,7 @@ beforeEach(() => {
   delete process.env.SENSO_API_KEY;
   delete process.env.SENSO_BASE_URL;
   delete process.env.SENSO_DEBUG;
+  delete process.env.SENSO_GAP_SIGNALS;
   process.env.SENSO_NO_UPDATE_CHECK = "1";
 
   // Color codes would otherwise be interleaved through every assertion about

@@ -122,6 +122,7 @@ describe("`senso --help`", () => {
     expect(res.stdout).toContain("SENSO_CONFIG_DIR");
     expect(res.stdout).toContain("SENSO_DEBUG");
     expect(res.stdout).toContain("SENSO_NO_UPDATE_CHECK");
+    expect(res.stdout).toContain("SENSO_GAP_SIGNALS");
     expect(res.stdout).toContain("NO_COLOR");
   });
 });

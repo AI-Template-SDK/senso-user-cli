@@ -2,6 +2,7 @@ import { Command } from "commander";
 import pc from "picocolors";
 import { apiRequest, apiStreamRequest } from "../lib/api-client.js";
 import { CliError, EXIT } from "../lib/errors.js";
+import { gapSignalsHeaders } from "../lib/gap-signals.js";
 import { emit, writeStdout } from "../lib/output.js";
 import { runAction, type Ctx } from "../lib/run-action.js";
 import * as log from "../utils/logger.js";
@@ -20,7 +21,16 @@ interface SearchOptions {
   maxResults?: string;
   contentIds?: string[];
   requireScopedIds?: boolean;
+  /** Commander's value for `--no-gap-signals`: false when the flag was passed. */
+  gapSignals?: boolean;
 }
+
+/**
+ * The help text for `--no-gap-signals`, shared so the five commands describe it
+ * identically.
+ */
+const GAP_SIGNALS_HELP =
+  "Keep this search out of the organization's gap report (sends X-Senso-Signals: off). Use it for probes, tests and monitors — a real question that finds nothing should be left eligible. The search still runs, costs credits and is recorded. Set SENSO_GAP_SIGNALS=off to do this for every search.";
 
 function buildSearchBody(query: string, cmdOpts: SearchOptions): Record<string, unknown> {
   const body: Record<string, unknown> = {
@@ -98,6 +108,7 @@ function resolveSearchOptions(command: Command): SearchOptions {
     maxResults: resolveOption<string>(command, "maxResults"),
     contentIds: resolveOption<string[]>(command, "contentIds"),
     requireScopedIds: resolveOption<boolean>(command, "requireScopedIds"),
+    gapSignals: resolveOption<boolean>(command, "gapSignals"),
   };
 }
 
@@ -126,14 +137,17 @@ function addSearchVariant(
       "Restrict search to specific content item IDs (space-separated UUIDs)",
     )
     .option("--require-scoped-ids", "Only return results from the specified --content-ids")
+    .option("--no-gap-signals", GAP_SIGNALS_HELP)
     .action(
       runAction(
         program,
         async (ctx: Ctx, query: string, _cmdOpts: SearchOptions, command: Command) => {
+          const opts = resolveSearchOptions(command);
           const data = await apiRequest<SearchResponse>({
             method: "POST",
             path,
-            body: buildSearchBody(query, resolveSearchOptions(command)),
+            body: buildSearchBody(query, opts),
+            headers: gapSignalsHeaders(opts.gapSignals),
             apiKey: ctx.apiKey,
             baseUrl: ctx.baseUrl,
           });
@@ -155,7 +169,7 @@ export function registerSearchCommands(program: Command): void {
   const search = program
     .command("search")
     .description(
-      "Search the knowledge base with natural language queries. Returns AI-generated answers synthesized from matching content chunks, or raw chunks/content IDs.",
+      "Search the knowledge base with natural language queries. Returns AI-generated answers synthesized from matching content chunks, or raw chunks/content IDs. An answering search (`search`, `search full`, `search stream`) that finds nothing is filed in the organization's gap report as an API search gap — read them with `senso gaps list --origin api_unanswered_question --status weak --status open`. Pass --no-gap-signals, or set SENSO_GAP_SIGNALS=off, on probes and tests so they do not.",
     );
 
   // Default: senso search <query> → POST /org/search (answer + results)
@@ -170,12 +184,14 @@ export function registerSearchCommands(program: Command): void {
       "--require-scoped-ids",
       "Only return results from the specified --content-ids (omit to allow fallback to all content)",
     )
+    .option("--no-gap-signals", GAP_SIGNALS_HELP)
     .action(
       runAction(program, async (ctx: Ctx, query: string, cmdOpts: SearchOptions) => {
         const data = await apiRequest<SearchResponse>({
           method: "POST",
           path: "/org/search",
           body: buildSearchBody(query, cmdOpts),
+          headers: gapSignalsHeaders(cmdOpts.gapSignals),
           apiKey: ctx.apiKey,
           baseUrl: ctx.baseUrl,
         });
@@ -240,14 +256,17 @@ export function registerSearchCommands(program: Command): void {
       "Restrict search to specific content item IDs (space-separated UUIDs)",
     )
     .option("--require-scoped-ids", "Only return results from the specified --content-ids")
+    .option("--no-gap-signals", GAP_SIGNALS_HELP)
     .action(
       runAction(
         program,
         async (ctx: Ctx, query: string, _cmdOpts: SearchOptions, command: Command) => {
+          const opts = resolveSearchOptions(command);
           const res = await apiStreamRequest({
             method: "POST",
             path: "/org/search/stream",
-            body: buildSearchBody(query, resolveSearchOptions(command)),
+            body: buildSearchBody(query, opts),
+            headers: gapSignalsHeaders(opts.gapSignals),
             apiKey: ctx.apiKey,
             baseUrl: ctx.baseUrl,
           });
