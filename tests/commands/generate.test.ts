@@ -1047,3 +1047,35 @@ describe("generate industry-draft", () => {
     expect(res.stderr).toBe("");
   });
 });
+
+describe("generate industry-draft, the empty product-line list", () => {
+  /**
+   * Omitting `selected_product_line_ids` means "all of them", so sending `[]`
+   * is not the same thing — it would strip the product-line context off a call
+   * that consumes credits. An explicitly empty list is a usage error instead.
+   */
+  it("exits 2 rather than sending an empty selected_product_line_ids", async () => {
+    let called = false;
+    server.use(
+      http.post(apiUrl("/org/content-generation/industry-prompt-draft"), () => {
+        called = true;
+        return HttpResponse.json({});
+      }),
+    );
+
+    const res = await runCli([
+      "generate",
+      "industry-draft",
+      "--industry-prompt-id",
+      "a4226991-3d00-49ec-b5cc-95642c946cc0",
+      "--content-type-id",
+      "06f9f0df-b9b5-42d9-af53-859f1a47f27e",
+      "--product-line-ids",
+      "",
+    ]);
+
+    expect(res.exitCode).toBe(2);
+    expect(called).toBe(false);
+    expect(res.stderr).toContain("Omit the flag");
+  });
+});

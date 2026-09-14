@@ -86,6 +86,16 @@ interface RequestOptions {
   params?: Record<string, string | number | undefined>;
   apiKey?: string;
   baseUrl?: string;
+  /**
+   * Override the abort budget for this one call.
+   *
+   * The default suits a request that should come back promptly. It does not
+   * suit an endpoint that does the work inline and bills for it: a draft the
+   * spec says takes 10-30 seconds is not stored anywhere, so aborting at 30
+   * throws away a document the caller has already paid for. Raise it only for
+   * those, and only as far as the endpoint's own ceiling.
+   */
+  timeoutMs?: number;
 }
 
 export async function apiRequest<T = unknown>(opts: RequestOptions): Promise<T> {
@@ -109,7 +119,7 @@ export async function apiRequest<T = unknown>(opts: RequestOptions): Promise<T> 
   const controller = new AbortController();
   const timeout = setTimeout(() => {
     controller.abort();
-  }, REQUEST_TIMEOUT_MS);
+  }, opts.timeoutMs ?? REQUEST_TIMEOUT_MS);
   const startedAt = Date.now();
   logRequest(method, url.toString());
 

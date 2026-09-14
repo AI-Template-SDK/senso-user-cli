@@ -11,6 +11,32 @@ mattered, and what you need to do differently.
 
 ### Added
 
+- **`senso evals` — judge text against your organization's ground truth.** Six
+  commands: `evaluators` lists what can run and the version each is on; `text`
+  judges text you pass with `--text` or `--text-file`; `content` judges the
+  latest saved version of a content item; `runs` and `get` read runs; `claims`
+  reads the individual judged claims a score is built from.
+
+  Two evaluators. `kb_accuracy` extracts the factual claims a text makes about
+  your brand and verifies each against your knowledge base. `brand_alignment`
+  grades the text against your brand kit's writing rules, and ends `failed` if
+  the brand kit has none. Checking one text for both is two runs, so that one
+  score never covers for the other. Judge model spend is recorded on each run
+  but is not billed against your credit balance.
+
+  A trigger returns a queued run to read later with `evals get`. `--wait` polls
+  until the run finishes instead. A run that ends `failed` under `--wait` exits
+  1 with an empty stdout, so a caller that waited and got exit 0 can trust the
+  score it was handed; without `--wait` a queued run is the expected answer and
+  exits 0.
+
+  `--from` and `--to` on `runs` and `claims` are RFC 3339 instants
+  (`2026-09-01T00:00:00Z`), not the `YYYY-MM-DD` dates the analytics and
+  industries commands take, and a plain date is a usage error rather than a
+  round trip. `--evaluator` and `--subject-type` are deliberately unrestricted
+  there: subjects include `question_run` and `search_turn` as well as `inline`
+  and `content`.
+
 - **`senso industries` — the industry catalog, readable with your own key.**
   Seven commands over `/org/industries/*`: `list` browses the public catalog
   with `--search`, `--live`, `--sort` and paging; `prompts` lists the prompts an

@@ -27,6 +27,9 @@ interface ContentGenerationSampleJobResponse {
 const SAMPLE_JOB_POLL_INTERVAL_MS = 2_000;
 const SAMPLE_JOB_TIMEOUT_MS = 180_000;
 
+/** `industry-draft` generates inline and bills for it; see the call site. */
+const DRAFT_TIMEOUT_MS = 120_000;
+
 export function registerGenerateCommands(program: Command): void {
   const gen = program
     .command("generate")
@@ -347,6 +350,14 @@ export function registerGenerateCommands(program: Command): void {
               { code: "usage" },
             );
           }
+          // An empty list is not "omit": omitting means every product line, so
+          // silently sending [] would strip the context off a billable call.
+          if (productLineIds?.length === 0) {
+            throw new CliError("Invalid --product-line-ids: no ids given.", EXIT.USAGE, {
+              code: "usage",
+              hint: "Omit the flag entirely to include all of your product lines.",
+            });
+          }
           if (productLineIds && productLineIds.length > 100) {
             throw new CliError(
               `Invalid --product-line-ids: ${String(productLineIds.length)} ids given, the maximum is 100.`,
@@ -373,6 +384,11 @@ export function registerGenerateCommands(program: Command): void {
             body,
             apiKey: ctx.apiKey,
             baseUrl: ctx.baseUrl,
+            // The document is generated inline, charged for, and not stored: a
+            // draft that ran long would otherwise abort at the default 30s and
+            // lose work the caller already paid for. The server answers 504 on
+            // its own ceiling, so waiting is bounded either way.
+            timeoutMs: DRAFT_TIMEOUT_MS,
           });
           emit(ctx, data);
         },

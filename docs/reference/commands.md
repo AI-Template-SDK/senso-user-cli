@@ -17,6 +17,7 @@ Generated from the command tree of `@senso-ai/cli`. Every command accepts the [g
 - [`senso website-import`](#senso-website-import) — Import your organization's website into the knowledge base.
 - [`senso content`](#senso-content) — Manage content items in the knowledge base.
 - [`senso ctas`](#senso-ctas) — Manage call-to-action (CTA) templates — the card attached to a published content-engine page — and choose which one each content item carries.
+- [`senso evals`](#senso-evals) — Judge text against your organization's ground truth.
 - [`senso generate`](#senso-generate) — AI content generation.
 - [`senso engine`](#senso-engine) — Publish or draft content through the content engine.
 - [`senso destinations`](#senso-destinations) — Manage publish destinations.
@@ -808,6 +809,102 @@ senso ctas upload-url [options]
 | `--filename <name>` | The file's name. Its extension, when it has one, must match --content-type. |  |
 | `--content-type <type>` | The image media type: image/png \| image/jpeg \| image/webp \| image/gif |  |
 | `--size <bytes>` | The file size in bytes, at most 10485760 (10 MiB) |  |
+
+## senso evals
+
+Judge text against your organization's ground truth. `kb_accuracy` verifies the factual claims a text makes about your brand against your knowledge base; `brand_alignment` grades it against your brand kit's writing rules. Every run records the claims it checked, the verdict and the evidence, so a score can be audited rather than trusted. Judge model spend is recorded on each run but is not billed against your credit balance.
+
+```
+senso evals [options] [command]
+```
+
+### senso evals evaluators
+
+List the evaluators available to this organization, with the version each one is currently on. Use `latest_version` here to pin `--evaluator-version` on a trigger.
+
+```
+senso evals evaluators [options]
+```
+
+### senso evals text
+
+Judge text you supply. Pass the text with --text, or --text-file to read it from a file. Returns straight away with a run handle to read later with `senso evals get`; add --wait to poll until the run finishes and print the finished run instead. A run that ends `failed` under --wait exits 1, so a caller that waited and got exit 0 can trust the score it was handed.
+
+```
+senso evals text [options]
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--evaluator <key>` | Which check to run: kb_accuracy, brand_alignment (default kb_accuracy) |  |
+| `--evaluator-version <v>` | Pin an evaluator version (see `senso evals evaluators`) |  |
+| `--judge-model <model>` | Override the model that judges the text |  |
+| `--label <text>` | Free-form tag stored on the run, for finding it later |  |
+| `--idempotency-key <key>` | Makes the trigger safe to retry — the same key returns the original run |  |
+| `--wait` | Poll until the run finishes instead of returning a handle straight away |  |
+| `--text <text>` | The text to judge |  |
+| `--text-file <path>` | Read the text to judge from a file |  |
+| `--title <title>` | Optional title, stored with the run's subject (max 255 chars) |  |
+
+### senso evals runs
+
+List eval runs, newest first. Each row carries the score and the claim counts behind it, so a run can be read without opening it.
+
+```
+senso evals runs [options]
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--from <instant>` | Only items created at or after this RFC 3339 instant, e.g. 2026-09-01T00:00:00Z |  |
+| `--to <instant>` | Only items created before this RFC 3339 instant (exclusive) |  |
+| `--evaluator <key>` | Filter by evaluator key (see `senso evals evaluators`) |  |
+| `--subject-type <type>` | Filter by subject type, e.g. inline or content |  |
+| `--limit <n>` | Page size, 1-100 (default 25) |  |
+| `--offset <n>` | Number of items to skip (default 0) |  |
+
+### senso evals get
+
+Get one eval run in full — every claim it checked, the verdict, the evidence behind it, and what the judge searched for. This is the auditable form of a score.
+
+```
+senso evals get [options] <runId>
+```
+
+### senso evals claims
+
+List the individual claims evaluators have judged, across runs. This is the grain a score is built from: each row carries the claim, the verdict, whether it counted toward the score, and the evidence the judge relied on. Narrow to one run with --run-id.
+
+```
+senso evals claims [options]
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--from <instant>` | Only items created at or after this RFC 3339 instant, e.g. 2026-09-01T00:00:00Z |  |
+| `--to <instant>` | Only items created before this RFC 3339 instant (exclusive) |  |
+| `--evaluator <key>` | Filter by evaluator key (see `senso evals evaluators`) |  |
+| `--subject-type <type>` | Filter by subject type, e.g. inline or content |  |
+| `--limit <n>` | Page size, 1-100 (default 25) |  |
+| `--offset <n>` | Number of items to skip (default 0) |  |
+| `--run-id <id>` | Only claims from this eval run |  |
+
+### senso evals content
+
+Judge a saved content item — a knowledge-base document or a generated article — by its content id. Its latest saved version is what gets judged, and only items whose latest version is raw text can be: an uploaded file or a crawled page stores a pointer rather than text of its own and is a 422. Add --wait to poll until the run finishes.
+
+```
+senso evals content [options] <contentId>
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--evaluator <key>` | Which check to run: kb_accuracy, brand_alignment (default kb_accuracy) |  |
+| `--evaluator-version <v>` | Pin an evaluator version (see `senso evals evaluators`) |  |
+| `--judge-model <model>` | Override the model that judges the text |  |
+| `--label <text>` | Free-form tag stored on the run, for finding it later |  |
+| `--idempotency-key <key>` | Makes the trigger safe to retry — the same key returns the original run |  |
+| `--wait` | Poll until the run finishes instead of returning a handle straight away |  |
 
 ## senso generate
 

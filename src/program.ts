@@ -24,6 +24,7 @@ import { registerIngestCommands } from "./commands/ingest.js";
 import { registerWebsiteImportCommands } from "./commands/website-import.js";
 import { registerContentCommands } from "./commands/content.js";
 import { registerCtaCommands } from "./commands/ctas.js";
+import { registerEvalsCommands } from "./commands/evals.js";
 import { registerGenerateCommands } from "./commands/generate.js";
 import { registerEngineCommands } from "./commands/engine.js";
 import { registerDestinationsCommands } from "./commands/destinations.js";
@@ -145,6 +146,7 @@ export function createProgram(): Command {
   registerWebsiteImportCommands(program);
   registerContentCommands(program);
   registerCtaCommands(program);
+  registerEvalsCommands(program);
   registerGenerateCommands(program);
   registerEngineCommands(program);
   registerDestinationsCommands(program);
