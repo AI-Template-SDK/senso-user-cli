@@ -41,6 +41,18 @@ tags:
       An **unscoped** key (no KB folder grants — the default for a new key) searches your
       entire knowledge base. A key that has been **scoped** to specific KB folders (see
       `GET /org/api-keys/{keyId}/kb-permissions`) searches only within those folders.
+
+
+      An answering search (`/org/search`, `/org/search/full`, `/org/search/stream`) that finds nothing becomes an API search gap in your organization's gap report — see **Gaps**. Send `X-Senso-Signals: off` to keep automated or test searches out of it.
+  - name: Gaps
+    description: |
+      The questions and claims your knowledge base could not back up, and what was decided about each — the same queue the Senso app shows as the Gap Report.
+
+      **API search gaps.** A search through `POST /org/search`, `/org/search/full` or `/org/search/stream` (or the MCP server's `senso_search` tool in `answer` or `full` mode, or the CLI) that finds nothing files a gap with `origin.kind` `api_unanswered_question`, `surfaces` `[api_search]`, `problem` `not_found` and `kind` `missing`. The first such search for a question files it as `weak`, which the default list leaves out; a second, from any caller, makes it `open`. Questions match after folding case, whitespace and surrounding punctuation. A later API search for the same question that returns a sourced answer resolves the gap; a Quick Search answer in the app does not, and an API answer never resolves a Quick Search gap. `/org/search/context` and `/org/search/content` never file gaps, and searches made before API search gaps shipped never became gaps.
+
+      **Keeping automated searches out.** Send `X-Senso-Signals: off` on test, monitoring or synthetic searches. The search still runs, consumes credits and is recorded; it just never counts towards a gap.
+
+      Requires the Fetch product and the `bypass:kb_acl` permission, which organization API keys have.
   - name: Evals
     description: |
       Judge text against your organization's ground truth. An eval run applies one evaluator to one subject — a saved content item or text you supply — and records every claim it checked, the verdict, and the evidence behind it, so a score can be audited rather than trusted.
@@ -1308,6 +1320,8 @@ paths:
         the `kb_node_id` of its source document, so a cited passage can be opened in full
         with `GET /org/kb/nodes/{kb_node_id}`. Each call consumes search credits.
       operationId: orgSearch
+      parameters:
+        - $ref: "#/components/parameters/SensoSignals"
       requestBody:
         required: true
         content:
@@ -1343,6 +1357,8 @@ paths:
         opened in full with `GET /org/kb/nodes/{kb_node_id}`. Each call consumes search
         credits.
       operationId: orgSearchContext
+      parameters:
+        - $ref: "#/components/parameters/SensoSignals"
       requestBody:
         required: true
         content:
@@ -1378,6 +1394,8 @@ paths:
         document, so a cited passage can be opened in full with
         `GET /org/kb/nodes/{kb_node_id}`. Each call consumes search credits.
       operationId: orgSearchFull
+      parameters:
+        - $ref: "#/components/parameters/SensoSignals"
       requestBody:
         required: true
         content:
@@ -1413,6 +1431,8 @@ paths:
         the `/org/kb/nodes/{kb_node_id}` endpoints without a further lookup. Use this to
         discover which documents are relevant. Each call consumes search credits.
       operationId: orgSearchContent
+      parameters:
+        - $ref: "#/components/parameters/SensoSignals"
       requestBody:
         required: true
         content:
@@ -1450,6 +1470,8 @@ paths:
         sent); a provider failure mid-stream ends the stream normally (`sources` +
         `done`) with a truncated answer. Each call consumes search credits.
       operationId: orgSearchStream
+      parameters:
+        - $ref: "#/components/parameters/SensoSignals"
       requestBody:
         required: true
         content:
@@ -1695,6 +1717,282 @@ paths:
                 $ref: "#/components/schemas/EvaluatorListResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+
+  # ──────────────────────────────────────────────
+  # Gaps — /org/gaps (what the knowledge base could not back up)
+  # ──────────────────────────────────────────────
+  /org/gaps:
+    get:
+      tags: [Gaps]
+      summary: List gaps
+      description: >-
+        Returns a page of your organization's gap queue, the same queue the Senso app
+        shows as the Gap Report. With no `statuses` filter only `open`, `reopened` and
+        `addressed` gaps are returned, so an API search gap seen only once (`weak`) does
+        not appear until you ask for it with `statuses=weak`.
+
+
+        Repeatable filters are sent as repeated query parameters
+        (`?statuses=weak&statuses=open`). Values within one filter are ORed; different
+        filters are ANDed.
+      operationId: orgListGaps
+      parameters:
+        - name: statuses
+          in: query
+          description: >-
+            Restrict to these statuses. Defaults to `open`, `reopened` and `addressed`
+            when omitted.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              $ref: "#/components/schemas/GapStatus"
+        - name: problems
+          in: query
+          description: >-
+            Restrict to these problems. An unrecognized value is rejected with 400.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              $ref: "#/components/schemas/GapProblem"
+        - name: surfaces
+          in: query
+          description: Restrict to gaps seen on any of these surfaces.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              $ref: "#/components/schemas/GapSurface"
+        - name: origin_kinds
+          in: query
+          description: >-
+            Restrict to gaps with any of these origins. Use `api_unanswered_question` for
+            searches through the org API, the MCP server or the CLI that found nothing.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              $ref: "#/components/schemas/GapOriginKind"
+        - name: kinds
+          in: query
+          description: Restrict to these kinds.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              $ref: "#/components/schemas/GapKind"
+        - name: tag_ids
+          in: query
+          description: >-
+            Restrict to gaps carrying any of these tags. Values that are not UUIDs are
+            ignored.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+              format: uuid
+        - name: search
+          in: query
+          description: Case-insensitive substring match on the gap text (`claim_text`).
+          schema:
+            type: string
+        - name: sort
+          in: query
+          description: >-
+            `severity` (the default) puts conflicts above missing context, then wider
+            spread, then recency. `recent` orders by `last_seen_at`, newest first.
+            `demand` orders by `asker_count`, then `occurrence_count`, then recency.
+          schema:
+            type: string
+            enum: [severity, recent, demand]
+            default: severity
+        - name: limit
+          in: query
+          description: Page size, 1–100 (default 50). A value outside that range is treated as 50.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          description: Number of gaps to skip.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: A page of the gap queue.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GapListResponse"
+              example:
+                gaps:
+                  - gap_id: 5b0e3a4c-2f1d-4c6e-9a8b-7d3e2f1a0b9c
+                    kind: missing
+                    problem: not_found
+                    status: open
+                    claim_text: Do you offer an annual plan?
+                    occurrence_count: 3
+                    asker_count: 0
+                    api_occurrence_count: 3
+                    surfaces: [api_search]
+                    first_seen_at: "2026-09-14T10:00:00Z"
+                    last_seen_at: "2026-09-14T12:30:00Z"
+                    status_changed_at: "2026-09-14T11:05:00Z"
+                    awaiting_update: false
+                    tags: []
+                    origin:
+                      kind: api_unanswered_question
+                      surface: api_search
+                      subject_id: 0c9d8e7f-6a5b-4c3d-2e1f-0a9b8c7d6e5f
+                      surface_counts:
+                        search_turn: 0
+                        content: 0
+                        question_run: 0
+                        api_search: 3
+                total: 1
+                limit: 50
+                offset: 0
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /org/gaps/{gapId}:
+    get:
+      tags: [Gaps]
+      summary: Get a gap
+      description: >-
+        Returns one gap with up to its 20 most recent sightings, every resolution
+        recorded against it (newest first), and the evidence behind it. For an API search
+        gap, `lead_evidence` carries the question and the retrieval counts from the most
+        recent search that found nothing. The embedded `gap` never carries
+        `latest_resolution` and always reports `awaiting_update: false`; read
+        `resolutions` instead.
+      operationId: orgGetGap
+      parameters:
+        - $ref: "#/components/parameters/GapID"
+      responses:
+        "200":
+          description: The gap, its sightings, its resolutions and its evidence.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GapDetailResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /org/gaps/{gapId}/resolutions:
+    post:
+      tags: [Gaps]
+      summary: Record a resolution
+      description: >-
+        Records what was done about a gap and moves its status accordingly.
+
+
+        - `answered`, `content_added`, `content_updated` → `addressed`. Each requires
+        `produced_content_id`.
+
+        - `ruled_kb_correct`, `we_dont_do_this` → `resolved`.
+
+        - `dismissed`, `not_relevant`, `source_irrelevant` → `dismissed`.
+        `source_irrelevant` requires `authority_content_id`.
+
+        - `ruled_claim_correct`, `ruled_document` → no status change. The ruling is
+        recorded, and an open gap shows `awaiting_update` in the list until a follow-up
+        resolution such as `content_updated` moves it. Each requires
+        `authority_content_id`.
+
+
+        A resolution recorded with an API key names no person, so it has no
+        `resolved_by_name` or `resolved_by_email`.
+      operationId: orgCreateGapResolution
+      parameters:
+        - $ref: "#/components/parameters/GapID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGapResolutionRequest"
+            example:
+              resolution_type: content_added
+              produced_content_id: 8f14e45f-ceea-467a-9c2b-1b2f8d3a1c7e
+              notes: Added the annual plan to the pricing page.
+      responses:
+        "201":
+          description: The recorded resolution.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GapResolution"
+        "400":
+          description: >-
+            The body was malformed, `resolution_type` is missing or unknown, a content id
+            the type requires is missing, or the gap does not exist in your organization.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /org/gaps/{gapId}/resolutions/{resolutionId}:
+    delete:
+      tags: [Gaps]
+      summary: Undo a resolution
+      description: >-
+        Retracts a resolution and recomputes the gap's status from the resolutions that
+        remain: the newest remaining resolution that implies a status decides it, and if
+        none does, the gap returns to `open`.
+      operationId: orgDeleteGapResolution
+      parameters:
+        - $ref: "#/components/parameters/GapID"
+        - name: resolutionId
+          in: path
+          required: true
+          description: The resolution's id.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: The resolution was retracted. No content.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: >-
+            The gap or the resolution does not exist in your organization, or the
+            resolution belongs to a different gap.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   # ──────────────────────────────────────────────
   # Knowledge Base — /org/kb
@@ -6903,6 +7201,30 @@ components:
 
   # Reusable parameters: shared path ids, then the query parameters of the windowed analytics endpoints.
   parameters:
+    SensoSignals:
+      name: X-Senso-Signals
+      in: header
+      required: false
+      description: >-
+        Send `off` to keep this search out of your organization's gap report. The search
+        still runs, consumes credits and is recorded in search history; it is only never
+        counted towards a gap. `false`, `0`, `no`, `skip` and `none` mean the same,
+        case-insensitively. Any other value, or no header, leaves the search eligible.
+        Use it on automated, synthetic or test traffic. Only `POST /org/search`,
+        `/org/search/full` and `/org/search/stream` ever file gaps;
+        `/org/search/context` and `/org/search/content` accept the header and never file
+        one either way.
+      schema:
+        type: string
+      example: "off"
+    GapID:
+      name: gapId
+      in: path
+      required: true
+      description: The gap's id.
+      schema:
+        type: string
+        format: uuid
     ContentTypeID:
       name: id
       in: path
@@ -12339,6 +12661,516 @@ components:
         rank:
           type: integer
           description: The chunk's 1-based rank in that arm's pool.
+
+    # ── Gaps ──────────────────────────────────
+    GapStatus:
+      type: string
+      description: >-
+        Where a gap is in its lifecycle. `weak` is a gap with too little evidence to act
+        on yet (an API search gap seen once). `open` and `reopened` are work to do.
+        `addressed` means something was written that later evidence has not yet confirmed.
+        `resolved` and `dismissed` are closed. `dormant` has not been seen for a while.
+      enum: [weak, open, reopened, addressed, resolved, dismissed, dormant]
+    GapProblem:
+      type: string
+      description: >-
+        The state the queue badges and counts by: `conflict` (the knowledge base
+        disagrees), `not_found` (nothing was found for the question), `no_source`
+        (nothing backs a claim), `flagged` (a person marked an answer wrong).
+      enum: [conflict, not_found, no_source, flagged]
+    GapKind:
+      type: string
+      description: >-
+        `missing`, `conflict` (claim against the knowledge base), `kb_conflict` (two
+        knowledge-base documents disagree) or `flagged`.
+      enum: [missing, conflict, kb_conflict, flagged]
+    GapSurface:
+      type: string
+      description: >-
+        Where a gap was seen: `search_turn` (Quick Search in the Senso app), `content`
+        (something being written), `question_run` (a tracked prompt's AI answer), or
+        `api_search` (a search through the org API, the MCP server or the CLI).
+      enum: [search_turn, content, question_run, api_search]
+    GapOriginKind:
+      type: string
+      description: >-
+        What produced a gap: `claim` (a statement that could not be verified),
+        `unanswered_question` (a Quick Search that found nothing), `flagged_answer` (an
+        answer a person marked wrong), `documents_didnt_answer` (documents were found
+        but the answer still declined), or `api_unanswered_question` (a search through
+        the org API, the MCP server or the CLI that found nothing).
+      enum:
+        [
+          claim,
+          unanswered_question,
+          flagged_answer,
+          documents_didnt_answer,
+          api_unanswered_question,
+        ]
+    GapResolutionType:
+      type: string
+      description: What was decided about a gap. See `POST /org/gaps/{gapId}/resolutions` for the effect of each.
+      enum:
+        - answered
+        - content_added
+        - content_updated
+        - ruled_kb_correct
+        - ruled_claim_correct
+        - ruled_document
+        - dismissed
+        - not_relevant
+        - we_dont_do_this
+        - source_irrelevant
+    GapTag:
+      type: object
+      description: A topic tag attached to a gap.
+      additionalProperties: false
+      required:
+        - tag_id
+        - name
+        - curated
+      properties:
+        tag_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        curated:
+          type: boolean
+          description: True = part of the organization's working vocabulary; false = machine-minted, awaiting adoption.
+    GapSurfaceCounts:
+      type: object
+      description: How many times the gap was seen on each surface.
+      additionalProperties: false
+      required:
+        - search_turn
+        - content
+        - question_run
+        - api_search
+      properties:
+        search_turn:
+          type: integer
+        content:
+          type: integer
+        question_run:
+          type: integer
+        api_search:
+          type: integer
+    GapOrigin:
+      type: object
+      description: Where a gap came from, derived from its most recent sighting.
+      additionalProperties: false
+      required:
+        - kind
+        - surface
+        - surface_counts
+      properties:
+        kind:
+          $ref: "#/components/schemas/GapOriginKind"
+        surface:
+          $ref: "#/components/schemas/GapSurface"
+        subject_id:
+          type: string
+          format: uuid
+          description: >-
+            The search turn, content item or question run behind the most recent
+            sighting. For an API search gap, the most recent search that found nothing.
+        title:
+          type: string
+          description: A name for the subject — a document title, a tracked prompt, or the question asked.
+        model_label:
+          type: string
+          description: The engine that produced the answer. Absent for content, which a person wrote.
+        eval_mode:
+          type: string
+          description: How thoroughly the subject was checked. Absent for search signals, which are not judged.
+        surface_counts:
+          $ref: "#/components/schemas/GapSurfaceCounts"
+        session_id:
+          type: string
+          format: uuid
+          description: The Quick Search conversation the sighting happened in. Absent for API search gaps.
+        geo_question_id:
+          type: string
+          format: uuid
+          description: The tracked prompt behind an AI answer.
+        kb_node_id:
+          type: string
+          format: uuid
+          description: The knowledge-base document behind a content sighting. Absent when that document was deleted.
+    Gap:
+      type: object
+      description: One row of the gap queue.
+      additionalProperties: false
+      required:
+        - gap_id
+        - kind
+        - problem
+        - status
+        - claim_text
+        - occurrence_count
+        - asker_count
+        - api_occurrence_count
+        - surfaces
+        - first_seen_at
+        - last_seen_at
+        - status_changed_at
+        - awaiting_update
+        - tags
+      properties:
+        gap_id:
+          type: string
+          format: uuid
+        kind:
+          $ref: "#/components/schemas/GapKind"
+        problem:
+          $ref: "#/components/schemas/GapProblem"
+        status:
+          $ref: "#/components/schemas/GapStatus"
+        claim_text:
+          type: string
+          description: The gap in words — the claim that could not be backed up, or the question that went unanswered.
+        occurrence_count:
+          type: integer
+          description: How many times the gap was seen.
+        asker_count:
+          type: integer
+          description: Distinct signed-in people behind those sightings. Calls made with API keys are not counted here.
+        api_occurrence_count:
+          type: integer
+          description: Sightings that came from API-key calls. Never added into `asker_count`.
+        surfaces:
+          type: array
+          description: Every surface the gap was seen on.
+          items:
+            $ref: "#/components/schemas/GapSurface"
+        first_seen_at:
+          type: string
+          format: date-time
+        last_seen_at:
+          type: string
+          format: date-time
+        contradicting_content_id:
+          type: string
+          format: uuid
+          description: The knowledge-base content a claim contradicts. Grounding-checked.
+        contradicting_content_title:
+          type: string
+        suggested_content_id:
+          type: string
+          format: uuid
+          description: Content that may be relevant. An unverified hint, not a finding.
+        suggested_content_title:
+          type: string
+        assigned_user_id:
+          type: string
+          format: uuid
+        assigned_user_name:
+          type: string
+        assigned_user_email:
+          type: string
+        status_changed_at:
+          type: string
+          format: date-time
+        awaiting_update:
+          type: boolean
+          description: >-
+            True when the latest resolution ruled which side is correct but the losing
+            document has not been updated yet, so the gap is still `open` or `reopened`.
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/GapTag"
+        latest_resolution:
+          $ref: "#/components/schemas/GapResolution"
+        origin:
+          $ref: "#/components/schemas/GapOrigin"
+    GapListResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - gaps
+        - total
+        - limit
+        - offset
+      properties:
+        gaps:
+          type: array
+          items:
+            $ref: "#/components/schemas/Gap"
+        total:
+          type: integer
+          description: Gaps matching the filters, across all pages.
+        limit:
+          type: integer
+        offset:
+          type: integer
+    GapOccurrence:
+      type: object
+      description: One sighting of a gap.
+      additionalProperties: false
+      required:
+        - subject_type
+        - occurred_at
+      properties:
+        eval_claim_id:
+          type: string
+          format: uuid
+          description: The judged claim behind the sighting. Absent for search signals, which are not judged.
+        eval_run_id:
+          type: string
+          format: uuid
+          description: The evaluation run behind the sighting. Absent for search signals.
+        subject_type:
+          type: string
+          description: What was seen. `search_turn` for every search sighting, API searches included.
+        subject_id:
+          type: string
+          format: uuid
+        question:
+          type: string
+          description: The question that was asked, when there was one.
+        source_text:
+          type: string
+          description: The sentence that carried the claim, for a judged claim.
+        asked_by_name:
+          type: string
+          description: The signed-in person who asked. Absent for calls made with an API key.
+        occurred_at:
+          type: string
+          format: date-time
+    GapResolution:
+      type: object
+      description: One decision recorded against a gap.
+      additionalProperties: false
+      required:
+        - resolution_id
+        - resolution_type
+        - created_at
+      properties:
+        resolution_id:
+          type: string
+          format: uuid
+        resolution_type:
+          $ref: "#/components/schemas/GapResolutionType"
+        ruling_side:
+          type: string
+          enum: [kb, claim, document]
+        authority_content_id:
+          type: string
+          format: uuid
+        authority_content_version_id:
+          type: string
+          format: uuid
+        produced_content_id:
+          type: string
+          format: uuid
+        produced_content_version_id:
+          type: string
+          format: uuid
+        notes:
+          type: string
+        resolved_by_name:
+          type: string
+          description: The person who recorded it. Absent when it was recorded with an API key.
+        resolved_by_email:
+          type: string
+          description: Absent when it was recorded with an API key.
+        created_at:
+          type: string
+          format: date-time
+    CreateGapResolutionRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - resolution_type
+      properties:
+        resolution_type:
+          $ref: "#/components/schemas/GapResolutionType"
+        produced_content_id:
+          type: string
+          format: uuid
+          description: The content that was written. Required for `answered`, `content_added` and `content_updated`.
+        authority_content_id:
+          type: string
+          format: uuid
+          description: >-
+            The document the decision is about. Required for `ruled_claim_correct`,
+            `ruled_document` and `source_irrelevant`.
+        ruling_side:
+          type: string
+          enum: [kb, claim, document]
+          description: Which side a ruling found correct.
+        notes:
+          type: string
+    GapEvidenceItem:
+      type: object
+      description: A document weighed against a claim.
+      additionalProperties: false
+      required:
+        - content_id
+        - relation
+      properties:
+        content_id:
+          type: string
+          format: uuid
+        content_version_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        version_num:
+          type: integer
+          format: int64
+        updated_at:
+          type: string
+          format: date-time
+        relation:
+          type: string
+          description: "`entails` or `contradicts` (both grounding-checked), or `related` (context)."
+        was_cited:
+          type: boolean
+          description: Whether the answer actually cited this document.
+    GapEvidenceSearch:
+      type: object
+      description: One query issued against the knowledge base while checking a claim.
+      additionalProperties: false
+      required:
+        - query
+      properties:
+        query:
+          type: string
+        result_count:
+          type: integer
+    GapAnswerSource:
+      type: object
+      description: One document an answer cited, in rank order.
+      additionalProperties: false
+      required:
+        - content_id
+        - title
+        - source_type
+        - content_type
+        - rank
+        - available
+      properties:
+        content_id:
+          type: string
+          format: uuid
+        kb_node_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        source_type:
+          type: string
+        content_type:
+          type: string
+        rank:
+          type: integer
+        available:
+          type: boolean
+          description: False when the cited document has since been deleted.
+    GapFeedbackNote:
+      type: object
+      description: What a person said when they flagged an answer.
+      additionalProperties: false
+      required:
+        - rating
+        - created_at
+      properties:
+        user_name:
+          type: string
+        rating:
+          type: string
+        comment:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    GapRetrievalContext:
+      type: object
+      description: What retrieval recorded on a search that found nothing.
+      additionalProperties: false
+      properties:
+        raw_result_count:
+          type: integer
+          description: How many candidates retrieval considered.
+        filtered_result_count:
+          type: integer
+          description: How many candidates survived relevance filtering.
+        top_score:
+          type: number
+          description: The best candidate's score, when there was one.
+    GapLeadEvidence:
+      type: object
+      description: >-
+        The evidence behind a gap, from its most recent sighting. Every field is optional
+        because each origin carries different evidence. For an API search gap it is
+        `prompt` and, when recorded, `retrieval`.
+      additionalProperties: false
+      properties:
+        source_text:
+          type: string
+          description: The sentence that carried the claim.
+        prompt:
+          type: string
+          description: The question that produced the answer, or the question that went unanswered.
+        answer_text:
+          type: string
+          description: The whole answer, so `source_text` can be read in context.
+        quote:
+          type: string
+          description: A verbatim knowledge-base quote behind the verdict.
+        reasoning:
+          type: string
+        suggested_fix:
+          type: string
+        confidence:
+          type: string
+        grounding_failed:
+          type: boolean
+          description: True when a verdict was demoted because its quote failed the grounding check.
+        evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/GapEvidenceItem"
+        searches:
+          type: array
+          items:
+            $ref: "#/components/schemas/GapEvidenceSearch"
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/GapAnswerSource"
+        feedback:
+          type: array
+          items:
+            $ref: "#/components/schemas/GapFeedbackNote"
+        retrieval:
+          $ref: "#/components/schemas/GapRetrievalContext"
+    GapDetailResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - gap
+        - occurrences
+        - resolutions
+      properties:
+        gap:
+          $ref: "#/components/schemas/Gap"
+        occurrences:
+          type: array
+          description: Up to the 20 most recent sightings, newest first.
+          items:
+            $ref: "#/components/schemas/GapOccurrence"
+        resolutions:
+          type: array
+          description: Every resolution still in effect, newest first.
+          items:
+            $ref: "#/components/schemas/GapResolution"
+        lead_evidence:
+          $ref: "#/components/schemas/GapLeadEvidence"
 
     # ── Destinations & Credits ──
     OrgDestinationResponse:
