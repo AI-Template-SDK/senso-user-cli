@@ -9,6 +9,62 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
+### Added
+
+- **`senso industries` — the industry catalog, readable with your own key.**
+  Seven commands over `/org/industries/*`: `list` browses the public catalog
+  with `--search`, `--live`, `--sort` and paging; `prompts` lists the prompts an
+  industry runs; `brands` is the brand leaderboard, with `--no-canonicalize`,
+  `--rollup parent` and `--entity-type` to shape it; `brand` and `brand-by-id`
+  look one brand up; `domain` looks up a domain's citations; `import-prompts`
+  copies prompts from your own industry into your organization.
+
+  Reads accept any industry in the public catalog, not only your own, and the
+  `<industry>` argument takes a UUID, a name or a slug — a UUID is used as-is, a
+  name costs one search first. `brand` and `domain` answer `mentioned: false` and
+  `cited: false` rather than a 404 when there is nothing to report, so exit 0
+  means the question was answered, not that the brand was found.
+
+  `import-prompts` accepts 1–100 ids and is restricted to your own industry. It
+  ACTIVATES the organization and starts its scheduled runs, so it is the one
+  command in the group with a side effect beyond reading. Re-running is safe:
+  prompts already held are skipped.
+
+- **`senso history-imports list` and `senso history-imports get`.** Follow the
+  run-history import that `industries import-prompts` starts. A `completed`
+  import may have copied nothing, so `prompts_count` and
+  `historic_runs_imported` sit next to the status in the default table rather
+  than leaving the status to be read on its own.
+
+- **`senso org set-industry <industryId>`.** Sets the industry your organization
+  belongs to, from the catalog at `senso industries list`. It creates no
+  prompts and starts no runs. It can be done ONCE — afterwards the API answers
+  409 and changing it is not self-serve — so the 409 is reported with the
+  server's own message naming the industry already in place, rather than as a
+  conflict worth retrying.
+
+- **`senso generate industry-draft`.** Drafts a whole document from one of your
+  industry's prompts in a single synchronous call, grounded in your knowledge
+  base and written in a content type you choose. Returns GitHub Flavored
+  Markdown with citations rather than storing content. It takes 10–30 seconds
+  and consumes credits, so `--audience`, `--style-tone`, `--extra-instructions`
+  and `--product-line-ids` are length-checked before the request goes out.
+
+### Changed
+
+- **`senso industries` now reads `/org/*`; the partner commands moved to `senso
+partner`.** The six partner-network commands are unchanged apart from their
+  name: `senso industries list` is now `senso partner industries list`, and so on
+  for `summary`, `brand`, `domain` and `prompt-metrics`, while
+  `senso industries glossary` is now `senso partner glossary`. They still need a
+  PARTNER API key.
+
+  The name moved because almost every caller has an organization key and wants
+  the org-scoped view; giving that the obvious name and putting the partner-only
+  commands behind `senso partner` makes the key each one needs legible from the
+  command itself. **Update any script calling `senso industries` for
+  partner-network data.**
+
 ## [0.15.0] — 2026-09-13
 
 ### Added

@@ -844,3 +844,206 @@ describe("generate sample, when the job never finishes", () => {
     expect(stub.polls()).toBe(TIMEOUT_MS / POLL_INTERVAL_MS);
   });
 });
+
+/**
+ * `generate industry-draft` is synchronous, slow and billable — 10-30 seconds and
+ * credits per call in live testing. That is why the length limits are checked
+ * here rather than left to the API: a body that will be rejected for a 501-char
+ * `--audience` should not cost the caller a round trip to find out, and a 402
+ * has to be legible rather than a generic failure.
+ *
+ * The other thing worth protecting is that the document is a payload, not a
+ * diagnostic. The progress line goes to stderr so `--output json | jq` still
+ * sees nothing but the object.
+ */
+describe("generate industry-draft", () => {
+  const PROMPT_ID = "a4226991-3d00-49ec-b5cc-95642c946cc0";
+  const CT_ID = "06f9f0df-b9b5-42d9-af53-859f1a47f27e";
+  const DRAFT = {
+    industry_prompt_id: PROMPT_ID,
+    prompt_text: "How do change fees compare?",
+    funnel_stage: "consideration",
+    document_markdown: "# Heading\n\nBody.",
+    citations: [],
+    notes: [],
+    model_used: "gpt-5.4-mini",
+  };
+
+  const draftPath = "/org/content-generation/industry-prompt-draft";
+
+  it("exits 2 without sending a request when --audience is over 500 characters", async () => {
+    const res = await runCli([
+      "generate",
+      "industry-draft",
+      "--industry-prompt-id",
+      PROMPT_ID,
+      "--content-type-id",
+      CT_ID,
+      "--audience",
+      "x".repeat(501),
+    ]);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stderr).toContain("maximum is 500");
+  });
+
+  it("exits 2 when --extra-instructions is over 4000 characters", async () => {
+    const res = await runCli([
+      "generate",
+      "industry-draft",
+      "--industry-prompt-id",
+      PROMPT_ID,
+      "--content-type-id",
+      CT_ID,
+      "--extra-instructions",
+      "x".repeat(4001),
+    ]);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stderr).toContain("maximum is 4000");
+  });
+
+  it("exits 2 when more than 100 product line ids are given", async () => {
+    const ids = Array.from({ length: 101 }, (_, i) => `pl-${String(i)}`).join(",");
+
+    const res = await runCli([
+      "generate",
+      "industry-draft",
+      "--industry-prompt-id",
+      PROMPT_ID,
+      "--content-type-id",
+      CT_ID,
+      "--product-line-ids",
+      ids,
+    ]);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stderr).toContain("maximum is 100");
+  });
+
+  it("exits 2 when the required options are missing", async () => {
+    const res = await runCli(["generate", "industry-draft"]);
+
+    expect(res.exitCode).toBe(2);
+  });
+
+  it("exits 1 and stays legible on a 402 for an insufficient credit balance", async () => {
+    server.use(
+      http.post(apiUrl(draftPath), () =>
+        HttpResponse.json({ message: "Insufficient credits" }, { status: 402 }),
+      ),
+    );
+
+    const res = await runCli([
+      "generate",
+      "industry-draft",
+      "--industry-prompt-id",
+      PROMPT_ID,
+      "--content-type-id",
+      CT_ID,
+    ]);
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toBe("");
+    expect(res.stderr).toContain("Insufficient credits");
+  });
+
+  it("exits 4 when the prompt is not part of the organization's industry", async () => {
+    server.use(
+      http.post(apiUrl(draftPath), () =>
+        HttpResponse.json({ message: "Not found" }, { status: 404 }),
+      ),
+    );
+
+    const res = await runCli([
+      "generate",
+      "industry-draft",
+      "--industry-prompt-id",
+      PROMPT_ID,
+      "--content-type-id",
+      CT_ID,
+    ]);
+
+    expect(res.exitCode).toBe(4);
+  });
+
+  it("sends only the fields that were given", async () => {
+    let body: unknown;
+    server.use(
+      http.post(apiUrl(draftPath), async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json(DRAFT);
+      }),
+    );
+
+    const res = await runCli([
+      "generate",
+      "industry-draft",
+      "--industry-prompt-id",
+      PROMPT_ID,
+      "--content-type-id",
+      CT_ID,
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(body).toEqual({
+      industry_prompt_id: PROMPT_ID,
+      selected_content_type_id: CT_ID,
+    });
+  });
+
+  it("maps every optional flag onto its snake_case field", async () => {
+    let body: unknown;
+    server.use(
+      http.post(apiUrl(draftPath), async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json(DRAFT);
+      }),
+    );
+
+    await runCli([
+      "generate",
+      "industry-draft",
+      "--industry-prompt-id",
+      PROMPT_ID,
+      "--content-type-id",
+      CT_ID,
+      "--product-line-ids",
+      "pl-1, pl-2",
+      "--audience",
+      "Business travelers",
+      "--style-tone",
+      "Direct",
+      "--extra-instructions",
+      "Avoid pricing claims",
+    ]);
+
+    expect(body).toEqual({
+      industry_prompt_id: PROMPT_ID,
+      selected_content_type_id: CT_ID,
+      selected_product_line_ids: ["pl-1", "pl-2"],
+      audience: "Business travelers",
+      style_tone: "Direct",
+      extra_instructions: "Avoid pricing claims",
+    });
+  });
+
+  it("keeps the progress line off stdout under --output json", async () => {
+    server.use(http.post(apiUrl(draftPath), () => HttpResponse.json(DRAFT)));
+
+    const res = await runCli([
+      "generate",
+      "industry-draft",
+      "--industry-prompt-id",
+      PROMPT_ID,
+      "--content-type-id",
+      CT_ID,
+      "--output",
+      "json",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(res.json<{ document_markdown: string }>().document_markdown).toBe("# Heading\n\nBody.");
+    expect(res.stderr).toBe("");
+  });
+});

@@ -45,7 +45,9 @@ import { registerCompetitorsCommands } from "./commands/competitors.js";
 import { registerTrackedSourcesCommands } from "./commands/tracked-sources.js";
 import { registerGeneratedContentCommands } from "./commands/generated-content.js";
 import { registerAnalyticsCommands } from "./commands/analytics/index.js";
+import { registerHistoryImportsCommands } from "./commands/history-imports.js";
 import { registerIndustriesCommands } from "./commands/industries.js";
+import { registerPartnerCommands } from "./commands/partner.js";
 import { registerUpdateCommand } from "./commands/update.js";
 
 /**
@@ -164,7 +166,9 @@ export function createProgram(): Command {
   registerTrackedSourcesCommands(program);
   registerGeneratedContentCommands(program);
   registerAnalyticsCommands(program);
+  registerHistoryImportsCommands(program);
   registerIndustriesCommands(program);
+  registerPartnerCommands(program);
   registerUpdateCommand(program);
 
   return program;

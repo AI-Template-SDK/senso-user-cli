@@ -291,6 +291,93 @@ export function registerGenerateCommands(program: Command): void {
         emit(ctx, data);
       }),
     );
+
+  gen
+    .command("industry-draft")
+    .description(
+      "Draft a complete document from one of your industry's prompts in a single call. The prompt is resolved against your organization's industry, grounded in your knowledge base, and written in the requested content type with your brand kit and product lines applied. The result is NOT stored as content — it comes back as GitHub Flavored Markdown with footnote citations for you to review or store separately. Typically takes 10-30 seconds and consumes credits like an ad-hoc generation. Requires the GEO product.",
+    )
+    .requiredOption(
+      "--industry-prompt-id <id>",
+      "An industry prompt id from `senso industries prompts` — NOT one of your own prompt ids",
+    )
+    .requiredOption(
+      "--content-type-id <id>",
+      "A content type id from `senso content-types list`, giving the document its format",
+    )
+    .option(
+      "--product-line-ids <ids>",
+      "Comma-separated product line ids (default: all, up to 100)",
+    )
+    .option("--audience <text>", "Who the document is for (max 500 chars)")
+    .option("--style-tone <text>", "Voice and tone guidance (max 500 chars)")
+    .option("--extra-instructions <text>", "Further instructions for the writer (max 4000 chars)")
+    .action(
+      runAction(
+        program,
+        async (
+          ctx,
+          cmdOpts: {
+            industryPromptId: string;
+            contentTypeId: string;
+            productLineIds?: string;
+            audience?: string;
+            styleTone?: string;
+            extraInstructions?: string;
+          },
+        ) => {
+          const productLineIds = cmdOpts.productLineIds
+            ?.split(",")
+            .map((p) => p.trim())
+            .filter((p) => p.length > 0);
+
+          // Checked here because the call is slow and billable: a body the API
+          // rejects for length should not cost 10-30 seconds to find out about.
+          const tooLong = (
+            [
+              ["--audience", cmdOpts.audience, 500],
+              ["--style-tone", cmdOpts.styleTone, 500],
+              ["--extra-instructions", cmdOpts.extraInstructions, 4000],
+            ] as const
+          ).find(([, value, max]) => value !== undefined && value.length > max);
+          if (tooLong) {
+            throw new CliError(
+              `Invalid ${tooLong[0]}: ${String(tooLong[1]?.length)} characters, the maximum is ${String(tooLong[2])}.`,
+              EXIT.USAGE,
+              { code: "usage" },
+            );
+          }
+          if (productLineIds && productLineIds.length > 100) {
+            throw new CliError(
+              `Invalid --product-line-ids: ${String(productLineIds.length)} ids given, the maximum is 100.`,
+              EXIT.USAGE,
+              { code: "usage" },
+            );
+          }
+
+          const body: Record<string, unknown> = {
+            industry_prompt_id: cmdOpts.industryPromptId,
+            selected_content_type_id: cmdOpts.contentTypeId,
+          };
+          if (productLineIds) body.selected_product_line_ids = productLineIds;
+          if (cmdOpts.audience !== undefined) body.audience = cmdOpts.audience;
+          if (cmdOpts.styleTone !== undefined) body.style_tone = cmdOpts.styleTone;
+          if (cmdOpts.extraInstructions !== undefined) {
+            body.extra_instructions = cmdOpts.extraInstructions;
+          }
+
+          if (!ctx.quiet) log.info("Generating — this usually takes 10-30 seconds.");
+          const data = await apiRequest({
+            method: "POST",
+            path: "/org/content-generation/industry-prompt-draft",
+            body,
+            apiKey: ctx.apiKey,
+            baseUrl: ctx.baseUrl,
+          });
+          emit(ctx, data);
+        },
+      ),
+    );
 }
 
 async function waitForSampleJob(

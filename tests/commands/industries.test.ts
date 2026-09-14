@@ -1,24 +1,24 @@
 /**
- * Command layer: `senso industries`.
+ * Command layer: `senso industries` — the org-key view of the industry catalog.
  *
- * This group is the odd one out, and both of its peculiarities are the reason
- * the file is worth its length.
+ * Three things here are worth protecting.
  *
- * The first is authentication. Every command here reads a `/partner/*` route,
- * which rejects the organization key that `senso login` stores. The generic
- * handler would answer a 401 with "run `senso login`", which is the one thing
- * that can never fix it, so the group translates 401 and 403 into an
- * explanation naming partner authentication and pointing at `senso analytics`
- * for org-level metrics. That translation is the most user-visible behavior in
- * the file, and it must not leak to other statuses — a 404 is still a 404.
+ * The first is that this group is NOT `senso partner industries`. It reads
+ * `/org/industries/*` with the key `senso login` stores; the partner group reads
+ * `/partner/*` and needs a partner key. The two are one word apart on the command
+ * line, so every test below asserts the `/org/` path explicitly — a regression that
+ * sent these at `/partner/` would authenticate fine for a partner and 401 for
+ * everyone else.
  *
- * The second is the `<industry>` argument, which accepts a UUID or a name. A
- * UUID is used as-is; a name costs an extra search request first, and the id it
- * resolves to has to appear in the path of the request that follows. Both
- * halves are asserted below, including the case where a UUID must NOT trigger a
- * search — the test registers a spy on the search route and asserts it was
- * never called, because a silent extra round trip per command is exactly the
- * kind of regression nobody notices.
+ * The second is flag validation. `--limit`, `--sort`, `--entity-type`, `--rollup`
+ * and `--prompt-ids` all have closed value sets, and every one of them must fail
+ * before a request is made. `--entity-type` matters most: it filters server-side
+ * before paging, so a typo would come back as a perfectly plausible empty
+ * leaderboard rather than an error.
+ *
+ * The third is `--no-canonicalize`. The server default is true, so the flag has to
+ * send `canonicalize=false` when passed and send NOTHING when omitted; a command
+ * that always sent the parameter would silently defeat the default.
  *
  * Failure branches come first, as in tests/commands/roles.test.ts.
  */
@@ -30,26 +30,61 @@ import { apiUrl, runCli } from "../helpers.js";
 
 /** A real UUID shape, so `resolveIndustryId` takes the no-search branch. */
 const INDUSTRY_UUID = "3f7c1a2b-4d5e-4f60-9a1b-2c3d4e5f6071";
+const PROMPT_A = "a4226991-3d00-49ec-b5cc-95642c946cc0";
+const PROMPT_B = "ac8d66db-888d-4ae8-b806-cb02d19e8cc6";
 
-const INDUSTRIES = {
+const CATALOGUE = {
   industries: [
-    { industry_id: INDUSTRY_UUID, name: "Automotive", slug: "automotive", active_prompt_count: 42 },
     {
-      industry_id: "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
-      name: "Insurance",
-      slug: "insurance",
-      active_prompt_count: 17,
+      industry_id: INDUSTRY_UUID,
+      name: "Airlines (Canada)",
+      slug: "airlines-canada",
+      active_prompt_count: 1000,
+      model_count: 3,
+      location_count: 1,
     },
   ],
+  total: 1,
+  limit: 50,
+  offset: 0,
 };
 
-const SUMMARY = { industry_id: INDUSTRY_UUID, brand_count: 12, share_of_voice: 0.31 };
+describe("industries list, when a flag is not a valid value", () => {
+  it("exits 2 when --limit is above the maximum", async () => {
+    const res = await runCli(["industries", "list", "--limit", "101"]);
 
-describe("industries, when partner authentication rejects the key", () => {
-  it("exits 3 on a 401 and blames partner auth rather than telling the user to log in again", async () => {
+    expect(res.exitCode).toBe(2);
+    expect(res.stdout).toBe("");
+    expect(res.stderr).toContain("--limit");
+  });
+
+  it("exits 2 when --limit is not a whole number", async () => {
+    const res = await runCli(["industries", "list", "--limit", "abc"]);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stderr).toContain("not a whole number");
+  });
+
+  it("exits 2 when --offset is negative", async () => {
+    const res = await runCli(["industries", "list", "--offset", "-1"]);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stderr).toContain("--offset");
+  });
+
+  it("exits 2 and names the valid values when --sort is not one of them", async () => {
+    const res = await runCli(["industries", "list", "--sort", "whenever"]);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stderr).toContain("name_asc");
+  });
+});
+
+describe("industries list, when the API refuses", () => {
+  it("exits 3 on a 401", async () => {
     server.use(
-      http.get(apiUrl("/partner/industries"), () =>
-        HttpResponse.json({ error: "partner auth required" }, { status: 401 }),
+      http.get(apiUrl("/org/industries"), () =>
+        HttpResponse.json({ message: "Unauthorized" }, { status: 401 }),
       ),
     );
 
@@ -57,320 +92,229 @@ describe("industries, when partner authentication rejects the key", () => {
 
     expect(res.exitCode).toBe(3);
     expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("partner authentication");
-    // The hint is the whole point: it names what will not help, and what will.
-    expect(res.stderr).toContain("/partner/*");
-    expect(res.stderr).toContain("senso analytics");
-    expect(res.stderr).not.toContain("Authentication failed");
   });
 
-  it("exits 3 on a 403 with the same explanation", async () => {
+  it("exits 3 on a 403 from an organization without the GEO product", async () => {
     server.use(
-      http.get(apiUrl("/partner/glossary"), () =>
-        HttpResponse.json({ error: "forbidden" }, { status: 403 }),
+      http.get(apiUrl("/org/industries/:id/prompts"), () =>
+        HttpResponse.json(
+          { message: "Your organization doesn't have access to this product" },
+          { status: 403 },
+        ),
       ),
     );
 
-    const res = await runCli(["industries", "glossary"]);
+    const res = await runCli(["industries", "prompts", INDUSTRY_UUID]);
 
     expect(res.exitCode).toBe(3);
-    expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("partner authentication");
-    expect(res.stderr).not.toContain("Permission denied");
-  });
-
-  it("reports the partner failure as JSON on stderr, keeping the status and the hint", async () => {
-    server.use(
-      http.get(apiUrl("/partner/industries"), () =>
-        HttpResponse.json({ error: "partner auth required" }, { status: 403 }),
-      ),
-    );
-
-    const res = await runCli(["industries", "list", "--output", "json"]);
-
-    expect(res.exitCode).toBe(3);
-    expect(res.stdout).toBe("");
-
-    const reported = JSON.parse(res.stderr) as {
-      error: { code: string; status: number; message: string; hint: string };
-    };
-    // 403 keeps the "forbidden" code even though the message is rewritten, so a
-    // script switching on the code sees the same value it would elsewhere.
-    expect(reported.error.code).toBe("forbidden");
-    expect(reported.error.status).toBe(403);
-    expect(reported.error.message).toContain("partner authentication");
-    expect(reported.error.hint).toContain("--api-key");
-  });
-
-  it("uses the unauthorized code for a 401 and the forbidden code for a 403", async () => {
-    server.use(
-      http.get(apiUrl("/partner/glossary"), () =>
-        HttpResponse.json({ error: "nope" }, { status: 401 }),
-      ),
-    );
-
-    const res = await runCli(["industries", "glossary", "--output", "json"]);
-
-    expect(res.exitCode).toBe(3);
-    const reported = JSON.parse(res.stderr) as { error: { code: string; status: number } };
-    expect(reported.error.code).toBe("unauthorized");
-    expect(reported.error.status).toBe(401);
-  });
-
-  it("translates the partner failure even when it happens during name resolution", async () => {
-    // The 401 comes from the industries search, one request before the command's
-    // own — the translation has to cover the whole action, not just the last call.
-    server.use(
-      http.get(apiUrl("/partner/industries"), () =>
-        HttpResponse.json({ error: "partner auth required" }, { status: 401 }),
-      ),
-    );
-
-    const res = await runCli(["industries", "summary", "Automotive"]);
-
-    expect(res.exitCode).toBe(3);
-    expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("partner authentication");
-  });
-});
-
-describe("industries, when the request fails for some other reason", () => {
-  it("exits 3 and explains how to authenticate when there is no API key at all", async () => {
-    const res = await runCli(["industries", "list"], { withKey: false });
-
-    expect(res.exitCode).toBe(3);
-    expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("no API key found");
-  });
-
-  it("leaves a 404 alone: it is not an auth problem and must not be described as one", async () => {
-    server.use(
-      http.get(
-        apiUrl("/partner/industries/:id/summary"),
-        () => new HttpResponse(null, { status: 404 }),
-      ),
-    );
-
-    const res = await runCli(["industries", "summary", INDUSTRY_UUID]);
-
-    expect(res.exitCode).toBe(4);
-    expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("Not found");
-    expect(res.stderr).not.toContain("partner authentication");
-  });
-
-  it("leaves a 500 alone", async () => {
-    server.use(
-      http.get(apiUrl("/partner/glossary"), () => new HttpResponse(null, { status: 500 })),
-    );
-
-    const res = await runCli(["industries", "glossary"]);
-
-    expect(res.exitCode).toBe(1);
-    expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("not your fault");
-    expect(res.stderr).not.toContain("partner authentication");
-  });
-
-  it("exits 5 on a 429, so a caller in a loop knows to back off", async () => {
-    server.use(
-      http.get(apiUrl("/partner/glossary"), () => new HttpResponse(null, { status: 429 })),
-    );
-
-    const res = await runCli(["industries", "glossary"]);
-
-    expect(res.exitCode).toBe(5);
-    expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("Rate limited");
-  });
-
-  it("names the valid formats when --output is not one of them", async () => {
-    const res = await runCli(["industries", "list", "--output", "yaml"]);
-
-    expect(res.exitCode).toBe(2);
-    expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("json, table, plain");
   });
 });
 
 describe("industries, resolving the <industry> argument", () => {
-  it("uses a UUID directly, without a search request", async () => {
-    let searched = false;
-    let seen: Request | undefined;
+  it("exits 4 when no industry matches the name", async () => {
     server.use(
-      http.get(apiUrl("/partner/industries"), () => {
-        searched = true;
-        return HttpResponse.json(INDUSTRIES);
-      }),
-      http.get(apiUrl("/partner/industries/:id/summary"), ({ request }) => {
-        seen = request;
-        return HttpResponse.json(SUMMARY);
-      }),
-    );
-
-    const res = await runCli(["industries", "summary", INDUSTRY_UUID]);
-
-    expect(res.exitCode).toBe(0);
-    // A round trip per command that nobody asked for is the regression here.
-    expect(searched).toBe(false);
-    expect(new URL(seen!.url).pathname).toBe(`/api/v1/partner/industries/${INDUSTRY_UUID}/summary`);
-  });
-
-  it("accepts a UUID in upper case and with surrounding whitespace", async () => {
-    let seen: Request | undefined;
-    server.use(
-      http.get(apiUrl("/partner/industries/:id/summary"), ({ request }) => {
-        seen = request;
-        return HttpResponse.json(SUMMARY);
-      }),
-    );
-
-    const res = await runCli(["industries", "summary", ` ${INDUSTRY_UUID.toUpperCase()} `]);
-
-    expect(res.exitCode).toBe(0);
-    expect(new URL(seen!.url).pathname).toBe(
-      `/api/v1/partner/industries/${INDUSTRY_UUID.toUpperCase()}/summary`,
-    );
-  });
-
-  it("searches first for a name, then uses the first match's industry_id", async () => {
-    let search: Request | undefined;
-    let seen: Request | undefined;
-    server.use(
-      http.get(apiUrl("/partner/industries"), ({ request }) => {
-        search = request;
-        return HttpResponse.json(INDUSTRIES);
-      }),
-      http.get(apiUrl("/partner/industries/:id/summary"), ({ request }) => {
-        seen = request;
-        return HttpResponse.json(SUMMARY);
-      }),
-    );
-
-    const res = await runCli(["industries", "summary", "Automotive"]);
-
-    expect(res.exitCode).toBe(0);
-    expect(search?.method).toBe("GET");
-    expect(new URL(search!.url).pathname).toBe("/api/v1/partner/industries");
-    expect(new URL(search!.url).searchParams.get("search")).toBe("Automotive");
-    // The id came out of the search response, not out of the argument.
-    expect(new URL(seen!.url).pathname).toBe(`/api/v1/partner/industries/${INDUSTRY_UUID}/summary`);
-  });
-
-  it("exits 4 and quotes the name back when the search matches nothing", async () => {
-    server.use(
-      http.get(apiUrl("/partner/industries"), () => HttpResponse.json({ industries: [] })),
-    );
-
-    const res = await runCli(["industries", "summary", "Underwater Basket Weaving"]);
-
-    expect(res.exitCode).toBe(4);
-    expect(res.stdout).toBe("");
-    expect(res.stderr).toContain('No industry found matching "Underwater Basket Weaving"');
-    expect(res.stderr).toContain("industries list");
-  });
-
-  it("exits 4 when the first match carries no industry_id", async () => {
-    server.use(
-      http.get(apiUrl("/partner/industries"), () =>
-        HttpResponse.json({ industries: [{ name: "Automotive" }] }),
+      http.get(apiUrl("/org/industries"), () =>
+        HttpResponse.json({ industries: [], total: 0, limit: 50, offset: 0 }),
       ),
     );
 
-    const res = await runCli(["industries", "summary", "Automotive"]);
+    const res = await runCli(["industries", "prompts", "Nonexistent Sector"]);
 
     expect(res.exitCode).toBe(4);
-    expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("No industry found matching");
+    expect(res.stderr).toContain("No industry found");
+  });
+
+  it("searches the ORG catalog, not the partner one, to resolve a name", async () => {
+    let seen: Request | undefined;
+    server.use(
+      http.get(apiUrl("/org/industries"), ({ request }) => {
+        seen = request;
+        return HttpResponse.json(CATALOGUE);
+      }),
+      http.get(apiUrl("/org/industries/:id/prompts"), () =>
+        HttpResponse.json({ prompts: [], total: 0, limit: 50, offset: 0 }),
+      ),
+    );
+
+    const res = await runCli(["industries", "prompts", "Airlines (Canada)"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(new URL(seen!.url).pathname).toBe("/api/v1/org/industries");
+    expect(new URL(seen!.url).searchParams.get("search")).toBe("Airlines (Canada)");
+  });
+
+  it("does NOT search when the argument is already a UUID", async () => {
+    let searched = false;
+    server.use(
+      http.get(apiUrl("/org/industries"), () => {
+        searched = true;
+        return HttpResponse.json(CATALOGUE);
+      }),
+      http.get(apiUrl("/org/industries/:id/prompts"), () =>
+        HttpResponse.json({ prompts: [], total: 0, limit: 50, offset: 0 }),
+      ),
+    );
+
+    const res = await runCli(["industries", "prompts", INDUSTRY_UUID]);
+
+    expect(res.exitCode).toBe(0);
+    expect(searched).toBe(false);
   });
 });
 
 describe("industries list, on the wire", () => {
-  it("GETs /partner/industries with no query when --search is absent", async () => {
+  it("sends search, limit, offset, sort and live as query parameters", async () => {
     let seen: Request | undefined;
     server.use(
-      http.get(apiUrl("/partner/industries"), ({ request }) => {
+      http.get(apiUrl("/org/industries"), ({ request }) => {
         seen = request;
-        return HttpResponse.json(INDUSTRIES);
+        return HttpResponse.json(CATALOGUE);
+      }),
+    );
+
+    const res = await runCli([
+      "industries",
+      "list",
+      "--search",
+      "air",
+      "--limit",
+      "10",
+      "--offset",
+      "5",
+      "--sort",
+      "name_desc",
+      "--live",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    const url = new URL(seen!.url);
+    expect(url.pathname).toBe("/api/v1/org/industries");
+    expect(url.searchParams.get("search")).toBe("air");
+    expect(url.searchParams.get("limit")).toBe("10");
+    expect(url.searchParams.get("offset")).toBe("5");
+    expect(url.searchParams.get("sort")).toBe("name_desc");
+    expect(url.searchParams.get("live")).toBe("true");
+  });
+
+  it("omits live entirely when the flag is not passed", async () => {
+    let seen: Request | undefined;
+    server.use(
+      http.get(apiUrl("/org/industries"), ({ request }) => {
+        seen = request;
+        return HttpResponse.json(CATALOGUE);
       }),
     );
 
     await runCli(["industries", "list"]);
 
-    expect(seen?.method).toBe("GET");
-    expect(new URL(seen!.url).pathname).toBe("/api/v1/partner/industries");
-    expect(new URL(seen!.url).search).toBe("");
-  });
-
-  it("passes --search through as the search parameter", async () => {
-    let seen: Request | undefined;
-    server.use(
-      http.get(apiUrl("/partner/industries"), ({ request }) => {
-        seen = request;
-        return HttpResponse.json(INDUSTRIES);
-      }),
-    );
-
-    await runCli(["industries", "list", "--search", "auto"]);
-
-    expect(new URL(seen!.url).searchParams.get("search")).toBe("auto");
+    expect(new URL(seen!.url).searchParams.has("live")).toBe(false);
   });
 });
 
-describe("industries summary, on the wire", () => {
-  it("sends from, to, location and models as query parameters", async () => {
+describe("industries brands, on the wire", () => {
+  const LEADERBOARD = {
+    window: { from: "2026-08-15", to: "2026-09-14" },
+    totals: { run_count: 1, answered_count: 1, brand_mention_total: 1 },
+    total: 1,
+    limit: 100,
+    offset: 0,
+    brands: [{ brand_id: "b1", brand_name: "Air Canada", mentions_count: 10, mentions_rank: 1 }],
+  };
+
+  it("sends the window filters, paging, rollup and entity_type", async () => {
     let seen: Request | undefined;
     server.use(
-      http.get(apiUrl("/partner/industries/:id/summary"), ({ request }) => {
+      http.get(apiUrl("/org/industries/:id/brands"), ({ request }) => {
         seen = request;
-        return HttpResponse.json(SUMMARY);
+        return HttpResponse.json(LEADERBOARD);
       }),
     );
 
-    await runCli([
+    const res = await runCli([
       "industries",
-      "summary",
+      "brands",
       INDUSTRY_UUID,
       "--from",
-      "2026-01-01",
+      "2026-09-01",
       "--to",
-      "2026-03-31",
-      "--location",
-      "US",
+      "2026-09-14",
       "--models",
-      "chatgpt,gemini",
+      "gpt-5",
+      "--location",
+      "CA",
+      "--limit",
+      "5",
+      "--offset",
+      "2",
+      "--rollup",
+      "parent",
+      "--entity-type",
+      "brand,publisher",
     ]);
 
-    const params = new URL(seen!.url).searchParams;
-    expect(params.get("from")).toBe("2026-01-01");
-    expect(params.get("to")).toBe("2026-03-31");
-    expect(params.get("location")).toBe("US");
-    expect(params.get("models")).toBe("chatgpt,gemini");
+    expect(res.exitCode).toBe(0);
+    const url = new URL(seen!.url);
+    expect(url.pathname).toBe(`/api/v1/org/industries/${INDUSTRY_UUID}/brands`);
+    expect(url.searchParams.get("from")).toBe("2026-09-01");
+    expect(url.searchParams.get("to")).toBe("2026-09-14");
+    expect(url.searchParams.get("models")).toBe("gpt-5");
+    expect(url.searchParams.get("location")).toBe("CA");
+    expect(url.searchParams.get("limit")).toBe("5");
+    expect(url.searchParams.get("offset")).toBe("2");
+    expect(url.searchParams.get("rollup")).toBe("parent");
+    expect(url.searchParams.get("entity_type")).toBe("brand,publisher");
   });
 
-  it("omits the filters entirely when they are not given", async () => {
+  it("sends canonicalize=false only when --no-canonicalize is passed", async () => {
     let seen: Request | undefined;
     server.use(
-      http.get(apiUrl("/partner/industries/:id/summary"), ({ request }) => {
+      http.get(apiUrl("/org/industries/:id/brands"), ({ request }) => {
         seen = request;
-        return HttpResponse.json(SUMMARY);
+        return HttpResponse.json(LEADERBOARD);
       }),
     );
 
-    await runCli(["industries", "summary", INDUSTRY_UUID]);
+    await runCli(["industries", "brands", INDUSTRY_UUID, "--no-canonicalize"]);
+    expect(new URL(seen!.url).searchParams.get("canonicalize")).toBe("false");
 
-    // Not `from=`, not `from=undefined`: absent.
-    expect(new URL(seen!.url).search).toBe("");
+    await runCli(["industries", "brands", INDUSTRY_UUID]);
+    expect(new URL(seen!.url).searchParams.has("canonicalize")).toBe(false);
+  });
+
+  it("exits 2 when --entity-type is not a known type", async () => {
+    const res = await runCli(["industries", "brands", INDUSTRY_UUID, "--entity-type", "brnad"]);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stderr).toContain("brnad");
+  });
+
+  it("exits 2 when one entry in --entity-type is unknown", async () => {
+    const res = await runCli([
+      "industries",
+      "brands",
+      INDUSTRY_UUID,
+      "--entity-type",
+      "brand,bogus",
+    ]);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stderr).toContain("bogus");
+  });
+
+  it("exits 2 when --rollup is not `parent`", async () => {
+    const res = await runCli(["industries", "brands", INDUSTRY_UUID, "--rollup", "parents"]);
+
+    expect(res.exitCode).toBe(2);
   });
 });
 
-describe("industries brand, on the wire", () => {
-  it("puts the brand name in the path, percent-encoded", async () => {
+describe("industries brand and brand-by-id, on the wire", () => {
+  it("percent-encodes the brand name in the path", async () => {
     let seen: Request | undefined;
     server.use(
-      http.get(apiUrl("/partner/industries/:id/brands/:brand"), ({ request }) => {
+      http.get(apiUrl("/org/industries/:id/brands/:brand"), ({ request }) => {
         seen = request;
-        return HttpResponse.json({ brand: "Acme & Co", mentioned: false });
+        return HttpResponse.json({ mentioned: false });
       }),
     );
 
@@ -385,37 +329,49 @@ describe("industries brand, on the wire", () => {
 
     expect(res.exitCode).toBe(0);
     expect(new URL(seen!.url).pathname).toBe(
-      `/api/v1/partner/industries/${INDUSTRY_UUID}/brands/${encodeURIComponent("Acme & Co")}`,
+      `/api/v1/org/industries/${INDUSTRY_UUID}/brands/${encodeURIComponent("Acme & Co")}`,
     );
     expect(new URL(seen!.url).searchParams.get("location")).toBe("US");
   });
 
-  it("resolves a named industry before fetching the brand", async () => {
+  it("exits 0 and reports mentioned=false for a brand that was never named", async () => {
+    server.use(
+      http.get(apiUrl("/org/industries/:id/brands/:brand"), () =>
+        HttpResponse.json({ mentioned: false, resolved: { brand_name: "Nobody" } }),
+      ),
+    );
+
+    const res = await runCli(["industries", "brand", INDUSTRY_UUID, "Nobody", "--output", "json"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(JSON.parse(res.stdout).mentioned).toBe(false);
+  });
+
+  it("uses the brands-by-id path for brand-by-id", async () => {
     let seen: Request | undefined;
     server.use(
-      http.get(apiUrl("/partner/industries"), () => HttpResponse.json(INDUSTRIES)),
-      http.get(apiUrl("/partner/industries/:id/brands/:brand"), ({ request }) => {
+      http.get(apiUrl("/org/industries/:id/brands-by-id/:brandId"), ({ request }) => {
         seen = request;
-        return HttpResponse.json({ brand: "Acme", mentioned: true });
+        return HttpResponse.json({ mentioned: true });
       }),
     );
 
-    const res = await runCli(["industries", "brand", "Automotive", "Acme"]);
+    const res = await runCli(["industries", "brand-by-id", INDUSTRY_UUID, "b-123"]);
 
     expect(res.exitCode).toBe(0);
     expect(new URL(seen!.url).pathname).toBe(
-      `/api/v1/partner/industries/${INDUSTRY_UUID}/brands/Acme`,
+      `/api/v1/org/industries/${INDUSTRY_UUID}/brands-by-id/b-123`,
     );
   });
 });
 
 describe("industries domain, on the wire", () => {
-  it("puts the domain in the path, percent-encoded", async () => {
+  it("keeps the domain in the path and sends --url as a query parameter", async () => {
     let seen: Request | undefined;
     server.use(
-      http.get(apiUrl("/partner/industries/:id/domains/:domain"), ({ request }) => {
+      http.get(apiUrl("/org/industries/:id/domains/:domain"), ({ request }) => {
         seen = request;
-        return HttpResponse.json({ domain: "example.com", cited: false });
+        return HttpResponse.json({ cited: true });
       }),
     );
 
@@ -423,150 +379,189 @@ describe("industries domain, on the wire", () => {
       "industries",
       "domain",
       INDUSTRY_UUID,
-      "example.com",
-      "--from",
-      "2026-01-01",
+      "aircanada.com",
+      "--url",
+      "https://aircanada.com/a?b=c",
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(new URL(seen!.url).pathname).toBe(
-      `/api/v1/partner/industries/${INDUSTRY_UUID}/domains/example.com`,
-    );
-    expect(new URL(seen!.url).searchParams.get("from")).toBe("2026-01-01");
+    const url = new URL(seen!.url);
+    expect(url.pathname).toBe(`/api/v1/org/industries/${INDUSTRY_UUID}/domains/aircanada.com`);
+    expect(url.searchParams.get("url")).toBe("https://aircanada.com/a?b=c");
   });
-});
 
-describe("industries prompt-metrics, on the wire", () => {
-  it("sends the shared filters plus limit and offset", async () => {
-    let seen: Request | undefined;
+  it("exits 0 and reports cited=false for a domain that was never cited", async () => {
     server.use(
-      http.get(apiUrl("/partner/industries/:id/prompt-metrics"), ({ request }) => {
-        seen = request;
-        return HttpResponse.json({ prompts: [] });
-      }),
+      http.get(apiUrl("/org/industries/:id/domains/:domain"), () =>
+        HttpResponse.json({ cited: false }),
+      ),
     );
 
-    await runCli([
+    const res = await runCli([
       "industries",
-      "prompt-metrics",
+      "domain",
       INDUSTRY_UUID,
-      "--from",
-      "2026-01-01",
-      "--models",
-      "chatgpt",
-      "--limit",
-      "50",
-      "--offset",
-      "100",
+      "nope.example",
+      "--output",
+      "json",
     ]);
 
-    const params = new URL(seen!.url).searchParams;
-    expect(new URL(seen!.url).pathname).toBe(
-      `/api/v1/partner/industries/${INDUSTRY_UUID}/prompt-metrics`,
-    );
-    expect(params.get("from")).toBe("2026-01-01");
-    expect(params.get("models")).toBe("chatgpt");
-    expect(params.get("limit")).toBe("50");
-    expect(params.get("offset")).toBe("100");
+    expect(res.exitCode).toBe(0);
+    expect(JSON.parse(res.stdout).cited).toBe(false);
   });
 });
 
-describe("industries glossary, on the wire", () => {
-  it("GETs /partner/glossary, which takes no industry and no filters", async () => {
-    let seen: Request | undefined;
+describe("industries import-prompts, validating --prompt-ids", () => {
+  it("exits 2 without sending a request when an id is not a UUID", async () => {
+    const res = await runCli([
+      "industries",
+      "import-prompts",
+      INDUSTRY_UUID,
+      "--prompt-ids",
+      `${PROMPT_A},nope`,
+    ]);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stderr).toContain("not a UUID");
+  });
+
+  it("exits 2 when an id appears more than once", async () => {
+    const res = await runCli([
+      "industries",
+      "import-prompts",
+      INDUSTRY_UUID,
+      "--prompt-ids",
+      `${PROMPT_A},${PROMPT_B},${PROMPT_A}`,
+    ]);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stderr).toContain("more than once");
+  });
+
+  it("exits 2 when more than 100 ids are given", async () => {
+    const ids = Array.from(
+      { length: 101 },
+      (_, i) => `3f7c1a2b-4d5e-4f60-9a1b-${String(i).padStart(12, "0")}`,
+    ).join(",");
+
+    const res = await runCli(["industries", "import-prompts", INDUSTRY_UUID, "--prompt-ids", ids]);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stderr).toContain("maximum is 100");
+  });
+
+  it("exits 2 when --prompt-ids is empty", async () => {
+    const res = await runCli(["industries", "import-prompts", INDUSTRY_UUID, "--prompt-ids", ""]);
+
+    expect(res.exitCode).toBe(2);
+  });
+
+  it("exits 3 when the industry is not the organization's own", async () => {
     server.use(
-      http.get(apiUrl("/partner/glossary"), ({ request }) => {
-        seen = request;
-        return HttpResponse.json({ metrics: [] });
+      http.post(apiUrl("/org/industries/:id/prompts/import"), () =>
+        HttpResponse.json(
+          { message: "Industry does not match the organization's industry" },
+          { status: 403 },
+        ),
+      ),
+    );
+
+    const res = await runCli([
+      "industries",
+      "import-prompts",
+      INDUSTRY_UUID,
+      "--prompt-ids",
+      PROMPT_A,
+    ]);
+
+    expect(res.exitCode).toBe(3);
+  });
+});
+
+describe("industries import-prompts, on success", () => {
+  const IMPORTED = {
+    outcomes: [{ industry_prompt_id: PROMPT_A, status: "created" }],
+    created: 1,
+    skipped: 0,
+    defaults_seeded: { models: [], schedule_dows: [], locations: [] },
+    history_import: { status: "queued", import_id: "imp-1", days: 7 },
+  };
+
+  it("posts prompt_ids as an array", async () => {
+    let body: unknown;
+    server.use(
+      http.post(apiUrl("/org/industries/:id/prompts/import"), async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json(IMPORTED);
       }),
     );
 
-    await runCli(["industries", "glossary"]);
+    const res = await runCli([
+      "industries",
+      "import-prompts",
+      INDUSTRY_UUID,
+      "--prompt-ids",
+      `${PROMPT_A}, ${PROMPT_B}`,
+    ]);
 
-    expect(seen?.method).toBe("GET");
-    expect(new URL(seen!.url).pathname).toBe("/api/v1/partner/glossary");
-    expect(new URL(seen!.url).search).toBe("");
+    expect(res.exitCode).toBe(0);
+    expect(body).toEqual({ prompt_ids: [PROMPT_A, PROMPT_B] });
+  });
+
+  it("returns the payload on stdout and the confirmation on stderr", async () => {
+    server.use(
+      http.post(apiUrl("/org/industries/:id/prompts/import"), () => HttpResponse.json(IMPORTED)),
+    );
+
+    const res = await runCli([
+      "industries",
+      "import-prompts",
+      INDUSTRY_UUID,
+      "--prompt-ids",
+      PROMPT_A,
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stderr).toContain("imported");
+    expect(res.stdout).toContain("created");
+  });
+
+  it("keeps stdout pure JSON under --output json", async () => {
+    server.use(
+      http.post(apiUrl("/org/industries/:id/prompts/import"), () => HttpResponse.json(IMPORTED)),
+    );
+
+    const res = await runCli([
+      "industries",
+      "import-prompts",
+      INDUSTRY_UUID,
+      "--prompt-ids",
+      PROMPT_A,
+      "--output",
+      "json",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(JSON.parse(res.stdout).history_import.import_id).toBe("imp-1");
   });
 });
 
-describe("industries list, on success", () => {
-  it("prints the payload unmodified under --output json", async () => {
-    server.use(http.get(apiUrl("/partner/industries"), () => HttpResponse.json(INDUSTRIES)));
-
-    const res = await runCli(["industries", "list", "--output", "json"]);
-
-    expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual(INDUSTRIES);
-    expect(res.stderr).toBe("");
-  });
-
-  it("renders one row per industry under --output table", async () => {
-    server.use(http.get(apiUrl("/partner/industries"), () => HttpResponse.json(INDUSTRIES)));
+describe("industries list, rendering", () => {
+  it("renders a table under --output table", async () => {
+    server.use(http.get(apiUrl("/org/industries"), () => HttpResponse.json(CATALOGUE)));
 
     const res = await runCli(["industries", "list", "--output", "table"]);
 
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain("industry_id");
-    expect(res.stdout).toContain("Automotive");
-    expect(res.stdout).toContain("insurance");
+    expect(res.stdout).toContain("Airlines (Canada)");
   });
 
-  it("renders a readable block per industry by default", async () => {
-    server.use(http.get(apiUrl("/partner/industries"), () => HttpResponse.json(INDUSTRIES)));
+  it("names the valid formats when --output is not one of them", async () => {
+    const res = await runCli(["industries", "list", "--output", "yaml"]);
 
-    const res = await runCli(["industries", "list"]);
-
-    expect(res.exitCode).toBe(0);
-    expect(res.stdout).toContain("Automotive");
-    expect(res.stdout).toContain("Insurance");
-  });
-
-  it("says so plainly when the partner can see no industries", async () => {
-    server.use(
-      http.get(apiUrl("/partner/industries"), () => HttpResponse.json({ industries: [] })),
-    );
-
-    const res = await runCli(["industries", "list"]);
-
-    expect(res.exitCode).toBe(0);
-    expect(res.stdout).toContain("industries");
-  });
-});
-
-describe("industries summary, on success", () => {
-  it("prints the single object unmodified under --output json", async () => {
-    server.use(
-      http.get(apiUrl("/partner/industries/:id/summary"), () => HttpResponse.json(SUMMARY)),
-    );
-
-    const res = await runCli(["industries", "summary", INDUSTRY_UUID, "--output", "json"]);
-
-    expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual(SUMMARY);
-    expect(res.stderr).toBe("");
-  });
-
-  it("renders a single object as field/value rows under --output table", async () => {
-    server.use(
-      http.get(apiUrl("/partner/industries/:id/summary"), () => HttpResponse.json(SUMMARY)),
-    );
-
-    const res = await runCli(["industries", "summary", INDUSTRY_UUID, "--output", "table"]);
-
-    expect(res.exitCode).toBe(0);
-    expect(res.stdout).toContain("field");
-    expect(res.stdout).toContain("brand_count");
-  });
-
-  it("renders key/value lines by default", async () => {
-    server.use(
-      http.get(apiUrl("/partner/industries/:id/summary"), () => HttpResponse.json(SUMMARY)),
-    );
-
-    const res = await runCli(["industries", "summary", INDUSTRY_UUID]);
-
-    expect(res.exitCode).toBe(0);
-    expect(res.stdout).toContain("share_of_voice");
-    expect(res.stdout).toContain("0.31");
+    expect(res.exitCode).toBe(2);
+    expect(res.stdout).toBe("");
+    expect(res.stderr).toContain("json, table, plain");
   });
 });

@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { apiRequest } from "../lib/api-client.js";
+import { ApiError, apiRequest } from "../lib/api-client.js";
 import { CliError, EXIT } from "../lib/errors.js";
 import { parseJsonFlag } from "../lib/json-arg.js";
 import { emit } from "../lib/output.js";
@@ -50,6 +50,42 @@ export function registerOrgCommands(program: Command): void {
         });
         if (!ctx.quiet) log.success("Organization updated.");
         emit(ctx, data);
+      }),
+    );
+
+  org
+    .command("set-industry <industryId>")
+    .description(
+      "Set the industry your organization belongs to, chosen from the public catalog (`senso industries list`). This can be done ONCE: afterwards the call is rejected and changing it is not self-serve. It is what `senso industries import-prompts` and `senso generate industry-draft` work from, and where an org with no models or locations of its own inherits them on activation. Nothing else happens — no prompts are created and no runs start.",
+    )
+    .action(
+      runAction(program, async (ctx, industryId: string) => {
+        try {
+          const data = await apiRequest({
+            method: "PUT",
+            path: "/org/me/industry",
+            body: { industry_id: industryId },
+            apiKey: ctx.apiKey,
+            baseUrl: ctx.baseUrl,
+          });
+          if (!ctx.quiet) log.success("Organization industry set.");
+          emit(ctx, data);
+        } catch (err) {
+          // A 409 here is not a generic conflict: the industry is already set
+          // and no flag or retry will change it. Say so, rather than leaving the
+          // caller to retry a call that can never succeed.
+          if (err instanceof ApiError && err.status === 409) {
+            // The server names the industry already in place, which is the one
+            // detail worth keeping — pass it through rather than flattening it.
+            throw new CliError(err.message, EXIT.ERROR, {
+              code: "conflict",
+              status: 409,
+              hint: "An industry can be set only once, and changing it afterwards is not self-serve — contact Senso support. Run `senso org get` to see the industry this organization already has.",
+              cause: err,
+            });
+          }
+          throw err;
+        }
       }),
     );
 

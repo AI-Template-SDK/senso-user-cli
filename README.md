@@ -122,7 +122,8 @@ argument and flag, generated from the CLI itself.
 | `ctas`                                                                   | Call-to-action cards on published pages                             |
 | `generate` `engine` `generated-content` `destinations` `publish-records` | Generate content and publish it                                     |
 | `analytics`                                                              | GEO metrics for your own organization                               |
-| `industries`                                                             | Competitive intelligence (needs a partner key)                      |
+| `industries` `history-imports`                                           | The industry catalog: brand leaderboards, citations, prompt import  |
+| `partner`                                                                | Partner-network competitive intelligence (needs a partner key)      |
 | `prompts` `questions` `competitors` `tracked-sources`                    | What gets monitored                                                 |
 | `brand-kit` `content-types` `product-lines` `tags`                       | How content is shaped                                               |
 | `org` `users` `members` `roles` `permissions` `api-keys` `credits`       | Organization administration                                         |
