@@ -11,6 +11,39 @@ mattered, and what you need to do differently.
 
 ### Added
 
+- **`senso gaps` — the gap report, for agents as much as people.** Six
+  commands over `/org/gaps`: `list` finds work, `get` reads one gap in full,
+  `resolve` records a decision, `answer` and `dismiss` are shortcuts for the
+  two common ones, and `undo` retracts a decision. A gap is something the
+  knowledge base could not back up: a question nothing answered, a claim
+  nothing supports, a contradiction, or an answer somebody flagged. A search
+  through the API, the MCP server or this CLI that finds nothing now files one
+  too, with origin `api_unanswered_question`.
+
+  `list` returns only `open`, `reopened` and `addressed` gaps unless told
+  otherwise. A gap seen once is `weak` and hidden, so new API search gaps need
+  `--status weak`, or `--status all` for everything. Filters repeat or take a
+  comma list and reach the API as repeated query keys. `get` ends with the exact
+  commands to act on that gap, chosen from its problem and status, with its real
+  ids filled in. Every decision prints what the gap now is and the `undo`
+  command for it. All of that guidance is stderr, so `--output json` is still
+  the API's payload and nothing else.
+
+  The resolution matrix is checked before the request: `answered`,
+  `content_added` and `content_updated` need `--produced-content-id`, and
+  `ruled_claim_correct`, `ruled_document` and `source_irrelevant` need
+  `--authority-content-id`, each exiting 2 with the missing flag named.
+  Resolving a gap that does not exist exits 4, although the API answers it with
+  a 400.
+
+- **`--no-gap-signals` on every search command, and `SENSO_GAP_SIGNALS=off`.**
+  Keeps a search out of the gap report by sending `X-Senso-Signals: off`. The
+  search still runs, costs credits and is recorded. Use it on probes, tests and
+  monitors; leave real questions alone. The flag covers one search and the
+  variable a whole session. An unrecognized value in the variable exits 2
+  before any request, because the API would read a typo as "eligible" and file
+  every probe.
+
 - **`senso evals` — judge text against your organization's ground truth.** Six
   commands: `evaluators` lists what can run and the version each is on; `text`
   judges text you pass with `--text` or `--text-file`; `content` judges the

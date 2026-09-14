@@ -18,6 +18,7 @@ Generated from the command tree of `@senso-ai/cli`. Every command accepts the [g
 - [`senso content`](#senso-content) — Manage content items in the knowledge base.
 - [`senso ctas`](#senso-ctas) — Manage call-to-action (CTA) templates — the card attached to a published content-engine page — and choose which one each content item carries.
 - [`senso evals`](#senso-evals) — Judge text against your organization's ground truth.
+- [`senso gaps`](#senso-gaps) — The gap report: questions and claims your knowledge base could not back up, and what was decided about each — the same queue the Senso app shows.
 - [`senso generate`](#senso-generate) — AI content generation.
 - [`senso engine`](#senso-engine) — Publish or draft content through the content engine.
 - [`senso destinations`](#senso-destinations) — Manage publish destinations.
@@ -910,6 +911,93 @@ senso evals content [options] <contentId>
 | `--label <text>` | Free-form tag stored on the run, for finding it later |  |
 | `--idempotency-key <key>` | Makes the trigger safe to retry — the same key returns the original run |  |
 | `--wait` | Poll until the run finishes instead of returning a handle straight away |  |
+
+## senso gaps
+
+The gap report: questions and claims your knowledge base could not back up, and what was decided about each — the same queue the Senso app shows. Each gap has a PROBLEM (not_found: a question nothing answered; no_source: a claim nothing backs; conflict: the knowledge base contradicts it; flagged: a person marked an answer wrong), a STATUS (weak: seen once and hidden by default; open; reopened; addressed: a fix is recorded and awaits confirmation; resolved; dismissed; dormant), and an ORIGIN saying where it came from. A search through the API, the MCP server or this CLI that finds nothing files an api_unanswered_question gap: weak on the first call, open on the second, and resolved by a later API search that finds a sourced answer. Typical loop: `gaps list` to find work, `gaps get <id>` for the evidence and the exact next commands, write content with `kb create-raw`, then `gaps answer <id> --content-id <id>`; or `gaps dismiss <id>` for noise. Every decision can be undone with `gaps undo`.
+
+```
+senso gaps [options] [command]
+```
+
+### senso gaps list
+
+List gaps, most severe first. With no --status, only open, reopened and addressed gaps are returned — a gap seen once is weak and hidden, so pass --status weak (or --status all) to see new API search gaps. Repeat a filter or comma-separate it to OR values; different filters are ANDed. Plain output ends with the paging position and the command to read a gap.
+
+```
+senso gaps list [options]
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--status <status>` | Filter by status, repeatable: weak, open, reopened, addressed, resolved, dismissed, dormant, or all (default open, reopened, addressed) |  |
+| `--problem <problem>` | Filter by problem, repeatable: conflict, not_found, no_source, flagged |  |
+| `--origin <origin>` | Filter by origin, repeatable: claim, unanswered_question, documents_didnt_answer, flagged_answer, api_unanswered_question. api_unanswered_question is a search through the API, MCP server or CLI that found nothing |  |
+| `--surface <surface>` | Filter by where it was seen, repeatable: search_turn, content, question_run, api_search |  |
+| `--kind <kind>` | Filter by kind, repeatable: missing, conflict, kb_conflict, flagged |  |
+| `--tag <tagId>` | Filter by topic tag id, repeatable (see `senso tags list`) |  |
+| `--search <text>` | Only gaps whose text contains this |  |
+| `--sort <order>` | severity \| recent \| demand (default severity) |  |
+| `--limit <n>` | Page size, 1-100 (default 50) |  |
+| `--offset <n>` | Number of gaps to skip (default 0) |  |
+
+### senso gaps get
+
+Get one gap in full: the gap, every sighting behind it, every decision recorded against it, and the evidence — what the search found (retrieval counts and best score), the quote and reasoning behind a judged claim, the documents weighed or cited with their kb_node_id and content_id, and any feedback a person left. Plain output ends with the exact commands to act on this gap, chosen from its problem and status.
+
+```
+senso gaps get [options] <gapId>
+```
+
+### senso gaps resolve
+
+Record what was done about a gap, and move it accordingly. Types, with the status each leaves the gap in: answered → addressed: an answer was written into the knowledge base. Needs --produced-content-id. content_added → addressed: a new document was added. Needs --produced-content-id. content_updated → addressed: an existing document was improved. Needs --produced-content-id. ruled_kb_correct → resolved: the knowledge base was already right; the claim was wrong. ruled_claim_correct → no status change: the claim is right and the named document is stale; update that document next and record content_updated. Needs --authority-content-id. ruled_document → no status change: of two contradicting documents, the named one is right; update the other and record content_updated. Needs --authority-content-id. dismissed → dismissed: it does not matter. not_relevant → dismissed: nothing was wrong. we_dont_do_this → resolved: the organization does not do this, and recording that is the fix. source_irrelevant → dismissed: the answer used the wrong source; the named document should not have been used. Needs --authority-content-id. For the two common cases use the shortcuts `gaps answer` and `gaps dismiss`. Undo any decision with `gaps undo`.
+
+```
+senso gaps resolve [options] <gapId>
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--type <type>` | One of: answered, content_added, content_updated, ruled_kb_correct, ruled_claim_correct, ruled_document, dismissed, not_relevant, we_dont_do_this, source_irrelevant |  |
+| `--produced-content-id <id>` | The content that was written — required for answered, content_added and content_updated |  |
+| `--authority-content-id <id>` | The document the decision is about — required for ruled_claim_correct, ruled_document and source_irrelevant |  |
+| `--ruling-side <side>` | Which side a ruling found correct: kb, claim, document |  |
+| `--notes <text>` | Why, in a sentence — shown on the gap's timeline |  |
+
+### senso gaps answer
+
+Record that content was written to fix a gap — the usual last step after `senso kb create-raw`. Records `answered` (or `content_updated` with --updated, when an existing document was improved instead). The gap becomes addressed and resolves when a later search or evaluation confirms the answer; for an API search gap, that is the next API search for the same question that returns a sourced answer.
+
+```
+senso gaps answer [options] <gapId>
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--content-id <id>` | The content that answers it: the `id` from `senso kb create-raw`, or a `content_id` from `senso kb get` |  |
+| `--updated` | An existing document was improved, rather than a new one written |  |
+| `--notes <text>` | What was written, in a sentence |  |
+
+### senso gaps dismiss
+
+Close a gap that does not need fixing — integration noise, a test or probe search, a question nobody needs answered. Records `dismissed`. A dismissed gap stays closed even if it is seen again; only `gaps undo` reopens it. To keep future probe searches out of the report, run them with `senso search --no-gap-signals`.
+
+```
+senso gaps dismiss [options] <gapId>
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--notes <text>` | Why it does not matter, in a sentence |  |
+
+### senso gaps undo
+
+Retract one recorded decision. The gap's status is recomputed from the decisions that remain — undoing the newer of two returns it to what the older one implied, and undoing the only one makes it open again. Resolution ids are on `gaps get` and in the output of `resolve`, `answer` and `dismiss`.
+
+```
+senso gaps undo [options] <gapId> <resolutionId>
+```
 
 ## senso generate
 
