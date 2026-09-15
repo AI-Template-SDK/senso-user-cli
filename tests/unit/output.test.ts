@@ -33,21 +33,63 @@ function capture(fn: () => void): { out: string; err: string } {
   return { out: out.join("\n"), err: err.join("\n") };
 }
 
-const ctx = (format: OutputContext["format"], quiet = false): OutputContext => ({ format, quiet });
+const ctx = (format: OutputContext["format"], quiet = false): OutputContext => ({
+  format,
+  quiet,
+  command: "roles list",
+});
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
 describe("emit, in json", () => {
-  it("prints the payload unchanged, on stdout", () => {
+  it("wraps the payload in the envelope, unmodified, on stdout", () => {
     const payload = { roles: [{ role_id: "r1" }], total: 1 };
     const { out, err } = capture(() => {
       emit(ctx("json"), payload);
     });
 
-    expect(JSON.parse(out)).toEqual(payload);
+    const envelope = JSON.parse(out) as Record<string, unknown>;
+    // `data` is the API's own shape. Renaming or reshaping it here would break
+    // every jq path an agent has been told to use.
+    expect(envelope.data).toEqual(payload);
+    expect(envelope.ok).toBe(true);
+    expect(envelope.command).toBe("roles list");
     expect(err).toBe("");
+  });
+
+  it("carries the guidance that stderr cannot, because json implies quiet", () => {
+    // The whole reason the envelope exists: `--output json` silences stderr,
+    // and every published Senso skill passes it, so a hint written only to
+    // stderr reaches nobody.
+    const { out } = capture(() => {
+      emit(ctx("json"), { items: [{ id: "a" }], total: 1 }, {
+        next: [{ why: "Read it", command: "senso kb get a" }],
+        warnings: ["one file was skipped"],
+      });
+    });
+
+    const envelope = JSON.parse(out) as { next: unknown; warnings: unknown };
+    expect(envelope.next).toEqual([{ why: "Read it", command: "senso kb get a" }]);
+    expect(envelope.warnings).toEqual(["one file was skipped"]);
+  });
+
+  it("omits page, next and warnings when they do not apply", () => {
+    const { out } = capture(() => {
+      emit(ctx("json"), { a: 1 });
+    });
+
+    expect(Object.keys(JSON.parse(out) as object)).toEqual(["ok", "command", "data"]);
+  });
+
+  it("derives the page position from the payload the API already sends", () => {
+    const { out } = capture(() => {
+      emit(ctx("json"), { items: [{ id: "a" }, { id: "b" }], total: 10, limit: 2, offset: 4 });
+    });
+
+    const { page } = JSON.parse(out) as { page: Record<string, unknown> };
+    expect(page).toMatchObject({ offset: 4, limit: 2, returned: 2, total: 10, has_more: true });
   });
 
   it("ignores a command's handcrafted plain rendering", () => {
@@ -57,7 +99,7 @@ describe("emit, in json", () => {
       emit(ctx("json"), { a: 1 }, { plain: ["something else entirely"] });
     });
 
-    expect(JSON.parse(out)).toEqual({ a: 1 });
+    expect((JSON.parse(out) as { data: unknown }).data).toEqual({ a: 1 });
   });
 });
 
@@ -238,12 +280,16 @@ describe("emit, in plain", () => {
 });
 
 describe("emitConfirmation", () => {
-  it("puts a parseable object on stdout under json", () => {
+  it("puts a parseable envelope on stdout under json", () => {
     const { out } = capture(() => {
       emitConfirmation(ctx("json"), "Competitor deleted.");
     });
 
-    expect(JSON.parse(out)).toEqual({ ok: true, message: "Competitor deleted." });
+    expect(JSON.parse(out)).toEqual({
+      ok: true,
+      command: "roles list",
+      data: { action: "ok", message: "Competitor deleted." },
+    });
   });
 
   it("puts the tick on stderr, never stdout, for a human", () => {
@@ -266,11 +312,97 @@ describe("emitConfirmation", () => {
     expect(err).toBe("");
   });
 
-  it("prefers a real payload over the synthesized one when the API returned something", () => {
+  it("names what changed rather than handing back a sentence to parse", () => {
+    // A confirmation used to emit { ok, message }, so the only way to learn the
+    // id of what was deleted was to parse English out of the message.
     const { out } = capture(() => {
-      emitConfirmation(ctx("json"), "Removed.", { removed: "search" });
+      emitConfirmation(ctx("json"), "Removed.", {
+        action: "removed",
+        resource: "skill",
+        id: "search",
+      });
     });
 
-    expect(JSON.parse(out)).toEqual({ removed: "search" });
+    expect((JSON.parse(out) as { data: unknown }).data).toEqual({
+      action: "removed",
+      resource: "skill",
+      id: "search",
+    });
+  });
+});
+
+describe("emit, in plain, on shapes that used to render as JSON strings", () => {
+  it("indents a nested object instead of stringifying it onto one line", () => {
+    // `kb get` is the case that mattered: `content.processing_status` is the
+    // whole point of the command, and it used to be buried inside an inline
+    // JSON blob that an agent would have to parse out of a key/value line.
+    const { out } = capture(() => {
+      emit(ctx("plain"), {
+        kb_node_id: "3f2a",
+        content: { content_id: "c1", processing_status: "complete" },
+      });
+    });
+
+    expect(out).toContain("processing_status");
+    expect(out).toContain("complete");
+    expect(out).not.toContain('{"content_id"');
+  });
+
+  it("renders a list that travels with extra scalars, instead of one long line", () => {
+    // `questions list` carries `sort_by`, `competitors suggest` carries `mode`
+    // and `cached`, `industries brands` carries `window` and `totals`. None are
+    // pagination keys, so the strict envelope rule refused to see a list at all
+    // and printed the whole array as a single stringified value.
+    const { out } = capture(() => {
+      emit(ctx("plain"), {
+        questions: [{ id: "q1", text: "one" }],
+        sort_by: "created_desc",
+        total: 1,
+      });
+    });
+
+    expect(out).toContain("sort_by");
+    expect(out).toContain("q1");
+    expect(out).not.toContain('[{"id"');
+  });
+
+  it("still treats an object that merely contains a list as an object", () => {
+    // /org/me returns the organization with a `locations` array. Reading that
+    // as the payload dropped the org's name, slug and tier from every format
+    // but json, which is the bug the strict rule was written for.
+    const { out } = capture(() => {
+      emit(ctx("plain"), { name: "Acme", slug: "acme", locations: [{ country_code: "US" }] });
+    });
+
+    expect(out).toContain("Acme");
+    expect(out).toContain("acme");
+  });
+
+  it("says a list is empty rather than printing a blank envelope field", () => {
+    const { out, err } = capture(() => {
+      emit(ctx("plain"), { gaps: [], total: 0 }, {
+        empty: "gaps",
+        emptyHint: "A gap seen once is weak and hidden. Try: senso gaps list --status weak",
+      });
+    });
+
+    expect(out).toContain("No gaps found.");
+    // Why it might be empty belongs on stderr, where it does not pollute the
+    // payload, and in `next`/`warnings` for the json caller.
+    expect(err).toContain("--status weak");
+  });
+});
+
+describe("emit, in table", () => {
+  it("warns when a declared column exists on no row", () => {
+    // This is the runtime half of the guard: `tags list` asked for `tag_id`
+    // where the API returns `id`, so every row printed a blank first column and
+    // the CLI looked finished.
+    const { err } = capture(() => {
+      outputTable([{ id: "t1", name: "pricing" }], ["tag_id", "name"]);
+    });
+
+    expect(err).toContain("tag_id");
+    expect(err).toContain("did not return");
   });
 });

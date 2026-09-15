@@ -85,7 +85,9 @@ function subcommandNames(cmd: Command): string[] {
 }
 
 function optionNames(cmd: Command): string[] {
-  return cmd.options.map((o) => o.long ?? o.short ?? "").filter(Boolean);
+  // `--help` is real and accepted but Commander keeps it out of `options`, so
+  // an agent reading `error.allowed` would conclude it does not exist.
+  return [...cmd.options.map((o) => o.long ?? o.short ?? "").filter(Boolean), "--help"];
 }
 
 /**

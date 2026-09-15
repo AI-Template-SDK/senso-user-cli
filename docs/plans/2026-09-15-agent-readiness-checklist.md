@@ -29,65 +29,65 @@ has to change for the CLI to be able to say the right thing. Check items off in 
 
 ### A1. The JSON envelope (`src/lib/output.ts`, `src/lib/run-action.ts`) — breaking, ship as 1.0
 
-- [ ] Every success under `--output json` writes `{ ok: true, command, data, page?, next?, warnings? }` to stdout. `data` is the API payload, unmodified; never rename its keys.
-- [ ] `emit()` gains `{ page, next, warnings }` options; `page` is `{ offset, limit, returned, total, has_more, next }` where `next` is the runnable next-page command.
-- [ ] `next` is an array of `{ why, command }` with real ids substituted — this is where every stderr hint that `--output json` currently discards goes (gaps get next steps, "poll kb get <id>", "read it with evals get <id>", undo commands).
-- [ ] `warnings` names anything the API did that the caller may not expect (list replaced, items skipped and why, publish_status failed on a 200).
-- [ ] `emitConfirmation()` emits `data: { action, resource, id }` instead of `{ ok, message }`.
-- [ ] Keep `--output json` implying quiet on stderr, but move the content of those hints into `next`/`warnings` so nothing is lost.
-- [ ] Bump the major version; CHANGELOG entry explaining `.answer` → `.data.answer`; update README "Using it from an agent" and the root help epilog with the envelope shape.
+- [x] Every success under `--output json` writes `{ ok: true, command, data, page?, next?, warnings? }` to stdout. `data` is the API payload, unmodified; never rename its keys.
+- [x] `emit()` gains `{ page, next, warnings }` options; `page` is `{ offset, limit, returned, total, has_more, next }` where `next` is the runnable next-page command.
+- [x] `next` is an array of `{ why, command }` with real ids substituted — this is where every stderr hint that `--output json` currently discards goes (gaps get next steps, "poll kb get <id>", "read it with evals get <id>", undo commands).
+- [x] `warnings` names anything the API did that the caller may not expect (list replaced, items skipped and why, publish_status failed on a 200).
+- [x] `emitConfirmation()` emits `data: { action, resource, id }` instead of `{ ok, message }`.
+- [x] Keep `--output json` implying quiet on stderr, but move the content of those hints into `next`/`warnings` so nothing is lost.
+- [x] Bump the major version; CHANGELOG entry explaining `.answer` → `.data.answer`; update README "Using it from an agent" and the root help epilog with the envelope shape.
 - [ ] Update every `jq` path in the seven skills (Part C).
 
 ### A2. The error contract (`src/lib/errors.ts`, `src/lib/api-client.ts`, `src/lib/run-action.ts`)
 
-- [ ] JSON error is `{ ok: false, error: { code, message, status?, field?, received?, allowed?, hint, request? } }` on stderr; stdout stays empty. Add `validation` to the stable code set for API 400/422 field errors.
-- [ ] `toCliError` stops discarding the API message on 404 and 401. Add a `notFound(resource, id, listCommand)` helper and use it at every call site so the message is "KB node <id> not found in organization <slug>", never "Not found.".
-- [ ] 409: keep the whole body — `existing_content_id` (uploads) must reach the agent as `error.details`.
-- [ ] 400/422: prefix the API message with what was attempted; surface `errors[]` field lists and extra keys (`valid_models`, `suggestions`) under `error.details`. `extractErrorMessage` must not drop them.
-- [ ] 403: distinguish (a) missing permission — name the scope and say an org admin can grant it, (b) missing product — "requires the GEO product", (c) KB node access — hint `kb permissions add`, (d) partner key required — hint `senso industries`. Read the middleware message to pick the branch.
-- [ ] 501/503 deployment refusals ("History imports are not available", "Evals are not enabled") pass through verbatim with no "retry shortly" hint.
-- [ ] 5xx keeps "not your fault" but includes the API message when the body has one.
-- [ ] Every error carries exactly one `hint`, and it is a runnable command whenever one exists.
-- [ ] `SENSO_DEBUG=1` adds `request: { method, path }` to every API error; consider always including it.
+- [x] JSON error is `{ ok: false, error: { code, message, status?, field?, received?, allowed?, hint, request? } }` on stderr; stdout stays empty. Add `validation` to the stable code set for API 400/422 field errors.
+- [x] `toCliError` stops discarding the API message on 404 and 401. Add a `notFound(resource, id, listCommand)` helper and use it at every call site so the message is "KB node <id> not found in organization <slug>", never "Not found.".
+- [x] 409: keep the whole body — `existing_content_id` (uploads) must reach the agent as `error.details`.
+- [x] 400/422: prefix the API message with what was attempted; surface `errors[]` field lists and extra keys (`valid_models`, `suggestions`) under `error.details`. `extractErrorMessage` must not drop them.
+- [x] 403: distinguish (a) missing permission — name the scope and say an org admin can grant it, (b) missing product — "requires the GEO product", (c) KB node access — hint `kb permissions add`, (d) partner key required — hint `senso industries`. Read the middleware message to pick the branch.
+- [x] 501/503 deployment refusals ("History imports are not available", "Evals are not enabled") pass through verbatim with no "retry shortly" hint.
+- [x] 5xx keeps "not your fault" but includes the API message when the body has one.
+- [x] Every error carries exactly one `hint`, and it is a runnable command whenever one exists.
+- [x] `SENSO_DEBUG=1` adds `request: { method, path }` to every API error; consider always including it.
 
 ### A3. Commander failures go through the contract (`src/program.ts`, `src/cli.ts`)
 
-- [ ] Unknown command, unknown option, missing argument and a bare group with no subcommand are reported through `reportError`: JSON under `--output json`, exit 2, hint `senso <group> --help`. Keep the "Did you mean" suggestion in `hint`.
-- [ ] A bare group prints a one-line list of its subcommands (not the full help dump) and exits 2; groups with one obvious action (`credits`) get it as the default.
-- [ ] The README claim "errors are JSON too" becomes true.
+- [x] Unknown command, unknown option, missing argument and a bare group with no subcommand are reported through `reportError`: JSON under `--output json`, exit 2, hint `senso <group> --help`. Keep the "Did you mean" suggestion in `hint`.
+- [x] A bare group prints a one-line list of its subcommands (not the full help dump) and exits 2; groups with one obvious action (`credits`) get it as the default.
+- [x] The README claim "errors are JSON too" becomes true.
 
 ### A4. Validation before the request (`src/lib/enum-arg.ts`, new `src/lib/id-arg.ts`, `src/lib/json-arg.ts`)
 
-- [ ] `parseUuidArg(label, value, idSpaceHint)` and use it for every `<id>` argument and every id flag → exit 2 with "ids are the `x_id` field of `senso <list command>`". No command validates its id today except `gaps`, `evals claims`, `gaps answer`.
-- [ ] Every `--limit`/`--offset` through `parseIntFlag` with the endpoint's real range; reject, never clamp (`search --max-results 999` → 20 and `abc` → 5 today).
-- [ ] Every closed set through `parseEnumFlag`, with the allowed values in the help text and in `error.allowed`. Missing today: `generate runs-list --status`, `generate runs-items --status`, `prompts create type`, `--models` everywhere, tracked-sources `--category`, several `--sort`/`--order` flags.
-- [ ] Date flags: one helper per format, named in help ("YYYY-MM-DD" vs "RFC 3339 instant"), validated → exit 2. Decide whether `evals --from/--to` should accept the date form too.
-- [ ] `--data` bodies: a per-command schema listing required keys, optional keys, and the meaning of `[]` vs `null` vs omitted; unknown keys named → exit 2. Refuse an empty replacement body (`kb tags set`, `content tags set`, `prompts tags set` with no flags currently send `{}` = clear all).
+- [x] `parseUuidArg(label, value, idSpaceHint)` and use it for every `<id>` argument and every id flag → exit 2 with "ids are the `x_id` field of `senso <list command>`". No command validates its id today except `gaps`, `evals claims`, `gaps answer`.
+- [x] Every `--limit`/`--offset` through `parseIntFlag` with the endpoint's real range; reject, never clamp (`search --max-results 999` → 20 and `abc` → 5 today).
+- [x] Every closed set through `parseEnumFlag`, with the allowed values in the help text and in `error.allowed`. Missing today: `generate runs-list --status`, `generate runs-items --status`, `prompts create type`, `--models` everywhere, tracked-sources `--category`, several `--sort`/`--order` flags.
+- [x] Date flags: one helper per format, named in help ("YYYY-MM-DD" vs "RFC 3339 instant"), validated → exit 2. Decide whether `evals --from/--to` should accept the date form too.
+- [x] `--data` bodies: a per-command schema listing required keys, optional keys, and the meaning of `[]` vs `null` vs omitted; unknown keys named → exit 2. Refuse an empty replacement body (`kb tags set`, `content tags set`, `prompts tags set` with no flags currently send `{}` = clear all).
 - [ ] Mutually exclusive / required-together flag pairs checked → exit 2 naming both flags.
 - [ ] Files: `assertFilesExist` and a local content-type check before any upload call (`kb update-file` skips it today; `.md`/`.json`/`.xml` are always rejected by the API and should exit 2 pointing at `kb create-raw`).
 
 ### A5. Plain and table rendering (`src/lib/output.ts`)
 
-- [ ] Single object: nested objects as indented sub-blocks, arrays of objects as numbered sub-blocks; never an inline JSON string. Primary id on the first line.
-- [ ] Lists: numbered blocks, id first; stderr footer "Showing a–b of n. Next page: <command>" from one shared helper.
-- [ ] Empty list: "No <things> found." on stdout plus a stderr note about any default filter that hid results (gaps weak, tags curated) and the command that widens it. Today the envelope renders as key/value with a blank value.
-- [ ] `findRows`: a payload that is one object-array plus scalar/object extras (`sort_by`, `scope`, `mode`, `window`, `totals`, `history_import`) renders as a list with the extras as a header block, instead of stringifying the array. Affects `questions list`, `run-config model-options`, `competitors suggest`, `industries brands`, `import-prompts`, `partner prompt-metrics`, `content verification`, `content versions`, `content provenance`, `evals get`.
-- [ ] Table honors declared `columns` even when `findRows` declines, and warns on stderr when a declared column is absent from every row (this would have caught A6).
-- [ ] Mutations: "✓ <Verb> <resource> <id>." on stderr, record on stdout, then "Next: <command>" lines.
+- [x] Single object: nested objects as indented sub-blocks, arrays of objects as numbered sub-blocks; never an inline JSON string. Primary id on the first line.
+- [x] Lists: numbered blocks, id first; stderr footer "Showing a–b of n. Next page: <command>" from one shared helper.
+- [x] Empty list: "No <things> found." on stdout plus a stderr note about any default filter that hid results (gaps weak, tags curated) and the command that widens it. Today the envelope renders as key/value with a blank value.
+- [x] `findRows`: a payload that is one object-array plus scalar/object extras (`sort_by`, `scope`, `mode`, `window`, `totals`, `history_import`) renders as a list with the extras as a header block, instead of stringifying the array. Affects `questions list`, `run-config model-options`, `competitors suggest`, `industries brands`, `import-prompts`, `partner prompt-metrics`, `content verification`, `content versions`, `content provenance`, `evals get`.
+- [x] Table honors declared `columns` even when `findRows` declines, and warns on stderr when a declared column is absent from every row (this would have caught A6).
+- [x] Mutations: "✓ <Verb> <resource> <id>." on stderr, record on stdout, then "Next: <command>" lines.
 - [ ] Async: each status transition on stderr; the exact poll command whenever the CLI returns before the work is done.
 
 ### A6. Columns that name fields the API never returns
 
-- [ ] `tags list`, `kb tags *`, `content tags *`, `prompts tags *`: `tag_id` → `id` (dto.TagResponse).
-- [ ] `competitors list`: `competitor_id` → `id`.
-- [ ] `tracked-sources list`: `source_id` → `id`.
+- [x] `tags list`, `kb tags *`, `content tags *`, `prompts tags *`: `tag_id` → `id` (dto.TagResponse).
+- [x] `competitors list`: `competitor_id` → `id`.
+- [x] `tracked-sources list`: `source_id` → `id`.
 - [ ] `prompts list`: verify `prompt_id` against the prompt DTO; `content list`/`generated-content list`: `status`/`processing_status`/`id` mappings.
-- [ ] Policy test: every string in a `columns` array must be a json tag on the endpoint's response DTO (generate the tag list from `senso-api/internal/api/dto` into a fixture).
+- [x] Policy test: every string in a `columns` array must be a json tag on the endpoint's response DTO (generate the tag list from `senso-api/internal/api/dto` into a fixture).
 - [ ] MSW fixtures are built from the DTO shapes, not invented; the existing fixtures spell ids the CLI's way, which is why the suite is green.
 
 ### A7. Help text (`src/program.ts`, every `src/commands/*.ts`)
 
-- [ ] A `describeCommand({ summary, arguments, returns, exitCodes, examples, seeAlso })` helper that emits the standard sections through `addHelpText`, so every leaf command has Arguments (with id space and source command), Options (required/default/allowed values), Returns (fields and enum meanings), Exit codes (specific to the command), Examples, See also.
+- [x] A `describeCommand({ summary, arguments, returns, exitCodes, examples, seeAlso })` helper that emits the standard sections through `addHelpText`, so every leaf command has Arguments (with id space and source command), Options (required/default/allowed values), Returns (fields and enum meanings), Exit codes (specific to the command), Examples, See also.
 - [ ] Every group description states the id spaces it uses and the typical workflow as an ordered command list.
 - [ ] Every status/enum field a command returns has its values and meanings in Returns (processing_status, eval status/verdict/band, gap kind/problem/status/origin, run status, publish_status, tier).
 - [ ] Policy test: every leaf command's help contains the Returns, Exit codes and Examples sections.
