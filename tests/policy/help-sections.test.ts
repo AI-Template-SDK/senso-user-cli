@@ -26,6 +26,26 @@ interface Leaf {
   help: string;
 }
 
+/**
+ * The help a user actually sees.
+ *
+ * NOT `helpInformation()`: that renders the usage, description, arguments and
+ * options, and stops. Everything added through `addHelpText("after")` — which
+ * is where Returns, Exit codes and Examples live — is appended by `outputHelp`
+ * on its way to the stream. Reading the wrong one here made this test assert
+ * against a string that could never contain the sections it was looking for.
+ */
+function renderHelp(cmd: Command): string {
+  let captured = "";
+  cmd.configureOutput({
+    writeOut: (str) => {
+      captured += str;
+    },
+  });
+  cmd.outputHelp();
+  return captured;
+}
+
 /** Every command that does work, with the help text a user would see. */
 function leafCommands(cmd: Command, path: string[] = []): Leaf[] {
   const here = cmd.parent === null ? [] : [...path, cmd.name()];
@@ -33,7 +53,7 @@ function leafCommands(cmd: Command, path: string[] = []): Leaf[] {
   if (children.length > 0) {
     return children.flatMap((c) => leafCommands(c, here));
   }
-  return [{ path: here.join(" "), help: cmd.helpInformation() }];
+  return [{ path: here.join(" "), help: renderHelp(cmd) }];
 }
 
 const leaves = leafCommands(createProgram());

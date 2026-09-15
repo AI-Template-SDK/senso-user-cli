@@ -13,10 +13,14 @@
  * the CLI catches them first and names the flag, so an agent learns the fix from
  * the message instead of a round trip.
  *
- * The third is the guidance. `get` ends with the commands to act on the gap,
- * chosen from its problem and status, and every mutation says what the gap now
- * is and how to undo it. All of it is stderr: under `--output json` stdout is
- * the API payload and nothing else.
+ * The third is the guidance, and it is the most valuable thing here. `get` ends
+ * with the commands to act on this gap, chosen from its problem and status, and
+ * every mutation says what the gap now is and how to undo it. All of it used to
+ * be written with `log.hint`, which `--output json` silences — so the caller it
+ * was written for, an agent passing the flag every published Senso skill passes,
+ * was the one caller who could never read it. It now travels in the envelope's
+ * `next` and `warnings` as well, and the tests under "the guidance a JSON caller
+ * gets" are what hold it there.
  *
  * The fourth is exit codes for "does not exist". Reading an unknown gap is a
  * 404, but recording a resolution against one is a 400 "gap not found"; both
@@ -28,12 +32,15 @@
 import { describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import { server } from "../setup.js";
-import { apiUrl, runCli } from "../helpers.js";
+import { apiUrl, envelope, errorEnvelope, runCli } from "../helpers.js";
 
 const GAP_ID = "11111111-2222-4333-8444-555555555555";
 const RESOLUTION_ID = "99999999-2222-4333-8444-555555555555";
 const CONTENT_ID = "420872df-71ee-485b-829d-fcdb48e17321";
 const TAG_ID = "7a3c9f10-1111-4222-8333-444455556666";
+/** A document node id. Distinct from TAG_ID: they are different id spaces. */
+const KB_NODE_ID = "6b2d8e01-1111-4222-8333-444455556666";
+const SEARCH_TURN_ID = "3d4e5f60-1111-4222-8333-444455556666";
 
 const API_GAP = {
   gap_id: GAP_ID,
@@ -64,7 +71,7 @@ const DETAIL = {
   occurrences: [
     {
       subject_type: "search_turn",
-      subject_id: "turn-1",
+      subject_id: SEARCH_TURN_ID,
       question: "Do you offer an annual plan?",
       occurred_at: "2026-09-14T12:30:00Z",
     },
@@ -154,11 +161,19 @@ describe("gaps get, resolve and undo, when an id is not usable", () => {
     expect(res.stderr).toContain("senso gaps get");
   });
 
-  it("exits 2 when --content-id is not a UUID", async () => {
-    const res = await runCli(["gaps", "answer", GAP_ID, "--content-id", "doc-1"]);
+  it("exits 2 when --content-id is not a UUID, and says which id space it wants", async () => {
+    const res = await runCli(["gaps", "answer", GAP_ID, "--content-id", "doc-1", "--output", "json"]);
 
     expect(res.exitCode).toBe(2);
-    expect(res.stderr).toContain("kb create-raw");
+    expect(res.stdout).toBe("");
+    // content_id and kb_node_id are both UUIDs and are not interchangeable, so
+    // the error names the field and where the right id comes from.
+    expect(errorEnvelope(res).error).toMatchObject({
+      code: "usage",
+      field: "--content-id",
+      received: "doc-1",
+    });
+    expect(errorEnvelope(res).error.hint).toContain("content_id");
   });
 });
 
@@ -335,7 +350,7 @@ describe("gaps list, what it prints", () => {
     const res = await runCli(["gaps", "list", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual(LIST);
+    expect(res.data()).toEqual(LIST);
     expect(res.stderr).toBe("");
   });
 
@@ -350,7 +365,8 @@ describe("gaps list, what it prints", () => {
     expect(res.stdout).not.toContain("Showing");
     expect(res.stderr).toContain("Showing 1–1 of 7");
     expect(res.stderr).toContain("--offset 1");
-    expect(res.stderr).toContain("senso gaps get <gap_id>");
+    // The real id, substituted — a placeholder is one more thing to resolve.
+    expect(res.stderr).toContain(`senso gaps get ${GAP_ID}`);
   });
 
   it("explains that weak gaps are hidden when the default view is empty", async () => {
@@ -359,6 +375,7 @@ describe("gaps list, what it prints", () => {
     const res = await runCli(["gaps", "list"]);
 
     expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain("No gaps found.");
     expect(res.stderr).toContain("--status weak");
   });
 
@@ -381,6 +398,80 @@ describe("gaps list, what it prints", () => {
   });
 });
 
+/**
+ * The guidance, under `--output json`.
+ *
+ * This is the single most important group in this file. `--output json` implies
+ * `--quiet`, every published Senso skill passes it, and all of the guidance
+ * below used to be written with `log.hint` — so the caller it was written for
+ * was the one caller who could never see it.
+ */
+describe("gaps list, the guidance a JSON caller gets", () => {
+  it("says weak gaps are hidden when the default view comes back empty", async () => {
+    // `{"gaps":[],"total":0}` reads as "no work to do". The organization may
+    // have dozens of weak gaps that the default filter hides, and the agent
+    // that stops here never finds out.
+    captureList({ gaps: [], total: 0, limit: 50, offset: 0 });
+
+    const res = await runCli(["gaps", "list", "--output", "json"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stderr).toBe("");
+    const env = envelope(res);
+    expect(env.next).toContainEqual(
+      expect.objectContaining({ command: "senso gaps list --status weak" }),
+    );
+    expect(env.next).toContainEqual(
+      expect.objectContaining({ command: "senso gaps list --status all" }),
+    );
+    // And the reason, not only the command: "why" is what lets an agent decide
+    // whether to run it.
+    expect(env.next?.map((n) => n.why).join(" ")).toContain("weak");
+  });
+
+  it("does not blame the default filter when the caller chose the statuses", async () => {
+    // An explicit --status that matches nothing means the filters are wrong,
+    // not that something is hidden, and suggesting `--status weak` to a caller
+    // who just asked for `--status weak` is noise.
+    captureList({ gaps: [], total: 0, limit: 50, offset: 0 });
+
+    const res = await runCli(["gaps", "list", "--status", "weak", "--output", "json"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(envelope(res).next ?? []).not.toContainEqual(
+      expect.objectContaining({ command: "senso gaps list --status weak" }),
+    );
+  });
+
+  it("names the first gap's id in next when there is something to read", async () => {
+    captureList();
+
+    const res = await runCli(["gaps", "list", "--output", "json"]);
+
+    expect(envelope(res).next).toContainEqual(
+      expect.objectContaining({ command: `senso gaps get ${GAP_ID}` }),
+    );
+  });
+
+  it("carries the paging position and a runnable next page in page", async () => {
+    // The `Showing 1–1 of 7` line and the next-page command are stderr-only, so
+    // a JSON caller reads them off `page` instead.
+    captureList();
+
+    const res = await runCli(["gaps", "list", "--output", "json"]);
+
+    expect(envelope(res).page).toMatchObject({
+      offset: 0,
+      limit: 1,
+      returned: 1,
+      total: 7,
+      has_more: true,
+    });
+    expect(envelope(res).page?.next).toContain("--offset 1");
+  });
+
+});
+
 describe("gaps get, what it prints", () => {
   it("shows the evidence and ends with the commands to act on an API search gap", async () => {
     serveDetail(DETAIL);
@@ -400,13 +491,75 @@ describe("gaps get, what it prints", () => {
     expect(res.stderr).toContain('senso search context "Do you offer an annual plan?"');
   });
 
-  it("keeps the guidance off stdout under --output json", async () => {
+  it("keeps the guidance out of the payload under --output json", async () => {
     serveDetail(DETAIL);
 
     const res = await runCli(["gaps", "get", GAP_ID, "--output", "json"]);
 
-    expect(res.json()).toEqual(DETAIL);
+    // `data` is the API's response, unmodified: the guidance rides beside it.
+    expect(res.data()).toEqual(DETAIL);
     expect(res.stderr).toBe("");
+  });
+
+  it("carries the same commands in next that plain writes to stderr", async () => {
+    // The commands below are the whole product of `gaps get`, and they used to
+    // exist only as `log.hint` lines — invisible to every caller that passed
+    // --output json, which is every published Senso skill.
+    serveDetail(DETAIL);
+
+    const res = await runCli(["gaps", "get", GAP_ID, "--output", "json"]);
+
+    expect(res.exitCode).toBe(0);
+    const commands = (envelope(res).next ?? []).map((n) => n.command).join("\n");
+    expect(commands).toContain("senso kb create-raw");
+    expect(commands).toContain(`senso gaps answer ${GAP_ID} --content-id`);
+    // A near miss — 12 candidates, 0 after the filter — so improving a document
+    // may be enough, and that is a different command from writing a new one.
+    expect(commands).toContain('senso search context "Do you offer an annual plan?"');
+    // Every command names this gap rather than a placeholder.
+    expect(envelope(res).next?.every((n) => n.why.length > 0)).toBe(true);
+  });
+
+  it("carries what cannot be run as warnings, not as commands", async () => {
+    // "This came from an API search" is a fact, not an act. Mixing it into
+    // `next` would hand an agent a line it cannot execute.
+    serveDetail(DETAIL);
+
+    const res = await runCli(["gaps", "get", GAP_ID, "--output", "json"]);
+
+    expect(envelope(res).warnings?.join(" ")).toContain(
+      "a search through the API, the MCP server or the CLI",
+    );
+  });
+
+  it("tells a JSON caller a closed gap needs nothing, and how to retract the fix", async () => {
+    serveDetail({
+      ...DETAIL,
+      gap: { ...API_GAP, status: "addressed" },
+      resolutions: [
+        {
+          resolution_id: RESOLUTION_ID,
+          resolution_type: "answered",
+          created_at: "2026-09-14T13:00:00Z",
+        },
+      ],
+    });
+
+    const res = await runCli(["gaps", "get", GAP_ID, "--output", "json"]);
+
+    const env = envelope(res);
+    expect(env.warnings?.join(" ")).toContain("Nothing to do unless the fix was wrong");
+    expect(env.next).toEqual([
+      expect.objectContaining({ command: `senso gaps undo ${GAP_ID} ${RESOLUTION_ID}` }),
+    ]);
+  });
+
+  it("says a weak gap is hidden, in the envelope as well as on stderr", async () => {
+    serveDetail({ ...DETAIL, gap: { ...API_GAP, status: "weak", occurrence_count: 1 } });
+
+    const res = await runCli(["gaps", "get", GAP_ID, "--output", "json"]);
+
+    expect(envelope(res).warnings?.join(" ")).toContain("hidden from the default list");
   });
 
   it("names the contradicting document in the ruling command for a conflict", async () => {
@@ -534,8 +687,41 @@ describe("gaps resolve, answer and dismiss, on the wire", () => {
 
     const res = await runCli(["gaps", "dismiss", GAP_ID, "--output", "json"]);
 
-    expect(res.json()).toEqual(SAVED);
+    expect(res.data()).toEqual(SAVED);
     expect(res.stderr).toBe("");
+  });
+
+  it("tells a JSON caller what the gap now is, and how to undo it", async () => {
+    captureResolution();
+
+    const res = await runCli(["gaps", "dismiss", GAP_ID, "--output", "json"]);
+
+    const env = envelope(res);
+    expect(env.warnings?.join(" ")).toContain("The gap is now dismissed");
+    expect(env.warnings?.join(" ")).toContain("stays closed even if the same question is asked again");
+    expect(env.next).toContainEqual(
+      expect.objectContaining({ command: `senso gaps undo ${GAP_ID} ${RESOLUTION_ID}` }),
+    );
+  });
+
+  it("warns that the API does not check the content id it was handed", async () => {
+    // A well-formed id belonging to nothing, or to another organization, still
+    // moves the gap to addressed. It is the one way this command can quietly do
+    // the wrong thing, and under --output json a stderr caveat reaches nobody.
+    captureResolution();
+
+    const res = await runCli([
+      "gaps",
+      "answer",
+      GAP_ID,
+      "--content-id",
+      CONTENT_ID,
+      "--output",
+      "json",
+    ]);
+
+    expect(envelope(res).warnings?.join(" ")).toContain("does not verify content ids");
+    expect(envelope(res).warnings?.join(" ")).toContain(CONTENT_ID);
   });
 });
 
@@ -553,7 +739,19 @@ describe("gaps undo, on the wire", () => {
 
     expect(res.exitCode).toBe(0);
     expect(path).toBe(`/api/v1/org/gaps/${GAP_ID}/resolutions/${RESOLUTION_ID}`);
-    expect(res.json()).toEqual({ ok: true, gap_id: GAP_ID, resolution_id: RESOLUTION_ID });
+    // Named fields rather than `{ ok: true }` and a sentence: the only way to
+    // learn WHAT was undone used to be to parse English out of the message.
+    expect(res.data()).toEqual({
+      action: "undone",
+      resource: "gap_resolution",
+      id: RESOLUTION_ID,
+      gap_id: GAP_ID,
+    });
+    // The API answers 204, so the new status is not in the payload — the
+    // command that reads it has to travel in the envelope.
+    expect(envelope(res).next).toEqual([
+      expect.objectContaining({ command: `senso gaps get ${GAP_ID}` }),
+    ]);
   });
 
   it("points at gaps get to read the recomputed status", async () => {
@@ -623,7 +821,7 @@ describe("gaps get, the next steps for each kind of gap", () => {
         {
           answer_text: "We only bill monthly.",
           sources: [
-            { content_id: CONTENT_ID, kb_node_id: TAG_ID, title: "Old pricing", available: true },
+            { content_id: CONTENT_ID, kb_node_id: KB_NODE_ID, title: "Old pricing", available: true },
           ],
           feedback: [{ user_name: "Dana", comment: "We have an annual plan now." }],
         },
@@ -634,7 +832,7 @@ describe("gaps get, the next steps for each kind of gap", () => {
 
     expect(res.stdout).toContain("Feedback from Dana: We have an annual plan now.");
     expect(res.stdout).toContain(
-      `Cited: Old pricing (kb_node_id: ${TAG_ID}, content_id: ${CONTENT_ID})`,
+      `Cited: Old pricing (kb_node_id: ${KB_NODE_ID}, content_id: ${CONTENT_ID})`,
     );
     expect(res.stderr).toContain("Read the feedback above first");
     expect(res.stderr).toContain("--type source_irrelevant --authority-content-id");
@@ -662,7 +860,7 @@ describe("gaps get, the next steps for each kind of gap", () => {
         { origin: { ...API_GAP.origin, kind: "documents_didnt_answer", surface: "search_turn" } },
         {
           sources: [
-            { content_id: CONTENT_ID, kb_node_id: TAG_ID, title: "Plans", available: true },
+            { content_id: CONTENT_ID, kb_node_id: KB_NODE_ID, title: "Plans", available: true },
           ],
         },
       ),
@@ -670,7 +868,7 @@ describe("gaps get, the next steps for each kind of gap", () => {
 
     const res = await runCli(["gaps", "get", GAP_ID]);
 
-    expect(res.stderr).toContain(`senso kb update-raw ${TAG_ID}`);
+    expect(res.stderr).toContain(`senso kb update-raw ${KB_NODE_ID}`);
     expect(res.stderr).toContain(`--content-id ${CONTENT_ID} --updated`);
     expect(res.stderr).toContain(`senso gaps dismiss ${GAP_ID}`);
   });

@@ -23,7 +23,7 @@
 import { describe, expect, it } from "vitest";
 import { http, HttpResponse, type JsonBodyType } from "msw";
 import { server, TEST_API_KEY } from "../setup.js";
-import { apiUrl, runCli } from "../helpers.js";
+import { apiUrl, envelope, errorEnvelope, runCli } from "../helpers.js";
 import type {
   AnalyticsWindow,
   CitationSeriesPoint,
@@ -43,10 +43,31 @@ import type {
 } from "../../src/commands/analytics/types.js";
 
 // ---------------------------------------------------------------------------
-// Fixtures, built from the interfaces in src/commands/analytics/types.ts
+// Fixtures, built from the DTOs in senso-api: internal/api/dto/org_analytics_dto.go
+// for the payloads, and industry_analytics_dto.go for Rate, RateTrend,
+// DataQuality and GlossaryEntry, which org analytics reuses.
 // ---------------------------------------------------------------------------
 
 const r = (value: number, display: string): Rate => ({ value, display });
+
+/**
+ * An ORG prompt id, and one that does not exist.
+ *
+ * Both are UUIDs because every command taking a prompt id now validates it
+ * before the request: a placeholder like "prm_a1" exits 2 and never reaches
+ * MSW, so a fixture using one would be testing the wrong branch.
+ */
+const PROMPT_ID = "3f2a8c10-5f4e-4a8f-9b0d-2c1e6a7b8d90";
+const MISSING_PROMPT_ID = "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+
+/**
+ * Two ids from the API's own --models allow-list.
+ *
+ * "gpt-4o" is not one of them: `--models gpt-4o` is exit 2 before the request,
+ * so it cannot appear in a fixture that expects to reach the handler either.
+ */
+const MODEL_A = "chatgpt";
+const MODEL_B = "gemini";
 
 const WINDOW: AnalyticsWindow = {
   from: "2025-08-01",
@@ -55,7 +76,22 @@ const WINDOW: AnalyticsWindow = {
   latest_data_day: "2025-08-29",
 };
 
-const QUALITY: DataQuality = { level: "good", answered_count: 460, reasons: [] };
+/** The equal-length window before it, which `summary` compares against. */
+const PREVIOUS_WINDOW: AnalyticsWindow = {
+  from: "2025-07-02",
+  to: "2025-07-31",
+  days: 30,
+  latest_data_day: "2025-07-31",
+};
+
+/** level is low | medium | high. "good" is not a value this API emits. */
+const QUALITY: DataQuality = { level: "high", answered_count: 460, reasons: [] };
+
+/** Every aggregate payload carries one, keyed by metric name. */
+const DEFINITIONS = {
+  mention_rate: "mentioned_count ÷ answered_count.",
+  share_of_voice: "mention_total ÷ brand_mention_total.",
+};
 
 const NOTES = [
   "Share of voice divides by mentions of every brand the models named, not only tracked competitors.",
@@ -87,6 +123,8 @@ const TOTALS: Totals = {
 const METRICS: Metrics = {
   mention_rate: r(0.2652, "26.5%"),
   share_of_voice: r(0.12, "12.0%"),
+  // A RankValue, not a Rate: its display carries the "#" so a reader cannot
+  // mistake an ordinal position for a percentage.
   avg_rank: r(3.2, "#3.2"),
   primary_citation_rate: r(0.15, "15.0%"),
   tracked_citation_rate: r(0.3, "30.0%"),
@@ -94,12 +132,14 @@ const METRICS: Metrics = {
   primary_citation_share: r(0.05, "5.0%"),
   tracked_citation_share: r(0.125, "12.5%"),
   external_citation_share: r(0.825, "82.5%"),
-  citations_per_answer: r(4, "4.0"),
+  // A Frequency: an intensity with a unit, never a percentage.
+  citations_per_answer: r(4, "4.00 citations per cited answer"),
 };
 
 const DELTAS: Deltas = {
   mention_rate: { prev: 0.21, delta: 0.055, direction: "improved", display: "+5.5pp" },
   share_of_voice: { prev: 0.132, delta: -0.012, direction: "declined", display: "-1.2pp" },
+  // null, not zero: a trend needs BOTH windows to have produced a value.
   primary_citation_rate: null,
 };
 
@@ -107,9 +147,32 @@ const SUMMARY = {
   window: WINDOW,
   totals: TOTALS,
   metrics: METRICS,
+  previous_window: { window: PREVIOUS_WINDOW, totals: TOTALS, metrics: METRICS },
   deltas: DELTAS,
   data_quality: QUALITY,
   notes: NOTES,
+  definitions: DEFINITIONS,
+};
+
+/**
+ * The same summary with every denominator at zero.
+ *
+ * Every metric is null rather than 0: the API's own `ratio` helper returns nil
+ * when the denominator is <= 0, and the deltas go with it because a trend needs
+ * both windows to have produced a value.
+ */
+const EMPTY_DENOMINATORS = {
+  ...SUMMARY,
+  totals: {
+    ...TOTALS,
+    answered_count: 0,
+    mentioned_count: 0,
+    cited_run_count: 0,
+    cited_total: 0,
+  },
+  metrics: Object.fromEntries(Object.keys(METRICS).map((key) => [key, null])) as unknown as Metrics,
+  previous_window: null,
+  deltas: null,
 };
 
 const MENTION_POINT: MentionSeriesPoint = {
@@ -135,6 +198,7 @@ const MENTIONS = {
   series: [MENTION_POINT],
   data_quality: QUALITY,
   notes: NOTES,
+  definitions: DEFINITIONS,
 };
 
 const CITATION_POINT: CitationSeriesPoint = {
@@ -165,6 +229,7 @@ const CITATIONS = {
   series: [CITATION_POINT],
   data_quality: QUALITY,
   notes: NOTES,
+  definitions: DEFINITIONS,
 };
 
 const DENOMINATORS: Denominators = {
@@ -195,6 +260,7 @@ const DOMAINS = {
   domains: [DOMAIN_ROW],
   data_quality: QUALITY,
   notes: NOTES,
+  definitions: DEFINITIONS,
 };
 
 const PAGE_ROW: CitedPageItem = {
@@ -209,7 +275,7 @@ const PAGE_ROW: CitedPageItem = {
   avg_citation_rank: 3.1,
   top_prompts: [
     {
-      prompt_id: "prm_a1",
+      prompt_id: PROMPT_ID,
       prompt_text: "what is generative engine optimization",
       cited_run_count: 9,
     },
@@ -225,19 +291,24 @@ const PAGES = {
   pages: [PAGE_ROW],
   data_quality: QUALITY,
   notes: NOTES,
+  definitions: DEFINITIONS,
 };
 
 const PROMPT_ROW: PromptPerformanceItem = {
-  prompt_id: "prm_a1",
+  prompt_id: PROMPT_ID,
   prompt_text: "what is generative engine optimization",
   prompt_type: "awareness",
   tags: ["launch", "geo"],
   run_count: 40,
   answered_count: 38,
   mentioned_count: 11,
+  mention_total: 14,
+  tracked_mention_total: 46,
+  brand_mention_total: 135,
+  rank_sum: 40,
+  sentiment: { positive: 7, neutral: 3, negative: 1 },
   cited_run_count: 24,
   primary_cited_run_count: 4,
-  sentiment: { positive: 7, neutral: 3, negative: 1 },
   mention_rate: r(0.2895, "28.9%"),
   share_of_voice: r(0.104, "10.4%"),
   avg_rank: r(3.6, "#3.6"),
@@ -246,7 +317,7 @@ const PROMPT_ROW: PromptPerformanceItem = {
     run_at: "2025-08-29T06:04:11Z",
     answer_count: 8,
     mentioned_count: 3,
-    models: ["gpt-4o", "claude-sonnet"],
+    models: [MODEL_A, MODEL_B],
     share_of_voice: r(0.1875, "18.8%"),
   },
 };
@@ -261,14 +332,15 @@ const PROMPTS = {
   prompts: [PROMPT_ROW],
   data_quality: QUALITY,
   notes: NOTES,
+  definitions: DEFINITIONS,
 };
 
 const ANSWER_ROW: LatestAnswerItem = {
-  prompt_id: "prm_a1",
+  prompt_id: PROMPT_ID,
   prompt_text: "what is generative engine optimization",
   prompt_type: "awareness",
   provider: "openai",
-  model: "gpt-4o",
+  model: MODEL_A,
   location: "US/California",
   run_at: "2025-08-29T06:04:11Z",
   response_text: "Generative engine optimization is the practice of ...",
@@ -287,7 +359,7 @@ const ANSWER_ROW: LatestAnswerItem = {
 };
 
 const PROMPT_DETAIL = {
-  prompt_id: "prm_a1",
+  prompt_id: PROMPT_ID,
   prompt_text: "what is generative engine optimization",
   prompt_type: "awareness",
   tags: ["launch"],
@@ -298,6 +370,7 @@ const PROMPT_DETAIL = {
   latest_answers: [ANSWER_ROW],
   data_quality: QUALITY,
   notes: NOTES,
+  definitions: DEFINITIONS,
 };
 
 const ANSWERS = {
@@ -306,24 +379,29 @@ const ANSWERS = {
   offset: 0,
   answers: [ANSWER_ROW],
   notes: NOTES,
+  definitions: DEFINITIONS,
 };
 
 const GLOSSARY_ENTRY: GlossaryEntry = {
-  metric: "Citation Share",
-  definition: "This tier's citation instances divided by every citation instance.",
-  denominator: "S — total citation instances",
-  gotcha: "Not interchangeable with Citation Rate, which divides by D.",
+  metric: "citation_share",
+  definition: "For one specific domain or page: its fraction of all citation instances.",
+  denominator: "S = cited_total",
+  gotcha: "Per-source shares sum to 100% across ALL sources in the window.",
 };
 
 const GLOSSARY = {
   entries: [
     GLOSSARY_ENTRY,
-    // No denominator and no gotcha: the placeholder path in the table renderer.
-    { metric: "Run Count", definition: "Answers collected in the window." },
+    // denominator and gotcha are omitempty: this is the placeholder path in the
+    // table renderer, and a real entry the API ships without them.
+    {
+      metric: "run_count",
+      definition: "Prompt-run answers attempted in the window.",
+    },
   ],
 };
 
-const MODEL: FilterOption = { id: "gpt-4o", display_name: "GPT-4o" };
+const MODEL: FilterOption = { id: MODEL_A, display_name: "ChatGPT" };
 
 const FILTERS = {
   models: [MODEL],
@@ -380,7 +458,7 @@ const WINDOW_FLAGS = [
   "--to",
   "2025-08-30",
   "--models",
-  "gpt-4o,claude-sonnet",
+  `${MODEL_A},${MODEL_B}`,
   "--location",
   "US,US/California",
   "--prompt-type",
@@ -391,7 +469,7 @@ const WINDOW_FLAGS = [
 const WINDOW_PARAMS = {
   from: "2025-08-01",
   to: "2025-08-30",
-  models: "gpt-4o,claude-sonnet",
+  models: `${MODEL_A},${MODEL_B}`,
   location: "US,US/California",
   prompt_type: "consideration",
 };
@@ -438,7 +516,7 @@ describe("analytics summary, when the request fails", () => {
     expect(res.stderr).toContain("Permission denied");
   });
 
-  it("exits 4 when the prompt being drilled into does not exist", async () => {
+  it("exits 4 naming the prompt and the id when it does not exist", async () => {
     server.use(
       http.get(
         apiUrl("/org/analytics/prompts/:promptId"),
@@ -446,11 +524,26 @@ describe("analytics summary, when the request fails", () => {
       ),
     );
 
-    const res = await runCli(["analytics", "prompt", "prm_missing"]);
+    const res = await runCli(["analytics", "prompt", MISSING_PROMPT_ID]);
 
     expect(res.exitCode).toBe(4);
     expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("Not found");
+    // An industry prompt id lands here, so the message has to name which id
+    // space was wanted rather than saying "Not found." and stopping.
+    expect(res.stderr).toContain(`Prompt ${MISSING_PROMPT_ID} not found`);
+    expect(res.stderr).toContain("senso analytics prompts");
+  });
+
+  it("exits 2 on a prompt id that is not a UUID, before the request", async () => {
+    const res = await runCli(["analytics", "prompt", "prm_a1", "--output", "json"]);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stdout).toBe("");
+    expect(errorEnvelope(res).error).toMatchObject({
+      code: "usage",
+      field: "<promptId>",
+      received: "prm_a1",
+    });
   });
 
   it("exits 1 on a 500 and says it is not the caller's fault", async () => {
@@ -462,7 +555,7 @@ describe("analytics summary, when the request fails", () => {
 
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("not your fault");
+    expect(res.stderr).toContain("server-side failure");
   });
 
   it("reports a malformed body rather than throwing a parse error at the user", async () => {
@@ -491,6 +584,87 @@ describe("analytics summary, when the request fails", () => {
     // containing an error object it would later read as analytics data.
     expect(res.stdout).toBe("");
     expect(JSON.parse(res.stderr)).toMatchObject({ error: { code: "forbidden", status: 403 } });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The payload guards: a body that is not the shape the renderers index
+// ---------------------------------------------------------------------------
+
+/** The same payload with one block removed, as an unexpected response would be. */
+function without(payload: Record<string, unknown>, ...keys: string[]): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(payload).filter(([key]) => !keys.includes(key)));
+}
+
+describe("analytics, when the response is missing a block the renderer reaches into", () => {
+  it("names the endpoint and the block, rather than throwing a TypeError at the caller", async () => {
+    // `apiRequest<T>` is a cast, not a validator, so `data.totals.mention_rate`
+    // is a fact to the compiler and a guess at runtime. The least instructive
+    // thing this command could hand a model is "Cannot read properties of
+    // undefined (reading 'mention_rate')": exit 1, code "error", and no way to
+    // tell a broken response from a broken CLI.
+    stub("/org/analytics/summary", without(SUMMARY, "totals"));
+
+    const res = await runCli(["analytics", "summary"]);
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toBe("");
+    expect(res.stderr).toContain("Unexpected response from GET /org/analytics/summary");
+    expect(res.stderr).toContain("no totals block");
+    expect(res.stderr).not.toContain("Cannot read properties");
+  });
+
+  it("lists every missing block at once, not the first one it tripped over", async () => {
+    stub("/org/analytics/summary", without(SUMMARY, "totals", "metrics"));
+
+    const res = await runCli(["analytics", "summary"]);
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stderr).toContain("no totals, metrics blocks");
+  });
+
+  it("puts the endpoint and the missing block in the JSON error, where a report can be built from it", async () => {
+    stub("/org/analytics/summary", without(SUMMARY, "totals"));
+
+    const res = await runCli(["analytics", "summary", "--output", "json"]);
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toBe("");
+    expect(errorEnvelope(res).error).toMatchObject({
+      code: "error",
+      request: { method: "GET", path: "/org/analytics/summary" },
+      details: { missing: ["totals"] },
+    });
+    expect(errorEnvelope(res).error.hint).toContain("SENSO_DEBUG=1");
+  });
+
+  it("guards the drill-down, which indexes the same two blocks", async () => {
+    stub("/org/analytics/prompts/:promptId", without(PROMPT_DETAIL, "metrics"));
+
+    const res = await runCli(["analytics", "prompt", PROMPT_ID]);
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stderr).toContain("/org/analytics/prompts/{promptId}");
+    expect(res.stderr).toContain("no metrics block");
+  });
+
+  it("guards the cited-source rollups, which index denominators instead", async () => {
+    stub("/org/analytics/citations/domains", without(DOMAINS, "denominators"));
+
+    const res = await runCli(["analytics", "domains"]);
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stderr).toContain("Unexpected response from GET /org/analytics/citations/domains");
+    expect(res.stderr).toContain("no denominators block");
+  });
+
+  it("guards the prompt list, which prints the org-wide metrics above the table", async () => {
+    stub("/org/analytics/prompts", without(PROMPTS, "metrics"));
+
+    const res = await runCli(["analytics", "prompts"]);
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stderr).toContain("Unexpected response from GET /org/analytics/prompts");
   });
 });
 
@@ -726,24 +900,24 @@ describe("analytics prompt <promptId>, on the wire", () => {
     await runCli([
       "analytics",
       "prompt",
-      "prm_a1",
+      PROMPT_ID,
       "--from",
       "2025-08-01",
       "--to",
       "2025-08-30",
       "--models",
-      "gpt-4o",
+      MODEL_A,
       "--location",
       "US",
     ]);
 
     expect(requested(seen)).toEqual({
       method: "GET",
-      path: pathOf("/org/analytics/prompts/prm_a1"),
+      path: pathOf(`/org/analytics/prompts/${PROMPT_ID}`),
       params: {
         from: "2025-08-01",
         to: "2025-08-30",
-        models: "gpt-4o",
+        models: MODEL_A,
         location: "US",
       },
     });
@@ -752,7 +926,7 @@ describe("analytics prompt <promptId>, on the wire", () => {
   it("asks for the answer bodies by saying nothing, since they are the default", async () => {
     const seen = stub("/org/analytics/prompts/:promptId", PROMPT_DETAIL);
 
-    await runCli(["analytics", "prompt", "prm_a1"]);
+    await runCli(["analytics", "prompt", PROMPT_ID]);
 
     // include_answers is absent rather than "true": the server's default is the
     // behavior being asked for, and sending it would freeze that default here.
@@ -762,7 +936,7 @@ describe("analytics prompt <promptId>, on the wire", () => {
   it("sends include_answers=false when --no-include-answers is passed", async () => {
     const seen = stub("/org/analytics/prompts/:promptId", PROMPT_DETAIL);
 
-    await runCli(["analytics", "prompt", "prm_a1", "--no-include-answers"]);
+    await runCli(["analytics", "prompt", PROMPT_ID, "--no-include-answers"]);
 
     expect(requested(seen).params).toEqual({ include_answers: "false" });
   });
@@ -787,7 +961,7 @@ describe("analytics answers, on the wire", () => {
       "--to",
       "2025-08-30",
       "--models",
-      "gpt-4o",
+      MODEL_A,
       "--location",
       "US/California",
       "--prompt-type",
@@ -812,7 +986,7 @@ describe("analytics answers, on the wire", () => {
       params: {
         from: "2025-08-01",
         to: "2025-08-30",
-        models: "gpt-4o",
+        models: MODEL_A,
         location: "US/California",
         prompt_type: "decision",
         tag: "launch",
@@ -1073,7 +1247,7 @@ describe("analytics summary, on success", () => {
     expect(res.exitCode).toBe(0);
     // Byte-for-byte the API's document: the raw counts, the nulls and the
     // notes all survive, which is what makes this the contract for an agent.
-    expect(res.json()).toEqual(SUMMARY);
+    expect(res.data()).toEqual(SUMMARY);
     expect(res.stderr).toBe("");
   });
 
@@ -1097,7 +1271,7 @@ describe("analytics summary, on success", () => {
 
     expect(res.stdout).toContain("2025-08-01");
     expect(res.stdout).toContain("latest data 2025-08-29");
-    expect(res.stdout).toContain("Data quality: good");
+    expect(res.stdout).toContain("Data quality: high");
   });
 
   it("renders a readable block with the monitoring footprint by default", async () => {
@@ -1117,21 +1291,7 @@ describe("analytics summary, on success", () => {
     // The misreading this whole command group exists to prevent: "—" means the
     // denominator was zero, so nothing was measured. 0% would mean it was
     // measured and the answer was none.
-    const empty = {
-      ...SUMMARY,
-      totals: {
-        ...TOTALS,
-        answered_count: 0,
-        mentioned_count: 0,
-        cited_run_count: 0,
-        cited_total: 0,
-      },
-      metrics: Object.fromEntries(
-        Object.keys(METRICS).map((key) => [key, null]),
-      ) as unknown as Metrics,
-      deltas: null,
-    };
-    stub("/org/analytics/summary", empty);
+    stub("/org/analytics/summary", EMPTY_DENOMINATORS);
 
     const res = await runCli(["analytics", "summary"]);
 
@@ -1140,6 +1300,34 @@ describe("analytics summary, on success", () => {
     expect(res.stdout).not.toMatch(/\b0(\.0)?%/);
     // And the denominator is still shown, so the placeholder explains itself.
     expect(res.stdout).toContain("0 / 0 answers");
+  });
+
+  it("keeps that metric null in the JSON payload, rather than coercing it to 0", async () => {
+    // The same fact, for the consumer that cannot read an em dash. A 0 here
+    // would be indistinguishable from a measured zero, and every published
+    // Senso skill reads this payload rather than the rendering.
+    stub("/org/analytics/summary", EMPTY_DENOMINATORS);
+
+    const res = await runCli(["analytics", "summary", "--output", "json"]);
+
+    expect(res.exitCode).toBe(0);
+    const data = res.data<{ metrics: Record<string, unknown>; deltas: unknown }>();
+    expect(data.metrics.mention_rate).toBeNull();
+    expect(data.metrics.primary_citation_share).toBeNull();
+    expect(Object.values(data.metrics).every((v) => v === null)).toBe(true);
+    // And a trend that neither window could produce is null too, not "flat".
+    expect(data.deltas).toBeNull();
+  });
+
+  it("renders the placeholder in the table as well, with the zero denominator beside it", async () => {
+    stub("/org/analytics/summary", EMPTY_DENOMINATORS);
+
+    const res = await runCli(["analytics", "summary", "--output", "table"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain("—");
+    expect(res.stdout).toContain("0 / 0 cited answers");
+    expect(res.stdout).not.toMatch(/\b0(\.0)?%/);
   });
 });
 
@@ -1154,7 +1342,7 @@ describe("analytics prompts, on success", () => {
     const res = await runCli(["analytics", "prompts", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual(PROMPTS);
+    expect(res.data()).toEqual(PROMPTS);
     expect(res.stderr).toBe("");
   });
 
@@ -1165,7 +1353,7 @@ describe("analytics prompts, on success", () => {
 
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain("mention_rate");
-    expect(res.stdout).toContain("prm_a1");
+    expect(res.stdout).toContain(PROMPT_ID);
     expect(res.stdout).toContain("28.9%");
     // The window figure and the "right now" figure are different numbers and
     // both are shown, because reconciling with the app needs the latter.
@@ -1189,8 +1377,9 @@ describe("analytics prompts, on success", () => {
 
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain("what is generative engine optimization");
-    expect(res.stdout).toContain("28.9% (11/38)");
-    expect(res.stdout).toContain("ID: prm_a1");
+    expect(res.stdout).toContain("28.9% (11/38 answers)");
+    // The id leads the block: it is the argument every follow-up command takes.
+    expect(res.stdout).toContain(PROMPT_ID);
     expect(res.stdout).toContain("tags: launch, geo");
   });
 
@@ -1261,13 +1450,14 @@ describe("the remaining subcommands render their own view", () => {
   it("prompt <promptId> prints the metric table, the series and the answer bodies", async () => {
     stub("/org/analytics/prompts/:promptId", PROMPT_DETAIL);
 
-    const res = await runCli(["analytics", "prompt", "prm_a1"]);
+    const res = await runCli(["analytics", "prompt", PROMPT_ID]);
 
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain("Mention Rate");
+    expect(res.stdout).toContain(`ID: ${PROMPT_ID}`);
     expect(res.stdout).toContain("Series");
     expect(res.stdout).toContain("Latest answers");
-    expect(res.stdout).toContain("gpt-4o · US/California");
+    expect(res.stdout).toContain(`${MODEL_A} · US/California`);
     expect(res.stdout).toContain("Generative engine optimization is the practice");
   });
 
@@ -1302,8 +1492,8 @@ describe("the remaining subcommands render their own view", () => {
     const res = await runCli(["analytics", "glossary"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.stdout).toContain("Citation Share");
-    expect(res.stdout).toContain("Denominator: S — total citation instances");
+    expect(res.stdout).toContain("citation_share");
+    expect(res.stdout).toContain("Denominator: S = cited_total");
     expect(res.stdout).toContain("Gotcha:");
   });
 
@@ -1313,7 +1503,7 @@ describe("the remaining subcommands render their own view", () => {
     const res = await runCli(["analytics", "glossary", "--output", "table"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.stdout).toContain("Run Count");
+    expect(res.stdout).toContain("run_count");
     expect(res.stdout).toContain("—");
   });
 
@@ -1326,7 +1516,7 @@ describe("the remaining subcommands render their own view", () => {
     expect(res.stdout).toContain("--models");
     // The display name, which is what a user reads, next to the location codes,
     // which are case-sensitive and must be echoed exactly.
-    expect(res.stdout).toContain("GPT-4o");
+    expect(res.stdout).toContain("ChatGPT");
     expect(res.stdout).toContain("US/California");
     expect(res.stdout).toContain("2025-06-01 → 2025-08-29");
   });
@@ -1376,7 +1566,7 @@ describe("the notes every analytics response carries", () => {
 
     const res = await runCli(["analytics", "summary", "--output", "json"]);
 
-    expect(res.json<typeof SUMMARY>().notes).toEqual(NOTES);
+    expect(res.data<typeof SUMMARY>().notes).toEqual(NOTES);
     expect(res.stdout.trimEnd().endsWith("}")).toBe(true);
     expect(res.stdout).not.toContain("Notes");
     expect(res.stderr).toBe("");
@@ -1388,5 +1578,76 @@ describe("the notes every analytics response carries", () => {
     const res = await runCli(["analytics", "summary"]);
 
     expect(res.stdout).not.toContain("Notes");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Paging: where this page sits, and the command that fetches the next one
+// ---------------------------------------------------------------------------
+
+describe("the paged analytics commands say where they are, and how to continue", () => {
+  const paged = [
+    { name: "domains", path: "/org/analytics/citations/domains", payload: DOMAINS, total: 88 },
+    { name: "pages", path: "/org/analytics/citations/pages", payload: PAGES, total: 412 },
+    { name: "prompts", path: "/org/analytics/prompts", payload: PROMPTS, total: 24 },
+    { name: "answers", path: "/org/analytics/answers/latest", payload: ANSWERS, total: 96 },
+  ] as const;
+
+  for (const { name, path, payload, total } of paged) {
+    it(`${name} prints the position and the next page on stderr, never on stdout`, async () => {
+      stub(path, payload);
+
+      const res = await runCli(["analytics", name]);
+
+      expect(res.exitCode).toBe(0);
+      expect(res.stderr).toContain(`Showing 1–1 of ${String(total)}.`);
+      expect(res.stderr).toContain("Next page: senso analytics");
+      // A footer on stdout would be prose after the payload, which is the one
+      // thing a caller piping this command cannot tolerate.
+      expect(res.stdout).not.toContain("Showing 1–1 of");
+    });
+
+    it(`${name} rebuilds the next page from the caller's own filters, not a bare --offset`, async () => {
+      // A next-page command that drops the filters pages through a DIFFERENT
+      // result set than the one being read, which is worse than saying nothing.
+      stub(path, payload);
+
+      const res = await runCli([
+        "analytics",
+        name,
+        "--models",
+        MODEL_A,
+        "--limit",
+        "1",
+        "--output",
+        "json",
+      ]);
+
+      expect(res.exitCode).toBe(0);
+      const { page } = envelope(res);
+      expect(page).toMatchObject({ offset: 0, returned: 1, total, has_more: true });
+      expect(page?.next).toContain(`senso analytics ${name}`);
+      expect(page?.next).toContain(`--models ${MODEL_A}`);
+      expect(page?.next).toContain("--limit 1");
+      expect(page?.next).toContain("--offset 1");
+    });
+  }
+
+  it("offers no next page once the last row has been returned", async () => {
+    stub("/org/analytics/prompts", { ...PROMPTS, total: 1 });
+
+    const res = await runCli(["analytics", "prompts", "--output", "json"]);
+
+    const { page } = envelope(res);
+    expect(page).toMatchObject({ returned: 1, total: 1, has_more: false });
+    expect(page?.next).toBeUndefined();
+  });
+
+  it("counts from the offset the API reported, not from one", async () => {
+    stub("/org/analytics/answers/latest", { ...ANSWERS, offset: 25 });
+
+    const res = await runCli(["analytics", "answers", "--offset", "25"]);
+
+    expect(res.stderr).toContain("Showing 26–26 of 96.");
   });
 });

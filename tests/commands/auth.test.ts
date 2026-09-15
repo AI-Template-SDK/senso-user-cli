@@ -70,8 +70,9 @@ vi.mock("@clack/prompts", () => ({
   select: vi.fn(),
 }));
 
+/** dto.OrgResponse from GET /org/me. org_id is a uuid.UUID. */
 const ORG = {
-  org_id: "org-abc",
+  org_id: "018f3b2c-4d5e-4a6b-8c7d-9e0f1a2b3c4d",
   name: "Acme Corp",
   slug: "acme",
   is_free_tier: false,
@@ -333,20 +334,34 @@ describe("whoami, when the API answers", () => {
     expect(res.stdout).not.toContain(TEST_API_KEY);
   });
 
-  it("gives a JSON caller the fields under stable names", async () => {
+  it("names its fields in snake_case, like every other command", async () => {
+    // `whoami` used to be the one command answering in camelCase, so a caller
+    // with a working `jq -r \'.data.org_id\'` everywhere else got null here and
+    // nothing said why. The API\'s own key names are what the payload uses.
     server.use(http.get(apiUrl("/org/me"), () => HttpResponse.json(ORG)));
 
     const res = await runCli(["whoami", "--output", "json"]);
 
-    expect(res.json()).toMatchObject({
-      orgId: ORG.org_id,
-      orgName: ORG.name,
-      orgSlug: ORG.slug,
-      isFreeTier: false,
-      apiKeyPrefix: `${TEST_API_KEY.slice(0, 8)}...`,
-      configPath: getConfigPath(),
+    expect(res.data()).toMatchObject({
+      org_id: ORG.org_id,
+      name: ORG.name,
+      slug: ORG.slug,
+      is_free_tier: false,
+      api_key_prefix: `${TEST_API_KEY.slice(0, 8)}...`,
+      config_path: getConfigPath(),
+      cached: false,
     });
     expect(res.stderr).toBe("");
+  });
+
+  it("says which of the three credential sources is in effect", async () => {
+    // --api-key, SENSO_API_KEY and the stored config all authenticate, and the
+    // commonest confusion here is not knowing which one won.
+    server.use(http.get(apiUrl("/org/me"), () => HttpResponse.json(ORG)));
+
+    const res = await runCli(["whoami", "--output", "json"]);
+
+    expect(res.data()).toMatchObject({ credential_source: "flag" });
   });
 
   it("renders as a table when asked", async () => {
@@ -355,7 +370,7 @@ describe("whoami, when the API answers", () => {
     const res = await runCli(["whoami", "--output", "table"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.stdout).toContain("orgName");
+    expect(res.stdout).toContain("org_id");
     expect(res.stdout).toContain(ORG.name);
   });
 });
@@ -408,9 +423,9 @@ describe("whoami, when the API cannot be reached", () => {
     const res = await runCli(["whoami", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toMatchObject({
-      orgId: ORG.org_id,
-      orgName: ORG.name,
+    expect(res.data()).toMatchObject({
+      org_id: ORG.org_id,
+      name: ORG.name,
       cached: true,
     });
   });
@@ -475,16 +490,30 @@ describe("logout", () => {
     const res = await runCli(["logout"]);
 
     expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("Credentials removed.");
+    expect(res.stderr).toContain("Removed stored credentials");
+    // The path, because "removed from where" is the follow-up question.
+    expect(res.stderr).toContain(getConfigPath());
   });
 
-  it("gives a JSON caller a parseable object instead of a tick", async () => {
+  it("says nothing was stored, rather than claiming a removal that did not happen", async () => {
+    const res = await runCli(["logout", "--output", "json"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(res.data()).toMatchObject({ action: "unchanged", had_credentials: false });
+  });
+
+  it("names what changed instead of handing back a sentence to parse", async () => {
     writeConfig({ apiKey: TEST_API_KEY });
 
     const res = await runCli(["logout", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toMatchObject({ ok: true, message: "Credentials removed." });
+    expect(res.data()).toMatchObject({
+      action: "deleted",
+      resource: "credentials",
+      had_credentials: true,
+      path: getConfigPath(),
+    });
     expect(res.stderr).toBe("");
   });
 });

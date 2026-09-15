@@ -43,6 +43,15 @@ mattered, and what you need to do differently.
 
 ### Fixed
 
+- **`senso kb get`, `create-folder`, `rename` and `move` print the node again.**
+  Every node carries a `tags` array, and the renderer reads an array under a
+  known list key as the payload — so these four commands rendered the node's
+  tags and dropped its `kb_node_id`, `type` and the whole `content` block. On a
+  node with no tags, which is every node the moment it is created, `plain` and
+  `table` printed "No tags found." for a node that plainly existed, and
+  `kb create-folder` never showed the id it had just made. `--output json` was
+  unaffected throughout, which is why it went unnoticed.
+
 - **Errors name the thing that failed.** Every 404 used to read "Not found."
   with the API's message discarded, across five UUID id spaces that are not
   interchangeable. A request now carries what it addresses, so the message

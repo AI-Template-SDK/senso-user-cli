@@ -28,27 +28,60 @@
 import { describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import { server } from "../setup.js";
-import { apiUrl, runCli } from "../helpers.js";
+import { apiUrl, envelope, runCli } from "../helpers.js";
 
 const RUN_ID = "291a6160-2306-428d-82d5-28a94c766585";
 const CONTENT_ID = "420872df-71ee-485b-829d-fcdb48e17321";
 
-const QUEUED = { eval_run_id: RUN_ID, evaluator_key: "kb_accuracy", status: "queued" };
-const COMPLETED = {
+/**
+ * dto.EvalRunSummary. evaluator_version, judge_model, subject_type and
+ * created_at have no `omitempty`, so the API sends them on every run — a
+ * fixture without them describes a response that cannot happen, and it is the
+ * absence of `accuracy_pct` and `band` that has to carry meaning here.
+ */
+const QUEUED = {
   eval_run_id: RUN_ID,
   evaluator_key: "kb_accuracy",
+  evaluator_version: "1.1",
+  status: "queued",
+  subject_type: "inline",
+  judge_model: "claude-sonnet-4-5",
+  created_at: "2026-09-15T10:00:00Z",
+};
+
+const COMPLETED = {
+  ...QUEUED,
   status: "completed",
   accuracy_pct: 100,
   band: "green",
   claims_total: 4,
   claims_scored: 4,
+  total_cost: 0.0142,
+  finished_at: "2026-09-15T10:00:21Z",
 };
+
+/**
+ * A gated run: terminal, exit 0, and carrying NO score.
+ *
+ * accuracy_pct and band are absent rather than zero, which is exactly why this
+ * is the status that misleads — an agent reading only the payload sees no
+ * failure anywhere.
+ */
+const GATED = {
+  ...QUEUED,
+  status: "gated",
+  claims_total: 0,
+  claims_scored: 0,
+  finished_at: "2026-09-15T10:00:01Z",
+};
+
 const FAILED = {
-  eval_run_id: RUN_ID,
+  ...QUEUED,
   evaluator_key: "brand_alignment",
   status: "failed",
   error_code: "judge_failed",
   error_message: "brand_alignment needs a brand kit with writing rules",
+  finished_at: "2026-09-15T10:00:03Z",
 };
 
 describe("evals text, when a flag is not usable", () => {
@@ -172,6 +205,25 @@ describe("evals, when the API refuses", () => {
     expect(res.exitCode).toBe(1);
   });
 
+  it("says a 503 is a deployment refusal, not something to retry", async () => {
+    // The API answers "Evals are not enabled in this environment" here. Reading
+    // that as a transient 5xx and telling the caller to retry shortly is advice
+    // that can never work, and a poll loop acts on it forever.
+    server.use(
+      http.get(apiUrl("/org/evals/evaluators"), () =>
+        HttpResponse.json({ message: "Evals are not enabled in this environment" }, { status: 503 }),
+      ),
+    );
+
+    const res = await runCli(["evals", "evaluators"]);
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toBe("");
+    expect(res.stderr).toContain("Evals are not enabled in this environment");
+    expect(res.stderr).toContain("not a transient failure");
+    expect(res.stderr).not.toContain("Retry shortly");
+  });
+
   it("exits 3 on a 401", async () => {
     server.use(
       http.get(apiUrl("/org/evals/evaluators"), () =>
@@ -271,7 +323,7 @@ describe("evals, waiting for a run", () => {
     const res = await runCli(["evals", "text", "--text", "hello", "--wait", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json<{ status: string }>().status).toBe("completed");
+    expect(res.data<{ status: string }>().status).toBe("completed");
     expect(polls).toBeGreaterThan(1);
   }, 20_000);
 
@@ -370,7 +422,7 @@ describe("evals, reading results", () => {
     const res = await runCli(["evals", "get", RUN_ID, "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json<{ accuracy_pct: number }>().accuracy_pct).toBe(100);
+    expect(res.data<{ accuracy_pct: number }>().accuracy_pct).toBe(100);
     expect(res.stderr).toBe("");
   });
 
@@ -390,32 +442,55 @@ describe("evals, terminal statuses", () => {
    * model spend — would have polled the whole 180-second budget and then
    * reported a timeout for a run that was already over.
    */
-  it("stops polling on a gated run instead of waiting out the budget", async () => {
+  function serveGatedRun(): void {
     server.use(
       http.post(apiUrl("/org/evals/text"), () => HttpResponse.json(QUEUED, { status: 202 })),
-      http.get(apiUrl("/org/evals/runs/:runId"), () =>
-        HttpResponse.json({ ...QUEUED, status: "gated" }),
-      ),
+      http.get(apiUrl("/org/evals/runs/:runId"), () => HttpResponse.json(GATED)),
     );
+  }
+
+  it("stops polling on a gated run instead of waiting out the budget", async () => {
+    serveGatedRun();
 
     const res = await runCli(["evals", "text", "--text", "hello", "--wait", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json<{ status: string }>().status).toBe("gated");
+    expect(res.data<{ status: string }>().status).toBe("gated");
   }, 20_000);
 
   it("says a gated run produced no score, rather than letting it read as a pass", async () => {
-    server.use(
-      http.post(apiUrl("/org/evals/text"), () => HttpResponse.json(QUEUED, { status: 202 })),
-      http.get(apiUrl("/org/evals/runs/:runId"), () =>
-        HttpResponse.json({ ...QUEUED, status: "gated" }),
-      ),
-    );
+    serveGatedRun();
 
     const res = await runCli(["evals", "text", "--text", "hello", "--wait"]);
 
     expect(res.exitCode).toBe(0);
     expect(res.stderr).toContain("nothing to judge");
+  }, 20_000);
+
+  it("carries the no-score warning in the envelope, where --output json can see it", async () => {
+    // The whole hazard: exit 0, a run-shaped payload, and no accuracy_pct. An
+    // agent reading only stdout has nothing telling it the absence is not a
+    // pass — and --output json silences the stderr line above.
+    serveGatedRun();
+
+    const res = await runCli(["evals", "text", "--text", "hello", "--wait", "--output", "json"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stderr).toBe("");
+    const env = envelope<{ accuracy_pct?: number }>(res);
+    expect(env.data.accuracy_pct).toBeUndefined();
+    expect(env.warnings?.join(" ")).toContain("NO score");
+    expect(env.warnings?.join(" ")).toContain("accuracy_pct");
+  }, 20_000);
+
+  it("does not offer a claims command for a gated run, because it judged nothing", async () => {
+    serveGatedRun();
+
+    const res = await runCli(["evals", "text", "--text", "hello", "--wait", "--output", "json"]);
+
+    expect(envelope(res).next ?? []).not.toContainEqual(
+      expect.objectContaining({ command: expect.stringContaining("evals claims") as string }),
+    );
   }, 20_000);
 
   it("stops polling on a canceled run, which is reserved but must not hang", async () => {
@@ -429,7 +504,7 @@ describe("evals, terminal statuses", () => {
     const res = await runCli(["evals", "text", "--text", "hello", "--wait", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json<{ status: string }>().status).toBe("canceled");
+    expect(res.data<{ status: string }>().status).toBe("canceled");
   }, 20_000);
 });
 

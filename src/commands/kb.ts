@@ -150,6 +150,37 @@ interface KBNode {
  * instead would apply the flattening to `plain` too and throw away everything
  * else on the node.
  */
+/**
+ * A single node payload is an OBJECT, not the list of tags it happens to carry.
+ *
+ * `findList` in lib/output.ts treats an array under a known list key as the
+ * payload, and `tags` is one of those keys. Every KBNodeResponse carries a
+ * `tags` array — empty when the node has none — so `kb get`, `kb create-folder`,
+ * `kb rename` and `kb move` rendered the tag rows and dropped the node. On an
+ * untagged node, which is every node the moment it is created, that printed
+ * "No tags found." for a node that plainly exists, and `kb create-folder` never
+ * showed the kb_node_id it had just made.
+ *
+ * Naming both renderings here keeps the object an object. `json` is untouched:
+ * it always carries the raw payload.
+ */
+function nodeDetail(ctx: OutputContext, data: unknown): EmitOptions {
+  if (ctx.format === "json") return {};
+  if (typeof data !== "object" || data === null || Array.isArray(data)) return {};
+  const fields = Object.entries(data as Record<string, unknown>);
+  if (ctx.format === "table") {
+    return {
+      table: {
+        rows: fields.map(([field, value]) => ({ field, value })),
+        columns: ["field", "value"],
+      },
+    };
+  }
+  // One row, so `plain` renders every field — including the `content` block and
+  // the tags — as the indented sub-blocks they should be.
+  return { rows: [data as Record<string, unknown>] };
+}
+
 function nodeTable(ctx: OutputContext, data: unknown, key: "nodes" | "ancestors"): EmitOptions {
   if (ctx.format !== "table") return {};
   const nodes = (data as Record<string, KBNode[] | undefined>)[key] ?? [];
@@ -685,6 +716,7 @@ export function registerKBCommands(program: Command): void {
             baseUrl: ctx.baseUrl,
           });
           emit(ctx, data, {
+            ...nodeDetail(ctx, data),
             next:
               data.type === "folder"
                 ? [{ why: "List what is inside", command: `senso kb children ${id}` }]
@@ -1029,6 +1061,7 @@ export function registerKBCommands(program: Command): void {
           });
           if (!ctx.quiet) log.success(`Folder "${name}" created.`);
           emit(ctx, data, {
+            ...nodeDetail(ctx, data),
             next:
               data.kb_node_id === undefined
                 ? []
@@ -1099,6 +1132,7 @@ export function registerKBCommands(program: Command): void {
           });
           if (!ctx.quiet) log.success(`Node ${id} renamed to "${name}".`);
           emit(ctx, data, {
+            ...nodeDetail(ctx, data),
             next: [{ why: "Re-read the node, with its ingestion state", command: `senso kb get ${id}` }],
           });
         }),
@@ -1168,6 +1202,7 @@ export function registerKBCommands(program: Command): void {
           });
           if (!ctx.quiet) log.success(`Node ${id} moved.`);
           emit(ctx, data, {
+            ...nodeDetail(ctx, data),
             next: [
               { why: "Check the new path", command: `senso kb ancestors ${id}` },
               {

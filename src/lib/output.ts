@@ -204,6 +204,23 @@ const ENVELOPE_KEYS = new Set([
  * sits under one of these IS the payload, whatever else travels with it, while
  * an organization that merely contains `locations` is still an organization.
  */
+/*
+ * Two names are deliberately absent, for the same reason.
+ *
+ * `tags` — every KBNodeResponse and ContentResponse carries one, so naming it a
+ * list key made `kb get`, `kb create-folder`, `kb rename`, `kb move` and
+ * `content get` render the record's TAGS and drop the record. An untagged node
+ * — which is every node at creation — printed "No tags found." where the
+ * kb_node_id should have been.
+ *
+ * `models` — `/org/me` returns the organization with a `models` array beside
+ * its own fields, which demoted the organization to a header block.
+ *
+ * Both endpoints that really do return one of these lists return it alone, so
+ * the "one candidate plus nothing but pagination" rule already covers them.
+ * This is the same mistake the envelope rule was written to stop, and it is
+ * worth being conservative about what counts as a list key.
+ */
 const LIST_KEYS = new Set([
   "items",
   "nodes",
@@ -216,7 +233,6 @@ const LIST_KEYS = new Set([
   "gaps",
   "prompts",
   "questions",
-  "tags",
   "competitors",
   "destinations",
   "publishers",
@@ -231,7 +247,6 @@ const LIST_KEYS = new Set([
   "industries",
   "suggestions",
   "model_options",
-  "models",
   "users",
   "members",
   "roles",
@@ -254,6 +269,7 @@ const LIST_KEYS = new Set([
   "folders",
   "occurrences",
   "resolutions",
+  "industry_prompts",
   "children",
   "ancestors",
 ]);

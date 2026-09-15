@@ -6,8 +6,18 @@
  *
  * The plain half is five POST bodies. `search`, `search context`, `search
  * content`, `search full` and `search stream` all send the same shape to five
- * different endpoints, and `max_results` is clamped and defaulted on the way —
- * so the assertions that earn their place are the ones on the request. A
+ * different endpoints, and every constrained input is now CHECKED rather than
+ * substituted: `--max-results 999` used to send 20 and `--max-results abc` used
+ * to send 5, a different search from the one that was asked for, reported as a
+ * success. So the assertions that earn their place are the ones on the request,
+ * and on the exit 2 that replaces a silent substitution.
+ *
+ * The other thing worth protecting is a search that finds nothing. It is not
+ * free and not silent: an answering search that finds nothing is filed in the
+ * organization's gap report, and a caller that never learns that fills the
+ * report with its own probes. So an empty result says so on stdout instead of
+ * printing blank lines, and says what was filed — in `warnings` and `next` as
+ * well, because `--output json` silences stderr. A
  * renamed field here silently changes what the API searches, and nothing in the
  * rendering would show it. Writing those assertions is how an option collision
  * came to light: the four subcommands declare the same option names as their
@@ -33,24 +43,73 @@
 import { describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import { server, TEST_API_KEY } from "../setup.js";
-import { apiUrl, runCli } from "../helpers.js";
+import { apiUrl, envelope, errorEnvelope, runCli } from "../helpers.js";
 
+/**
+ * content_id and kb_node_id, as the API sends them: two different UUIDs.
+ *
+ * The fixtures below used to say `content_id: "c-1"` and carry no kb_node_id at
+ * all, which meant the table asserted a column the API never omits and no test
+ * could catch a command that confused the two id spaces.
+ */
+const CONTENT_ID_1 = "11111111-1111-4111-8111-111111111111";
+const CONTENT_ID_2 = "22222222-2222-4222-8222-222222222222";
+const KB_NODE_ID_1 = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa";
+const KB_NODE_ID_2 = "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb";
+
+/** dto.SearchResultChunk, every field the API populates on a hybrid response. */
 const RESULTS = [
   {
-    content_id: "c-1",
-    title: "Refund policy",
+    content_chunk_id: "cccccccc-1111-4111-8111-cccccccccccc",
+    content_id: CONTENT_ID_1,
+    kb_node_id: KB_NODE_ID_1,
+    version_id: "dddddddd-1111-4111-8111-dddddddddddd",
+    chunk_index: 0,
     chunk_text: "Refunds are issued within 14 days.",
+    score: 0.91,
+    rank: 1,
+    title: "Refund policy",
+    source_type: "file",
+    content_type: "application/pdf",
   },
   {
-    content_id: "c-2",
-    title: "Returns",
+    content_chunk_id: "cccccccc-2222-4222-8222-cccccccccccc",
+    content_id: CONTENT_ID_2,
+    kb_node_id: KB_NODE_ID_2,
+    version_id: "dddddddd-2222-4222-8222-dddddddddddd",
+    chunk_index: 3,
     chunk_text: "Items must be unopened.",
+    score: 0.64,
+    rank: 2,
+    title: "Returns",
+    source_type: "file",
+    content_type: "text/markdown",
   },
 ];
 
-const ANSWER_PAYLOAD = { answer: "Refunds take 14 days.", results: RESULTS };
-
 const QUERY = "how do refunds work";
+
+/** dto.SearchResponse. */
+const ANSWER_PAYLOAD = {
+  query: QUERY,
+  search_type: "hybrid",
+  answer: "Refunds take 14 days.",
+  results: RESULTS,
+  total_results: RESULTS.length,
+  max_results: 5,
+  processing_time_ms: 412,
+};
+
+/** dto.SearchResponse with nothing matched — the shape that becomes a gap. */
+const EMPTY_PAYLOAD = {
+  query: QUERY,
+  search_type: "hybrid",
+  answer: "",
+  results: [],
+  total_results: 0,
+  max_results: 5,
+  processing_time_ms: 88,
+};
 
 /** What a search request looked like, filled in by the handler. */
 interface SeenRequest {
@@ -108,6 +167,21 @@ function sseStream(chunks: string[]): Response {
 /** One well-formed SSE frame. */
 const frame = (event: string, data: unknown): string =>
   `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+
+/**
+ * The `sources` event as the API actually sends it.
+ *
+ * Not only the chunks: search_handler.go puts search_type, total_results and
+ * max_results in the same frame, and they are the fields that tell a caller
+ * which scale `score` is on and what bound the server applied.
+ */
+const sourcesFrame = (results: typeof RESULTS = []): string =>
+  frame("sources", {
+    results,
+    total_results: results.length,
+    max_results: 5,
+    search_type: "hybrid",
+  });
 
 /** Registers the stream endpoint, and hands back what the request looked like. */
 function captureStream(chunks: string[]): SeenRequest {
@@ -175,7 +249,7 @@ describe("search, when the request fails", () => {
 
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("not your fault");
+    expect(res.stderr).toContain("server-side failure");
   });
 
   it("exits 5 when the search is rate limited", async () => {
@@ -227,47 +301,89 @@ describe("search, on the wire", () => {
     expect(seen.body).toMatchObject({ max_results: 12 });
   });
 
-  it("clamps an oversized count to the ceiling rather than sending it", async () => {
-    // The API caps this at 20. Sending 500 would be rejected or, worse,
-    // silently truncated somewhere the user cannot see.
+  it("exits 2 rather than sending 20 when --max-results is above the ceiling", async () => {
+    // The regression this pins: 999 used to be clamped to 20 and reported as a
+    // success, so a caller who asked for a different search than the one that
+    // ran had no way to notice. A rejected flag is recoverable; a substituted
+    // one is not.
     const seen = captureSearch("/org/search");
 
-    await runCli(["search", QUERY, "--max-results", "500"]);
+    const res = await runCli(["search", QUERY, "--max-results", "999"]);
 
-    expect(seen.body).toMatchObject({ max_results: 20 });
+    expect(res.exitCode).toBe(2);
+    expect(res.stdout).toBe("");
+    expect(res.stderr).toContain("--max-results");
+    expect(seen.method).toBeUndefined();
   });
 
-  it("falls back to the default when the count is not a usable number", async () => {
-    const seen = captureSearch("/org/search");
+  it("names the flag and the range in the JSON error for an oversized count", async () => {
+    captureSearch("/org/search");
 
-    await runCli(["search", QUERY, "--max-results", "not-a-number"]);
+    const res = await runCli(["search", QUERY, "--max-results", "999", "--output", "json"]);
 
-    expect(seen.body).toMatchObject({ max_results: 5 });
+    expect(res.exitCode).toBe(2);
+    expect(errorEnvelope(res).error).toMatchObject({
+      code: "usage",
+      field: "--max-results",
+      received: "999",
+    });
   });
 
-  it("falls back to the default rather than asking for zero results", async () => {
+  it("exits 2 rather than sending 5 when --max-results is not a whole number", async () => {
     const seen = captureSearch("/org/search");
 
-    await runCli(["search", QUERY, "--max-results", "0"]);
+    const res = await runCli(["search", QUERY, "--max-results", "abc", "--output", "json"]);
 
-    expect(seen.body).toMatchObject({ max_results: 5 });
+    expect(res.exitCode).toBe(2);
+    expect(res.stdout).toBe("");
+    expect(errorEnvelope(res).error).toMatchObject({ field: "--max-results", received: "abc" });
+    expect(seen.method).toBeUndefined();
+  });
+
+  it("exits 2 rather than quietly turning a request for zero results into five", async () => {
+    const seen = captureSearch("/org/search");
+
+    const res = await runCli(["search", QUERY, "--max-results", "0"]);
+
+    expect(res.exitCode).toBe(2);
+    expect(seen.method).toBeUndefined();
+  });
+
+  it("exits 2 when a --content-ids value is not a UUID, before any request", async () => {
+    const seen = captureSearch("/org/search");
+
+    const res = await runCli(["search", QUERY, "--content-ids", "c-1", "--output", "json"]);
+
+    expect(res.exitCode).toBe(2);
+    expect(errorEnvelope(res).error).toMatchObject({ field: "--content-ids", received: "c-1" });
+    expect(seen.method).toBeUndefined();
+  });
+
+  it("exits 2 when --require-scoped-ids is passed without --content-ids", async () => {
+    const seen = captureSearch("/org/search");
+
+    const res = await runCli(["search", QUERY, "--require-scoped-ids"]);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stderr).toContain("--content-ids");
+    expect(seen.method).toBeUndefined();
   });
 
   it("scopes the search to the content IDs it was given", async () => {
     const seen = captureSearch("/org/search");
 
-    await runCli(["search", QUERY, "--content-ids", "c-1", "c-2"]);
+    await runCli(["search", QUERY, "--content-ids", CONTENT_ID_1, CONTENT_ID_2]);
 
-    expect(seen.body).toMatchObject({ content_ids: ["c-1", "c-2"] });
+    expect(seen.body).toMatchObject({ content_ids: [CONTENT_ID_1, CONTENT_ID_2] });
   });
 
   it("sends require_scoped_ids only when the flag is present", async () => {
     const withoutFlag = captureSearch("/org/search");
-    await runCli(["search", QUERY, "--content-ids", "c-1"]);
+    await runCli(["search", QUERY, "--content-ids", CONTENT_ID_1]);
     expect(withoutFlag.body).not.toHaveProperty("require_scoped_ids");
 
     const withFlag = captureSearch("/org/search");
-    await runCli(["search", QUERY, "--content-ids", "c-1", "--require-scoped-ids"]);
+    await runCli(["search", QUERY, "--content-ids", CONTENT_ID_1, "--require-scoped-ids"]);
     expect(withFlag.body).toMatchObject({ require_scoped_ids: true });
   });
 
@@ -310,12 +426,17 @@ describe("the three search variants, on the wire", () => {
       await runCli(["search", name, QUERY, "--max-results", "17"]);
 
       expect(seen.body).toMatchObject({ max_results: 17 });
+    });
 
-      const clamped = captureSearch(path);
+    it(`exits 2 for an out-of-range --max-results on search ${name}`, async () => {
+      // Resolving the option off the parent is only half the fix: the value it
+      // finds has to be validated too, or the subcommands go back to clamping.
+      const seen = captureSearch(path);
 
-      await runCli(["search", name, QUERY, "--max-results", "99"]);
+      const res = await runCli(["search", name, QUERY, "--max-results", "99"]);
 
-      expect(clamped.body).toMatchObject({ max_results: 20 });
+      expect(res.exitCode).toBe(2);
+      expect(seen.method).toBeUndefined();
     });
 
     it(`applies the scoping options on search ${name}`, async () => {
@@ -323,10 +444,18 @@ describe("the three search variants, on the wire", () => {
       // those two documents, not over the whole knowledge base.
       const seen = captureSearch(path);
 
-      await runCli(["search", name, QUERY, "--content-ids", "c-1", "c-2", "--require-scoped-ids"]);
+      await runCli([
+        "search",
+        name,
+        QUERY,
+        "--content-ids",
+        CONTENT_ID_1,
+        CONTENT_ID_2,
+        "--require-scoped-ids",
+      ]);
 
       expect(seen.body).toMatchObject({
-        content_ids: ["c-1", "c-2"],
+        content_ids: [CONTENT_ID_1, CONTENT_ID_2],
         require_scoped_ids: true,
       });
     });
@@ -351,7 +480,7 @@ describe("search, on success", () => {
     const res = await runCli(["search", QUERY, "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual(ANSWER_PAYLOAD);
+    expect(res.data()).toEqual(ANSWER_PAYLOAD);
     expect(res.stderr).toBe("");
   });
 
@@ -364,7 +493,27 @@ describe("search, on success", () => {
     expect(res.stdout).toContain("Answer:");
     expect(res.stdout).toContain(ANSWER_PAYLOAD.answer);
     expect(res.stdout).toContain("Refund policy");
-    expect(res.stdout).toContain("c-1");
+  });
+
+  it("labels both ids on every hit, because they are not interchangeable", async () => {
+    // An unlabeled id in parentheses was sometimes a kb_node_id and sometimes a
+    // content_id, and `senso kb get <content_id>` is a 404 with no explanation.
+    captureSearch("/org/search");
+
+    const res = await runCli(["search", QUERY]);
+
+    expect(res.stdout).toContain(`kb_node_id  ${KB_NODE_ID_1}`);
+    expect(res.stdout).toContain(`content_id  ${CONTENT_ID_1}`);
+  });
+
+  it("points at the best hit's kb_node_id, not its content_id, in next", async () => {
+    captureSearch("/org/search");
+
+    const res = await runCli(["search", QUERY, "--output", "json"]);
+
+    expect(envelope(res).next).toEqual([
+      expect.objectContaining({ command: `senso kb get ${KB_NODE_ID_1}` }),
+    ]);
   });
 
   it("renders one row per result under --output table", async () => {
@@ -373,13 +522,17 @@ describe("search, on success", () => {
     const res = await runCli(["search", QUERY, "--output", "table"]);
 
     expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain("kb_node_id");
     expect(res.stdout).toContain("content_id");
     expect(res.stdout).toContain("title");
     expect(res.stdout).toContain("Returns");
+    // Every declared column exists on every row, so nothing warns about a
+    // column the API "did not return".
+    expect(res.stderr).not.toContain("did not return");
   });
 
   it("copes with an answer and no results", async () => {
-    captureSearch("/org/search", { answer: "Nothing matched.", results: [] });
+    captureSearch("/org/search", { ...EMPTY_PAYLOAD, answer: "Nothing matched." });
 
     const res = await runCli(["search", QUERY]);
 
@@ -388,18 +541,121 @@ describe("search, on success", () => {
   });
 
   it("renders a variant's chunks without an answer", async () => {
-    captureSearch("/org/search/context", { results: RESULTS });
+    captureSearch("/org/search/context", {
+      query: QUERY,
+      search_type: "hybrid",
+      results: RESULTS,
+      total_results: RESULTS.length,
+      max_results: 5,
+    });
 
     const res = await runCli(["search", "context", QUERY]);
 
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain("Refund policy");
   });
+
+  it("renders search content's `contents` key, which is not `results`", async () => {
+    // dto.SearchContentResponse puts the hits under `contents` and the count
+    // under `total`. A renderer that only knows `results` prints the whole
+    // response as one key/value blob.
+    captureSearch("/org/search/content", {
+      query: QUERY,
+      search_type: "hybrid",
+      contents: [
+        { content_id: CONTENT_ID_1, kb_node_id: KB_NODE_ID_1, title: "Refund policy" },
+        { content_id: CONTENT_ID_2, kb_node_id: KB_NODE_ID_2, title: "Returns" },
+      ],
+      total: 2,
+    });
+
+    const res = await runCli(["search", "content", QUERY, "--output", "table"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain(KB_NODE_ID_1);
+    expect(res.stdout).toContain("Returns");
+    expect(res.stderr).not.toContain("did not return");
+  });
+});
+
+/**
+ * A search that finds nothing.
+ *
+ * This is the case that used to print a payload made only of blank lines: exit
+ * 0, an empty-looking stdout, and no word anywhere that the question had just
+ * been filed in the organization's gap report. An agent that cannot see that
+ * fills the report with its own probes.
+ */
+describe("search, when nothing matched", () => {
+  it("says so on stdout rather than printing blank lines", async () => {
+    captureSearch("/org/search", EMPTY_PAYLOAD);
+
+    const res = await runCli(["search", QUERY]);
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain(`No results for ${JSON.stringify(QUERY)}.`);
+  });
+
+  it("says on stderr that the search was recorded as a gap, and where to read it", async () => {
+    captureSearch("/org/search", EMPTY_PAYLOAD);
+
+    const res = await runCli(["search", QUERY]);
+
+    expect(res.stderr).toContain("filed as an API search gap");
+    expect(res.stderr).toContain("senso gaps list --origin api_unanswered_question");
+  });
+
+  it("carries the gap notice in warnings and next under --output json", async () => {
+    // `--output json` implies `--quiet`, so the stderr sentence above reaches
+    // nobody. Every published Senso skill passes this flag.
+    captureSearch("/org/search", EMPTY_PAYLOAD);
+
+    const res = await runCli(["search", QUERY, "--output", "json"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stderr).toBe("");
+    const env = envelope(res);
+    expect(env.warnings?.join(" ")).toContain("filed as an API search gap");
+    expect(env.next).toContainEqual(
+      expect.objectContaining({ command: expect.stringContaining("senso gaps list") as string }),
+    );
+  });
+
+  it("says the search was NOT filed when gap signals were turned off", async () => {
+    // The opposite fact is just as important: a caller who passed
+    // --no-gap-signals must not go looking for a gap that was never created.
+    captureSearch("/org/search", EMPTY_PAYLOAD);
+
+    const res = await runCli(["search", QUERY, "--no-gap-signals", "--output", "json"]);
+
+    const env = envelope(res);
+    expect(env.warnings?.join(" ")).toContain("NOT filed as a gap");
+    expect(env.next).not.toContainEqual(
+      expect.objectContaining({ command: expect.stringContaining("senso gaps list") as string }),
+    );
+  });
+
+  it("says a non-answering variant is never filed at all", async () => {
+    // `search context` and `search content` cost credits but produce no gap, so
+    // an empty one must not send the caller to the gap report.
+    captureSearch("/org/search/context", {
+      query: QUERY,
+      search_type: "hybrid",
+      results: [],
+      total_results: 0,
+      max_results: 5,
+    });
+
+    const res = await runCli(["search", "context", QUERY, "--output", "json"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(envelope(res).warnings?.join(" ")).toContain("this one was not");
+  });
 });
 
 describe("search stream, on the wire", () => {
   it("posts the same body to /org/search/stream and asks for an event stream", async () => {
-    const seen = captureStream([frame("sources", { results: [] })]);
+    const seen = captureStream([sourcesFrame()]);
 
     await runCli(["search", "stream", QUERY]);
 
@@ -411,17 +667,20 @@ describe("search stream, on the wire", () => {
   });
 
   it("applies --max-results here too, clamped to the ceiling", async () => {
-    const seen = captureStream([frame("sources", { results: [] })]);
+    const seen = captureStream([sourcesFrame()]);
 
     await runCli(["search", "stream", QUERY, "--max-results", "17"]);
 
     expect(seen.body).toMatchObject({ max_results: 17 });
+  });
 
-    const clamped = captureStream([frame("sources", { results: [] })]);
+  it("exits 2 without opening a stream for an out-of-range --max-results", async () => {
+    const seen = captureStream([sourcesFrame()]);
 
-    await runCli(["search", "stream", QUERY, "--max-results", "50"]);
+    const res = await runCli(["search", "stream", QUERY, "--max-results", "50"]);
 
-    expect(clamped.body).toMatchObject({ max_results: 20 });
+    expect(res.exitCode).toBe(2);
+    expect(seen.method).toBeUndefined();
   });
 
   it("exits 3 without opening a stream when the key is rejected", async () => {
@@ -490,7 +749,7 @@ describe("search, keeping a probe out of the gap report", () => {
   });
 
   it("sends it from search stream", async () => {
-    const seen = captureStream([frame("sources", { results: [] })]);
+    const seen = captureStream([sourcesFrame()]);
 
     await runCli(["search", "stream", QUERY, "--no-gap-signals"]);
 
@@ -530,7 +789,7 @@ describe("search stream, reassembling the token stream", () => {
     captureStream([
       'event: token\ndata: {"token":"Hel',
       'lo"}\n\nevent: token\ndata: {"token":" world"}\n\n',
-      frame("sources", { results: [] }),
+      sourcesFrame(),
     ]);
 
     const res = await runCli(["search", "stream", QUERY]);
@@ -548,7 +807,7 @@ describe("search stream, reassembling the token stream", () => {
     captureStream([
       "even",
       't: token\ndata: {"token":"split header"}\n\n',
-      frame("sources", { results: [] }),
+      sourcesFrame(),
     ]);
 
     const res = await runCli(["search", "stream", QUERY]);
@@ -560,7 +819,7 @@ describe("search stream, reassembling the token stream", () => {
   it("assembles an answer arriving one token per chunk", async () => {
     captureStream([
       ...["The ", "answer ", "is ", "42."].map((token) => frame("token", { token })),
-      frame("sources", { results: RESULTS }),
+      sourcesFrame(RESULTS),
     ]);
 
     const res = await runCli(["search", "stream", QUERY]);
@@ -570,22 +829,31 @@ describe("search stream, reassembling the token stream", () => {
   });
 
   it("prints the sources after the answer", async () => {
-    captureStream([frame("token", { token: "Because." }), frame("sources", { results: RESULTS })]);
+    captureStream([frame("token", { token: "Because." }), sourcesFrame(RESULTS)]);
 
     const res = await runCli(["search", "stream", QUERY]);
 
     expect(res.stdout).toContain("Sources:");
     expect(res.stdout).toContain("Refund policy");
-    expect(res.stdout).toContain("c-1");
+    expect(res.stdout).toContain(KB_NODE_ID_1);
   });
 
-  it("says so when the stream carried no sources", async () => {
-    captureStream([frame("token", { token: "Because." }), frame("sources", { results: [] })]);
+  it("says so on stdout when the stream carried no sources", async () => {
+    captureStream([frame("token", { token: "Because." }), sourcesFrame()]);
 
     const res = await runCli(["search", "stream", QUERY]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.stdout).toContain("No sources found.");
+    expect(res.stdout).toContain(`No results for ${JSON.stringify(QUERY)}.`);
+  });
+
+  it("tells a streaming caller the empty search became a gap, on stderr", async () => {
+    captureStream([sourcesFrame()]);
+
+    const res = await runCli(["search", "stream", QUERY]);
+
+    expect(res.stderr).toContain("filed as an API search gap");
+    expect(res.stderr).toContain("senso gaps list --origin api_unanswered_question");
   });
 
   it("ignores an event it does not recognize", async () => {
@@ -593,7 +861,7 @@ describe("search stream, reassembling the token stream", () => {
     captureStream([
       frame("heartbeat", { ts: 1 }),
       frame("token", { token: "still here" }),
-      frame("sources", { results: [] }),
+      sourcesFrame(),
     ]);
 
     const res = await runCli(["search", "stream", QUERY]);
@@ -611,7 +879,7 @@ describe("search stream, when a frame is bad", () => {
       frame("token", { token: "before " }),
       "event: token\ndata: {this is not json}\n\n",
       frame("token", { token: "after" }),
-      frame("sources", { results: [] }),
+      sourcesFrame(),
     ]);
 
     const res = await runCli(["search", "stream", QUERY]);
@@ -664,36 +932,59 @@ describe("search stream, under --output json", () => {
     captureStream([
       frame("token", { token: "Refunds " }),
       frame("token", { token: "take 14 days." }),
-      frame("sources", { results: RESULTS }),
+      sourcesFrame(RESULTS),
     ]);
 
     const res = await runCli(["search", "stream", QUERY, "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual({
+    // The document describes the same search the API described: the fields the
+    // `sources` frame carried travel with the answer rather than being dropped
+    // because the CLI only kept the two it happened to render.
+    expect(res.data()).toEqual({
+      query: QUERY,
+      search_type: "hybrid",
       answer: "Refunds take 14 days.",
       results: RESULTS,
+      total_results: RESULTS.length,
+      max_results: 5,
     });
     expect(res.stderr).toBe("");
   });
 
   it("emits the document even when the stream carried no sources event", async () => {
+    // Nothing to carry the search_type or the counts, so they are absent rather
+    // than invented.
     captureStream([frame("token", { token: "Just an answer." })]);
 
     const res = await runCli(["search", "stream", QUERY, "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual({ answer: "Just an answer.", results: [] });
+    expect(res.data()).toEqual({ query: QUERY, answer: "Just an answer.", results: [] });
+  });
+
+  it("carries the gap notice in the envelope when the stream found nothing", async () => {
+    captureStream([sourcesFrame()]);
+
+    const res = await runCli(["search", "stream", QUERY, "--output", "json"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stderr).toBe("");
+    expect(envelope(res).warnings?.join(" ")).toContain("filed as an API search gap");
+    expect(envelope(res).next).toContainEqual(
+      expect.objectContaining({ command: expect.stringContaining("senso gaps list") as string }),
+    );
   });
 
   it("buffers the answer under --output table as well", async () => {
     // `table` is not the streaming format either — only `plain` is.
-    captureStream([frame("token", { token: "Buffered." }), frame("sources", { results: RESULTS })]);
+    captureStream([frame("token", { token: "Buffered." }), sourcesFrame(RESULTS)]);
 
     const res = await runCli(["search", "stream", QUERY, "--output", "table"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.stdout).toContain("content_id");
+    expect(res.stdout).toContain("kb_node_id");
     expect(res.stdout).toContain("Refund policy");
+    expect(res.stderr).not.toContain("did not return");
   });
 });

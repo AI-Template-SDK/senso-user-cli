@@ -20,6 +20,13 @@
  * uploaded is a bug this command has actually had, and it leaves a user waiting
  * on a document that will never finish processing.
  *
+ * Two more things this file now holds. Every id in a fixture is a real UUID,
+ * because ids are validated before the request and a fixture saying
+ * `kb_node_id: "n-a.txt"` describes a response the API cannot produce. And
+ * plain output carries the `kb_node_id` per file on stdout: this command's own
+ * help tells an agent to poll `senso kb get <kb_node_id>`, and plain — the
+ * format it gets by default — used to print nothing at all.
+ *
  * The prompts are mocked. `spinner()` from @clack/prompts writes frames and
  * cursor escapes to stdout even when stdout is a pipe; src/lib/progress.ts is
  * what keeps those bytes away from the payload, by degrading to a stderr line
@@ -35,7 +42,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { server } from "../setup.js";
-import { apiUrl, runCli } from "../helpers.js";
+import { apiUrl, envelope, errorEnvelope, runCli } from "../helpers.js";
 
 /** The scripted terminal. See tests/unit/folder-picker.test.ts for the shape. */
 const clack = vi.hoisted(() => ({
@@ -107,20 +114,59 @@ function md5(contents: string): string {
   return createHash("md5").update(Buffer.from(contents)).digest("hex");
 }
 
-/** One entry of the API's per-file `results` array. */
+/**
+ * A stable UUID per seed.
+ *
+ * Every id in dto.IngestionUploadResultItem is a uuid.UUID, and the CLI now
+ * validates ids before it sends them — so a fixture saying `kb_node_id:
+ * "n-a.txt"` describes a response the API cannot produce and hides the id-space
+ * confusion these tests exist to catch.
+ */
+function uuidFor(seed: string): string {
+  const h = createHash("md5").update(seed).digest("hex");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-8${h.slice(17, 20)}-${h.slice(20, 32)}`;
+}
+
+/** The id `senso kb get` takes, for one uploaded file. */
+const kbNodeIdFor = (filename: string): string => uuidFor(`kb_node:${filename}`);
+/** The id `senso content get` takes — a different id space, deliberately. */
+const contentIdFor = (filename: string): string => uuidFor(`content:${filename}`);
+
+/** A folder's kb_node_id, as `--folder-id` requires it. */
+const FOLDER_ID = uuidFor("folder:docs");
+/** A well-formed folder id the API will answer 404 for. */
+const MISSING_FOLDER_ID = uuidFor("folder:gone");
+/** The document node `ingest reprocess` replaces a file on. */
+const NODE_ID = uuidFor("kb_node:doc");
+/** A well-formed node id the API answers 404 for. */
+const MISSING_NODE_ID = uuidFor("kb_node:gone");
+
+/** One entry of the API's per-file `results` array (dto.IngestionUploadResultItem). */
 function accepted(filename: string, url = S3_URL) {
   return {
     filename,
     status: "upload_pending",
     upload_url: url,
-    content_id: `c-${filename}`,
-    kb_node_id: `n-${filename}`,
-    ingestion_run_id: `run-${filename}`,
+    expires_in: 3600,
+    content_id: contentIdFor(filename),
+    kb_node_id: kbNodeIdFor(filename),
+    ingestion_run_id: uuidFor(`run:${filename}`),
   };
 }
 
+/**
+ * A file the API declined. No kb_node_id and no upload_url: the DTO marks both
+ * `omitempty` and says a skipped file never reached a node.
+ */
 function rejected(filename: string, status: string, error?: string) {
-  return { filename, status, ...(error === undefined ? {} : { error }) };
+  return {
+    filename,
+    status,
+    ...(error === undefined ? {} : { error }),
+    ...(status === "conflict"
+      ? { existing_content_id: uuidFor(`existing:${filename}`) }
+      : {}),
+  };
 }
 
 function uploadResponse(results: Record<string, unknown>[]) {
@@ -172,7 +218,7 @@ describe("ingest upload, when the command line is wrong", () => {
   it("exits 2 before reading anything when more than 10 files are passed", async () => {
     const files = Array.from({ length: 11 }, (_, i) => tempFile(`f${i}.txt`, "x"));
 
-    const res = await runCli(["ingest", "upload", ...files, "--folder-id", "f-1"]);
+    const res = await runCli(["ingest", "upload", ...files, "--folder-id", FOLDER_ID]);
 
     // No handler is registered: the limit is checked before any request, and an
     // unmocked request would fail this test rather than pass it quietly.
@@ -191,7 +237,7 @@ describe("ingest upload, when the command line is wrong", () => {
       real,
       join(workDir, "absent.txt"),
       "--folder-id",
-      "f-1",
+      FOLDER_ID,
     ]);
 
     expect(res.exitCode).toBe(2);
@@ -207,7 +253,7 @@ describe("ingest upload, when the command line is wrong", () => {
       tempFile("empty.txt", ""),
       tempFile("also-empty.md", ""),
       "--folder-id",
-      "f-1",
+      FOLDER_ID,
     ]);
 
     expect(res.exitCode).toBe(2);
@@ -219,13 +265,36 @@ describe("ingest upload, when the command line is wrong", () => {
     expect(res.stderr).toContain("also-empty.md");
   });
 
-  it("names the valid formats when --output is not one of them", async () => {
+  it("exits 2 when --folder-id is not a UUID, without sending anything", async () => {
+    // No handler is registered: a mistyped folder id used to round-trip to a
+    // 400 "Invalid request payload" and exit 1, which reads like a server fault
+    // rather than a typo.
     const res = await runCli([
       "ingest",
       "upload",
       tempFile("a.txt", "hi"),
       "--folder-id",
       "f-1",
+      "--output",
+      "json",
+    ]);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stdout).toBe("");
+    expect(errorEnvelope(res).error).toMatchObject({
+      code: "usage",
+      field: "--folder-id",
+      received: "f-1",
+    });
+  });
+
+  it("names the valid formats when --output is not one of them", async () => {
+    const res = await runCli([
+      "ingest",
+      "upload",
+      tempFile("a.txt", "hi"),
+      "--folder-id",
+      FOLDER_ID,
       "--output",
       "yaml",
     ]);
@@ -238,7 +307,7 @@ describe("ingest upload, when the command line is wrong", () => {
 
 describe("ingest upload, when the request fails", () => {
   it("exits 3 and explains how to authenticate when there is no API key", async () => {
-    const res = await runCli(["ingest", "upload", tempFile("a.txt", "hi"), "--folder-id", "f-1"], {
+    const res = await runCli(["ingest", "upload", tempFile("a.txt", "hi"), "--folder-id", FOLDER_ID], {
       withKey: false,
     });
 
@@ -255,7 +324,7 @@ describe("ingest upload, when the request fails", () => {
       ),
     );
 
-    const res = await runCli(["ingest", "upload", tempFile("a.txt", "hi"), "--folder-id", "f-1"]);
+    const res = await runCli(["ingest", "upload", tempFile("a.txt", "hi"), "--folder-id", FOLDER_ID]);
 
     // The exit code survives the upload's own error handling: a rejected key is
     // 3, not the flat 1 that every upload failure used to produce.
@@ -271,7 +340,7 @@ describe("ingest upload, when the request fails", () => {
       ),
     );
 
-    const res = await runCli(["ingest", "upload", tempFile("a.txt", "hi"), "--folder-id", "f-1"]);
+    const res = await runCli(["ingest", "upload", tempFile("a.txt", "hi"), "--folder-id", FOLDER_ID]);
 
     expect(res.exitCode).toBe(3);
     expect(res.stdout).toBe("");
@@ -286,28 +355,69 @@ describe("ingest upload, when the request fails", () => {
       "upload",
       tempFile("a.txt", "hi"),
       "--folder-id",
-      "f-gone",
+      MISSING_FOLDER_ID,
     ]);
 
     expect(res.exitCode).toBe(4);
     expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("Not found");
+    // The 404 names what was not found and which id it was, rather than the
+    // bare "Not found" that left a caller guessing between the folder, the
+    // endpoint and the organization.
+    expect(res.stderr).toContain("KB folder");
+    expect(res.stderr).toContain(MISSING_FOLDER_ID);
+    expect(res.stderr).toContain("senso kb my-files");
+  });
+
+  it("names the resource and the id in the JSON 404, so the id can be fixed without parsing English", async () => {
+    server.use(http.post(apiUrl("/org/kb/upload"), () => new HttpResponse(null, { status: 404 })));
+
+    const res = await runCli([
+      "ingest",
+      "upload",
+      tempFile("a.txt", "hi"),
+      "--folder-id",
+      MISSING_FOLDER_ID,
+      "--output",
+      "json",
+    ]);
+
+    expect(res.exitCode).toBe(4);
+    expect(errorEnvelope(res).error).toMatchObject({
+      code: "not_found",
+      status: 404,
+      // The API's own field name, so the caller knows which id space it is.
+      field: "kb_folder_node_id",
+      received: MISSING_FOLDER_ID,
+    });
   });
 
   it("exits 1 on a 500 and says it is not the caller's fault", async () => {
-    server.use(http.post(apiUrl("/org/kb/upload"), () => new HttpResponse(null, { status: 503 })));
+    server.use(http.post(apiUrl("/org/kb/upload"), () => new HttpResponse(null, { status: 500 })));
 
-    const res = await runCli(["ingest", "upload", tempFile("a.txt", "hi"), "--folder-id", "f-1"]);
+    const res = await runCli(["ingest", "upload", tempFile("a.txt", "hi"), "--folder-id", FOLDER_ID]);
 
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("not your fault");
+    expect(res.stderr).toContain("server-side failure");
+    expect(res.stderr).toContain("Retry shortly");
+  });
+
+  it("does not offer a retry for a 503, because retrying is what will not work", async () => {
+    // 501 and 503 are deployment-level refusals: the endpoint is not served
+    // here. Inheriting the 5xx "retry shortly" hint sent callers into a loop.
+    server.use(http.post(apiUrl("/org/kb/upload"), () => new HttpResponse(null, { status: 503 })));
+
+    const res = await runCli(["ingest", "upload", tempFile("a.txt", "hi"), "--folder-id", FOLDER_ID]);
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stderr).toContain("not a transient failure");
+    expect(res.stderr).not.toContain("Retry shortly");
   });
 
   it("exits 5 when the API rate-limits, because retrying is the right response", async () => {
     server.use(http.post(apiUrl("/org/kb/upload"), () => new HttpResponse(null, { status: 429 })));
 
-    const res = await runCli(["ingest", "upload", tempFile("a.txt", "hi"), "--folder-id", "f-1"]);
+    const res = await runCli(["ingest", "upload", tempFile("a.txt", "hi"), "--folder-id", FOLDER_ID]);
 
     expect(res.exitCode).toBe(5);
     expect(res.stdout).toBe("");
@@ -333,7 +443,7 @@ describe("ingest upload, when the request fails", () => {
       tempFile("a.txt", "hi"),
       tempFile("b.exe", "MZ"),
       "--folder-id",
-      "f-1",
+      FOLDER_ID,
     ]);
 
     // A 409 carrying `results` is the batch-rejection shape, and it is the only
@@ -358,7 +468,7 @@ describe("ingest upload, when the request fails", () => {
       "upload",
       tempFile("a.txt", "hi"),
       "--folder-id",
-      "f-1",
+      FOLDER_ID,
       "--output",
       "json",
     ]);
@@ -377,7 +487,7 @@ describe("ingest upload, the metadata it sends", () => {
     const path = tempFile("notes.md", contents);
     const { prep, prepBodies } = serveUpload([accepted("notes.md")]);
 
-    const res = await runCli(["ingest", "upload", path, "--folder-id", "f-docs"]);
+    const res = await runCli(["ingest", "upload", path, "--folder-id", FOLDER_ID]);
 
     expect(res.exitCode).toBe(0);
     expect(prep[0]?.method).toBe("POST");
@@ -395,7 +505,7 @@ describe("ingest upload, the metadata it sends", () => {
           content_hash_md5: md5(contents),
         },
       ],
-      kb_folder_node_id: "f-docs",
+      kb_folder_node_id: FOLDER_ID,
     });
   });
 
@@ -408,7 +518,7 @@ describe("ingest upload, the metadata it sends", () => {
       tempFile("a.txt", "alpha"),
       tempFile("b.pdf", "%PDF-1.4"),
       "--folder-id",
-      "f-1",
+      FOLDER_ID,
     ]);
 
     expect(prepBodies[0]).toMatchObject({
@@ -422,7 +532,7 @@ describe("ingest upload, the metadata it sends", () => {
   it("falls back to application/octet-stream for an extension it does not know", async () => {
     const { prepBodies } = serveUpload([accepted("archive.zzz")]);
 
-    await runCli(["ingest", "upload", tempFile("archive.zzz", "data"), "--folder-id", "f-1"]);
+    await runCli(["ingest", "upload", tempFile("archive.zzz", "data"), "--folder-id", FOLDER_ID]);
 
     expect(prepBodies[0]).toMatchObject({
       files: [{ content_type: "application/octet-stream" }],
@@ -450,7 +560,7 @@ describe("ingest upload, the second request", () => {
       "upload",
       tempFile("fox.txt", contents),
       "--folder-id",
-      "f-1",
+      FOLDER_ID,
     ]);
 
     expect(res.exitCode).toBe(0);
@@ -477,7 +587,7 @@ describe("ingest upload, the second request", () => {
       tempFile("a.txt", "alpha"),
       tempFile("b.txt", "bravo"),
       "--folder-id",
-      "f-1",
+      FOLDER_ID,
     ]);
 
     expect(puts.map((p) => [p.request.url, p.body.toString("utf-8")])).toEqual([
@@ -494,7 +604,7 @@ describe("ingest upload, the second request", () => {
       "upload",
       tempFile("a.txt", "alpha"),
       "--folder-id",
-      "f-1",
+      FOLDER_ID,
     ]);
 
     expect(res.exitCode).toBe(0);
@@ -514,7 +624,7 @@ describe("ingest upload, when the API declines some of the files", () => {
       tempFile("new.txt", "fresh"),
       tempFile("old.txt", "stale"),
       "--folder-id",
-      "f-1",
+      FOLDER_ID,
     ]);
 
     // One rejected file does not abort the batch: the accepted one is still PUT.
@@ -535,7 +645,7 @@ describe("ingest upload, when the API declines some of the files", () => {
       tempFile("new.txt", "fresh"),
       tempFile("dupe.txt", "again"),
       "--folder-id",
-      "f-1",
+      FOLDER_ID,
     ]);
 
     expect(res.exitCode).toBe(0);
@@ -555,7 +665,7 @@ describe("ingest upload, when the API declines some of the files", () => {
       tempFile("ok.txt", "fine"),
       tempFile("bad.bin", "junk"),
       "--folder-id",
-      "f-1",
+      FOLDER_ID,
     ]);
 
     expect(res.exitCode).toBe(0);
@@ -565,7 +675,7 @@ describe("ingest upload, when the API declines some of the files", () => {
   it("falls back to a readable reason for an unrecognized status", async () => {
     serveUpload([rejected("odd.txt", "quarantined")]);
 
-    const res = await runCli(["ingest", "upload", tempFile("odd.txt", "x"), "--folder-id", "f-1"]);
+    const res = await runCli(["ingest", "upload", tempFile("odd.txt", "x"), "--folder-id", FOLDER_ID]);
 
     expect(res.stderr).toContain("Unexpected status: quarantined");
     expect(res.stderr).toContain("No files were uploaded");
@@ -581,7 +691,7 @@ describe("ingest upload, when S3 refuses the bytes", () => {
       "upload",
       tempFile("a.txt", "alpha"),
       "--folder-id",
-      "f-1",
+      FOLDER_ID,
     ]);
 
     expect(puts).toHaveLength(1);
@@ -605,7 +715,7 @@ describe("ingest upload, when S3 refuses the bytes", () => {
       "upload",
       tempFile("a.txt", "alpha"),
       "--folder-id",
-      "f-1",
+      FOLDER_ID,
     ]);
 
     expect(res.exitCode).toBe(1);
@@ -633,7 +743,7 @@ describe("ingest upload, when S3 refuses the bytes", () => {
       tempFile("a.txt", "alpha"),
       tempFile("b.txt", "bravo"),
       "--folder-id",
-      "f-1",
+      FOLDER_ID,
     ]);
 
     expect(res.exitCode).toBe(0);
@@ -647,7 +757,7 @@ describe("ingest upload, choosing a destination interactively", () => {
     server.use(
       http.get(apiUrl("/org/kb/my-files"), () =>
         HttpResponse.json({
-          nodes: [{ kb_node_id: "f-docs", name: "Docs", type: "folder" }],
+          nodes: [{ kb_node_id: FOLDER_ID, name: "Docs", type: "folder" }],
           total: 1,
           limit: 50,
           offset: 0,
@@ -659,20 +769,20 @@ describe("ingest upload, choosing a destination interactively", () => {
     );
     const { prepBodies } = serveUpload([accepted("a.txt")]);
     process.stdin.isTTY = true;
-    clack.selectAnswers = ["f-docs", "__SELECT_CURRENT__"];
+    clack.selectAnswers = [FOLDER_ID, "__SELECT_CURRENT__"];
     clack.textAnswers = ["yes"];
 
     const res = await runCli(["ingest", "upload", tempFile("a.txt", "alpha")]);
 
     expect(res.exitCode).toBe(0);
-    expect(prepBodies[0]).toMatchObject({ kb_folder_node_id: "f-docs" });
+    expect(prepBodies[0]).toMatchObject({ kb_folder_node_id: FOLDER_ID });
   });
 
   it("uploads nothing and exits 0 when the confirmation is declined", async () => {
     server.use(
       http.get(apiUrl("/org/kb/my-files"), () =>
         HttpResponse.json({
-          nodes: [{ kb_node_id: "f-docs", name: "Docs", type: "folder" }],
+          nodes: [{ kb_node_id: FOLDER_ID, name: "Docs", type: "folder" }],
           total: 1,
           limit: 50,
           offset: 0,
@@ -683,7 +793,7 @@ describe("ingest upload, choosing a destination interactively", () => {
       ),
     );
     process.stdin.isTTY = true;
-    clack.selectAnswers = ["f-docs", "__SELECT_CURRENT__"];
+    clack.selectAnswers = [FOLDER_ID, "__SELECT_CURRENT__"];
     clack.textAnswers = ["No"];
 
     const res = await runCli(["ingest", "upload", tempFile("a.txt", "alpha")]);
@@ -699,7 +809,7 @@ describe("ingest upload, choosing a destination interactively", () => {
     server.use(
       http.get(apiUrl("/org/kb/my-files"), () =>
         HttpResponse.json({
-          nodes: [{ kb_node_id: "f-docs", name: "Docs", type: "folder" }],
+          nodes: [{ kb_node_id: FOLDER_ID, name: "Docs", type: "folder" }],
           total: 1,
           limit: 50,
           offset: 0,
@@ -710,7 +820,7 @@ describe("ingest upload, choosing a destination interactively", () => {
       ),
     );
     process.stdin.isTTY = true;
-    clack.selectAnswers = ["f-docs", "__SELECT_CURRENT__"];
+    clack.selectAnswers = [FOLDER_ID, "__SELECT_CURRENT__"];
     clack.textAnswers = ["no"];
 
     await runCli(["ingest", "upload", tempFile("a.txt", "alpha")]);
@@ -747,13 +857,13 @@ describe("ingest upload, on success", () => {
       "upload",
       tempFile("a.txt", "alpha"),
       "--folder-id",
-      "f-1",
+      FOLDER_ID,
       "--output",
       "json",
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual(payload);
+    expect(res.data()).toEqual(payload);
   });
 
   it("says nothing on stderr under --output json", async () => {
@@ -767,7 +877,7 @@ describe("ingest upload, on success", () => {
       "upload",
       tempFile("a.txt", "alpha"),
       "--folder-id",
-      "f-1",
+      FOLDER_ID,
       "--output",
       "json",
     ]);
@@ -785,7 +895,7 @@ describe("ingest upload, on success", () => {
       tempFile("a.txt", "alpha"),
       tempFile("b.txt", "bravo"),
       "--folder-id",
-      "f-1",
+      FOLDER_ID,
       "--output",
       "table",
     ]);
@@ -794,7 +904,7 @@ describe("ingest upload, on success", () => {
     expect(res.stdout).toContain("filename");
     expect(res.stdout).toContain("a.txt");
     expect(res.stdout).toContain("duplicate");
-    expect(res.stdout).toContain("c-a.txt");
+    expect(res.stdout).toContain(contentIdFor("a.txt"));
   });
 
   // The command's description tells the caller to poll `senso kb get
@@ -809,31 +919,64 @@ describe("ingest upload, on success", () => {
       "upload",
       tempFile("a.txt", "alpha"),
       "--folder-id",
-      "f-1",
+      FOLDER_ID,
       "--output",
       "table",
     ]);
 
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain("kb_node_id");
-    expect(res.stdout).toContain("n-a.txt");
+    expect(res.stdout).toContain(kbNodeIdFor("a.txt"));
+    expect(res.stderr).not.toContain("did not return");
   });
 
-  it("writes nothing to stdout in plain mode, because the summary is the rendering", async () => {
-    serveUpload([accepted("a.txt")]);
+  it("prints the kb_node_id per file on stdout in plain mode", async () => {
+    // This command's own help says to poll `senso kb get <kb_node_id>`, and
+    // plain is the format an agent gets by default — which used to print
+    // nothing at all on stdout, so the id the instruction needs was nowhere.
+    serveUpload([accepted("a.txt"), accepted("b.pdf")]);
 
     const res = await runCli([
       "ingest",
       "upload",
       tempFile("a.txt", "alpha"),
+      tempFile("b.pdf", "%PDF-1.4"),
       "--folder-id",
-      "f-1",
+      FOLDER_ID,
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("1/1 file(s) uploaded");
-    expect(res.stderr).toContain("Background processing");
+    expect(res.stdout).toContain(`kb_node_id   ${kbNodeIdFor("a.txt")}`);
+    expect(res.stdout).toContain(`kb_node_id   ${kbNodeIdFor("b.pdf")}`);
+    // Labeled, because content_id is the id a caller reaches for and
+    // `senso content get` answers 400 for everything this command creates.
+    expect(res.stdout).toContain(`content_id   ${contentIdFor("a.txt")}`);
+    expect(res.stderr).toContain("2/2 file(s) uploaded");
+  });
+
+  it("hands a JSON caller the poll command for every accepted file", async () => {
+    serveUpload([accepted("a.txt"), rejected("b.txt", "duplicate")]);
+
+    const res = await runCli([
+      "ingest",
+      "upload",
+      tempFile("a.txt", "alpha"),
+      tempFile("b.txt", "bravo"),
+      "--folder-id",
+      FOLDER_ID,
+      "--output",
+      "json",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    const env = envelope(res);
+    // Only the accepted file: a duplicate has no node to poll.
+    expect(env.next).toEqual([
+      expect.objectContaining({ command: `senso kb get ${kbNodeIdFor("a.txt")}` }),
+    ]);
+    // The partial batch exits 0, so the skipped file has to be visible in the
+    // payload rather than only in the stderr summary json silences.
+    expect(env.warnings?.join(" ")).toContain("b.txt");
   });
 
   it("summarizes an empty results array rather than throwing on it", async () => {
@@ -846,7 +989,7 @@ describe("ingest upload, on success", () => {
       "upload",
       tempFile("a.txt", "alpha"),
       "--folder-id",
-      "f-1",
+      FOLDER_ID,
     ]);
 
     // apiRequest casts the body, it does not validate it. A response missing
@@ -874,11 +1017,11 @@ describe("ingest reprocess, on the wire", () => {
       }),
     );
 
-    const res = await runCli(["ingest", "reprocess", "n-1", tempFile("doc.txt", contents)]);
+    const res = await runCli(["ingest", "reprocess", NODE_ID, tempFile("doc.txt", contents)]);
 
     expect(res.exitCode).toBe(0);
     expect(seen?.method).toBe("PUT");
-    expect(new URL(seen!.url).pathname).toBe("/api/v1/org/kb/nodes/n-1/file");
+    expect(new URL(seen!.url).pathname).toBe(`/api/v1/org/kb/nodes/${NODE_ID}/file`);
     // A single `file` object, not the `files` array the batch endpoint takes.
     expect(body).toEqual({
       file: {
@@ -897,10 +1040,12 @@ describe("ingest reprocess, on the wire", () => {
       http.put(S3_PATH, () => new HttpResponse(null, { status: 200 })),
     );
 
-    const res = await runCli(["ingest", "reprocess", "n-1", tempFile("doc.txt", "v2")]);
+    const res = await runCli(["ingest", "reprocess", NODE_ID, tempFile("doc.txt", "v2")]);
 
     expect(res.stderr).toContain("Background re-processing started");
-    expect(res.stdout).toBe("");
+    // The ✓ line is on stderr and the ids are on stdout: a caller piping the
+    // command gets the kb_node_id to poll, not a sentence.
+    expect(res.stdout).toContain(`kb_node_id   ${kbNodeIdFor("doc.txt")}`);
   });
 
   it("warns and skips the S3 PUT when the API declines the new version", async () => {
@@ -912,7 +1057,7 @@ describe("ingest reprocess, on the wire", () => {
 
     // No S3 handler: a PUT here would be an unmocked request and fail the test,
     // which is the assertion — nothing is uploaded for a declined version.
-    const res = await runCli(["ingest", "reprocess", "n-1", tempFile("doc.txt", "v2")]);
+    const res = await runCli(["ingest", "reprocess", NODE_ID, tempFile("doc.txt", "v2")]);
 
     expect(res.exitCode).toBe(0);
     expect(res.stderr).toContain("Skipped: duplicate");
@@ -924,18 +1069,37 @@ describe("ingest reprocess, on the wire", () => {
       http.put(apiUrl("/org/kb/nodes/:nodeId/file"), () => new HttpResponse(null, { status: 404 })),
     );
 
-    const res = await runCli(["ingest", "reprocess", "n-gone", tempFile("doc.txt", "v2")]);
+    const res = await runCli(["ingest", "reprocess", MISSING_NODE_ID, tempFile("doc.txt", "v2")]);
 
     expect(res.exitCode).toBe(4);
     expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("Not found");
+    expect(res.stderr).toContain("KB node");
+    expect(res.stderr).toContain(MISSING_NODE_ID);
+  });
+
+  it("exits 2 when <kb_node_id> is not a UUID, without sending anything", async () => {
+    const res = await runCli([
+      "ingest",
+      "reprocess",
+      "n-1",
+      tempFile("doc.txt", "v2"),
+      "--output",
+      "json",
+    ]);
+
+    expect(res.exitCode).toBe(2);
+    expect(errorEnvelope(res).error).toMatchObject({
+      code: "usage",
+      field: "<kb_node_id>",
+      received: "n-1",
+    });
   });
 
   // The same pre-check `ingest upload` makes: one mistake, one exit code. No
   // handler is registered, so a request here would fail the test — the path is
   // checked before anything is sent.
   it("exits 2 naming the file when the path does not exist", async () => {
-    const res = await runCli(["ingest", "reprocess", "n-1", join(workDir, "absent.txt")]);
+    const res = await runCli(["ingest", "reprocess", NODE_ID, join(workDir, "absent.txt")]);
 
     expect(res.exitCode).toBe(2);
     expect(res.stdout).toBe("");
@@ -953,14 +1117,14 @@ describe("ingest reprocess, on the wire", () => {
     const res = await runCli([
       "ingest",
       "reprocess",
-      "n-1",
+      NODE_ID,
       tempFile("doc.txt", "v2"),
       "--output",
       "json",
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual(item);
+    expect(res.data()).toEqual(item);
     expect(res.stderr).toBe("");
   });
 });
