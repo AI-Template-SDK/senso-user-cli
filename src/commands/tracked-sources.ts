@@ -60,7 +60,7 @@ export function registerTrackedSourcesCommands(program: Command): void {
         });
         // The columns are the rule fields the add/update flags write.
         emit(ctx, data, {
-          columns: ["source_id", "pattern", "match_type", "tier", "category", "active"],
+          columns: ["id", "pattern", "match_type", "tier", "category", "active"],
         });
       }),
     );

@@ -179,6 +179,8 @@ export function registerUninstallCommand(program: Command): void {
 
         if (cmdOpts.dryRun) {
           emitConfirmation(ctx, "Dry run: nothing was removed.", {
+            action: "planned",
+            resource: "installation",
             dryRun: true,
             skills: skills.map((s) => ({
               name: shortName(s.name),
@@ -284,6 +286,8 @@ export function registerUninstallCommand(program: Command): void {
         }
 
         emitConfirmation(ctx, "Senso CLI removed.", {
+          action: "removed",
+          resource: "installation",
           skills: {
             removed: removedSkills.map((s) => ({
               name: shortName(s.name),

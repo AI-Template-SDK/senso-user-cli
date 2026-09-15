@@ -261,7 +261,9 @@ export function registerSkillsCommands(program: Command): void {
         }
 
         emitConfirmation(ctx, `Removed ${shortName(pkg)}`, {
-          removed: shortName(pkg),
+          action: "removed",
+          resource: "skill",
+          id: shortName(pkg),
           package: pkg,
         });
       }),

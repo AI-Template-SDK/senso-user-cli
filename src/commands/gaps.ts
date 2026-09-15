@@ -962,7 +962,7 @@ export function registerGapsCommands(program: Command): void {
         emitConfirmation(
           ctx,
           `Resolution ${resolutionId} undone. The gap's status was recomputed from the decisions that remain — read it with \`senso gaps get ${gapId}\`.`,
-          { ok: true, gap_id: gapId, resolution_id: resolutionId },
+          { action: "undone", resource: "gap_resolution", id: resolutionId, gap_id: gapId },
         );
       }),
     );

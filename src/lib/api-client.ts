@@ -1,7 +1,8 @@
 import pc from "picocolors";
 import { getApiKey, getBaseUrl } from "./config.js";
 import { version } from "./version.js";
-import { missingApiKeyError } from "./errors.js";
+import { missingApiKeyError, type RequestRef } from "./errors.js";
+import type { ResourceRef } from "./resource.js";
 import * as log from "../utils/logger.js";
 
 /**
@@ -45,6 +46,16 @@ export class ApiError extends Error {
     public status: number,
     public statusText: string,
     public body: unknown,
+    /**
+     * What the request was addressing, when the caller said.
+     *
+     * This is what lets a 404 read "KB node 3f2a… not found" instead of "Not
+     * found." — the one piece of context the error layer cannot reconstruct,
+     * because by then all it has is a status code and a path.
+     */
+    public resource?: ResourceRef,
+    /** The method and path, echoed to the caller in the JSON error. */
+    public request?: RequestRef,
   ) {
     const msg = extractErrorMessage(body, statusText);
     super(msg);
@@ -101,6 +112,15 @@ interface RequestOptions {
    * replace `X-API-Key`, `Accept` or the `User-Agent` by accident.
    */
   headers?: Record<string, string>;
+  /**
+   * What this request addresses, so a 404 or a 403 can name it.
+   *
+   * Optional, but every command that takes an id should pass one: it is the
+   * difference between "KB node <id> not found in organization acme" with a
+   * hint naming `senso kb my-files`, and the bare "Not found." this CLI used
+   * to print for every missing record in every id space.
+   */
+  resource?: ResourceRef;
   /**
    * Override the abort budget for this one call.
    *
@@ -174,7 +194,10 @@ export async function apiRequest<T = unknown>(opts: RequestOptions): Promise<T> 
       } catch {
         body = text;
       }
-      throw new ApiError(res.status, res.statusText, body);
+      throw new ApiError(res.status, res.statusText, body, opts.resource, {
+        method,
+        path: opts.path,
+      });
     }
 
     if (res.status === 204) {
@@ -260,7 +283,10 @@ export async function apiStreamRequest(opts: RequestOptions): Promise<Response> 
     } catch {
       body = text;
     }
-    throw new ApiError(res.status, res.statusText, body);
+    throw new ApiError(res.status, res.statusText, body, opts.resource, {
+      method,
+      path: opts.path,
+    });
   }
 
   return res;

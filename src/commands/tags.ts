@@ -28,7 +28,7 @@ export function registerTagsCommands(program: Command): void {
         // The count columns only exist when --counts was passed; a column with
         // no matching field renders empty rather than failing.
         emit(ctx, data, {
-          columns: ["tag_id", "name", "prompt_count", "content_count", "created_at"],
+          columns: ["id", "name", "prompt_count", "content_count", "created_at"],
         });
       }),
     );

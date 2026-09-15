@@ -23,7 +23,7 @@ export function registerCompetitorsCommands(program: Command): void {
           baseUrl: ctx.baseUrl,
         });
         emit(ctx, data, {
-          columns: ["competitor_id", "name", "url", "source", "created_at"],
+          columns: ["id", "name", "url", "source", "created_at"],
         });
       }),
     );

@@ -11,7 +11,11 @@ export function registerCreditsCommands(program: Command): void {
     );
 
   credits
-    .command("balance")
+    // isDefault: `senso credits` runs this. The group had no default action, so
+    // it printed help and exited 2 — and three of the published agent skills
+    // instruct `senso credits --output json` verbatim, so the one command they
+    // all start with failed for every agent that followed them.
+    .command("balance", { isDefault: true })
     .description(
       "Get the current credit balance for the organization. Returns available credits and any spend limit configured.",
     )

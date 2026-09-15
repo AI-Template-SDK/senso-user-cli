@@ -37,6 +37,8 @@ export function registerUpdateCommand(program: Command): void {
 
         if (!semver.gt(latest, version)) {
           emitConfirmation(ctx, `Already on the latest version (${version}).`, {
+            action: "checked",
+            resource: "cli",
             updated: false,
             current: version,
             latest,
@@ -60,6 +62,8 @@ export function registerUpdateCommand(program: Command): void {
           });
         }
         emitConfirmation(ctx, `Updated to v${latest}.`, {
+          action: "updated",
+          resource: "cli",
           updated: true,
           previous: version,
           latest,

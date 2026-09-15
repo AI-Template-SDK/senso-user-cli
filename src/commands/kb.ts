@@ -620,7 +620,7 @@ export function registerKBCommands(program: Command): void {
           apiKey: ctx.apiKey,
           baseUrl: ctx.baseUrl,
         });
-        emit(ctx, data, { columns: ["tag_id", "name", "created_at"] });
+        emit(ctx, data, { columns: ["id", "name", "created_at"] });
       }),
     );
 
@@ -642,7 +642,7 @@ export function registerKBCommands(program: Command): void {
           baseUrl: ctx.baseUrl,
         });
         if (!ctx.quiet) log.success(`KB node ${id} tags updated.`);
-        emit(ctx, data, { columns: ["tag_id", "name", "created_at"] });
+        emit(ctx, data, { columns: ["id", "name", "created_at"] });
       }),
     );
 
@@ -676,7 +676,7 @@ export function registerKBCommands(program: Command): void {
           return;
         }
         if (!ctx.quiet) log.success(`Tag attached to KB node ${id}.`);
-        emit(ctx, data, { columns: ["tag_id", "name", "created_at"] });
+        emit(ctx, data, { columns: ["id", "name", "created_at"] });
       }),
     );
 

@@ -14,6 +14,7 @@ import { vi, type MockInstance } from "vitest";
 import type { Command } from "commander";
 import { createProgram } from "../src/program.js";
 import { ExitSignal } from "../src/lib/errors.js";
+import { reportError, requestedFormat } from "../src/lib/run-action.js";
 import { TEST_API_KEY, TEST_BASE_URL } from "./setup.js";
 
 export interface CliResult {
@@ -77,17 +78,26 @@ export async function runCli(args: string[], opts: RunOptions = {}): Promise<Cli
   process.exitCode = undefined;
 
   const program = createProgram();
-  captureCommanderOutput(program, stdout, stderr);
+  captureCommanderOutput(program, stdout);
 
   try {
     await program.parseAsync(argv, { from: "user" });
   } catch (err) {
     // Commander's exitOverride throws this for --help and --version, which have
-    // already printed by then. Anything else is a genuine failure to surface.
+    // already printed by then.
     if (err instanceof ExitSignal) {
       process.exitCode = err.exitCode;
     } else {
-      throw err;
+      // Everything else mirrors src/cli.ts exactly: a failure raised before any
+      // action ran — an unknown option, a group with no subcommand — is
+      // reported in the requested format and sets the exit code. Re-throwing
+      // here instead, as this used to, meant the tests could never see what a
+      // user sees for the whole class of usage errors.
+      const cliError = reportError(err, {
+        format: requestedFormat(program, argv),
+        debug: false,
+      });
+      process.exitCode = cliError.exitCode;
     }
   } finally {
     for (const spy of spies) spy.mockRestore();
@@ -112,30 +122,101 @@ export async function runCli(args: string[], opts: RunOptions = {}): Promise<Cli
 }
 
 /**
- * Routes Commander's own writes into the captured streams.
+ * Routes Commander's help output into the captured stdout.
  *
- * Commander does not use `console.*` for its usage errors and help text — it
- * writes to `process.stderr` through its output configuration, which the spies
- * above do not see. Two consequences, both fixed here: those lines leaked into
- * the test runner's output as unattributed "error: required option ..." noise,
- * and a test could not assert on them, so every missing-flag case could only
- * check the exit code.
+ * Only `writeOut`. Commander's stderr is claimed by lib/commander-error.ts,
+ * which captures it so a usage failure can be re-reported through the error
+ * contract in the caller's chosen format — the suggestion line is lifted out of
+ * it for the hint, and nothing else is printed. Overriding `writeErr` here too
+ * would take that buffer away and let Commander's raw "error: unknown option"
+ * line reach the test's stderr, which is not what a user sees.
  *
  * The configuration has to be applied to each command in the tree. Subcommands
  * copy it at creation time, and by the time `createProgram()` returns they
  * already exist with the default.
  */
-function captureCommanderOutput(command: Command, stdout: string[], stderr: string[]): void {
+function captureCommanderOutput(command: Command, stdout: string[]): void {
   command.configureOutput({
     writeOut: (str) => stdout.push(str.replace(/\n$/, "")),
-    writeErr: (str) => stderr.push(str.replace(/\n$/, "")),
   });
   for (const sub of command.commands) {
-    captureCommanderOutput(sub, stdout, stderr);
+    captureCommanderOutput(sub, stdout);
   }
 }
 
 /** An absolute URL on the test host, for registering an MSW handler. */
 export function apiUrl(path: string): string {
   return `${TEST_BASE_URL}${path}`;
+}
+
+/** The success envelope every command writes under `--output json`. */
+export interface SuccessEnvelope<T> {
+  ok: true;
+  command: string;
+  data: T;
+  page?: {
+    offset?: number;
+    limit?: number;
+    returned: number;
+    total?: number;
+    has_more?: boolean;
+    next?: string;
+  };
+  next?: { why: string; command: string }[];
+  warnings?: string[];
+}
+
+/** The failure envelope, which is written to stderr with stdout left empty. */
+export interface ErrorEnvelope {
+  ok: false;
+  command: string;
+  error: {
+    code: string;
+    message: string;
+    status?: number;
+    field?: string;
+    received?: string;
+    allowed?: string[];
+    hint?: string;
+    details?: unknown;
+    request?: { method: string; path: string };
+  };
+}
+
+/**
+ * The parsed success envelope, with the shape asserted.
+ *
+ * Use this rather than `res.json()` in a JSON test: it fails loudly when a
+ * command has been left emitting a bare payload, which is the regression the
+ * envelope exists to prevent.
+ */
+export function envelope<T = unknown>(res: CliResult): SuccessEnvelope<T> {
+  // Parsed as an open record so the checks below are real checks: typing it as
+  // the envelope up front would make `ok !== true` provably false and the
+  // assertion would compile away.
+  const parsed = res.json<Record<string, unknown>>();
+  if (parsed.ok !== true || typeof parsed.command !== "string" || !("data" in parsed)) {
+    throw new Error(`stdout was not a success envelope:\n${res.stdout || "(empty)"}`);
+  }
+  return parsed as unknown as SuccessEnvelope<T>;
+}
+
+/**
+ * The parsed failure envelope from stderr.
+ *
+ * stderr also carries the banner in non-JSON runs, so the JSON object is
+ * located rather than assumed to be the whole stream.
+ */
+export function errorEnvelope(res: CliResult): ErrorEnvelope {
+  const start = res.stderr.indexOf("{");
+  const text = start === -1 ? "" : res.stderr.slice(start);
+  try {
+    const parsed = JSON.parse(text) as Record<string, unknown>;
+    if (parsed.ok !== false || typeof parsed.error !== "object") {
+      throw new Error("not an error envelope");
+    }
+    return parsed as unknown as ErrorEnvelope;
+  } catch {
+    throw new Error(`stderr was not an error envelope:\n${res.stderr || "(empty)"}`);
+  }
 }
