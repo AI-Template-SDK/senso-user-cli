@@ -66,7 +66,7 @@ describe("roles list, when the request fails", () => {
     const res = await runCli(["roles", "list"]);
 
     expect(res.exitCode).toBe(1);
-    expect(res.stderr).toContain("not your fault");
+    expect(res.stderr).toContain("not a transient failure");
   });
 
   it("reports a malformed body rather than throwing a parse error at the user", async () => {
@@ -122,7 +122,7 @@ describe("roles list, on success", () => {
     const res = await runCli(["roles", "list", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual(ROLES);
+    expect(res.data()).toEqual(ROLES);
     // Nothing decorative alongside it: no banner, no success tick.
     expect(res.stderr).toBe("");
   });

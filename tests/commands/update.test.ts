@@ -120,7 +120,7 @@ describe("update, when there is nothing to do", () => {
     const res = await runCli(["update", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toMatchObject({
+    expect(res.data()).toMatchObject({
       updated: false,
       current: version,
       latest: version,
@@ -150,17 +150,20 @@ describe("update, when the registry has something newer", () => {
     expect(child.execSync).toHaveBeenCalledTimes(1);
     // The exact command, because a renamed package here silently installs
     // nothing — or, worse, installs something else.
-    expect(child.execSync.mock.calls[0]?.[0]).toBe("npm install -g @senso-ai/cli@latest");
+    expect(child.execSync.mock.calls[0]?.[0]).toBe("npm install -g @senso-ai/cli@latest 2>&1");
   });
 
-  it("lets npm's own output through to the terminal it inherited", async () => {
-    // stdio: inherit. npm's progress is the only useful thing to look at while
-    // an install runs, and capturing it would mean showing nothing for a minute.
+  it("captures npm's output instead of letting it reach stdout", async () => {
+    // npm's log used to be inherited, which put it on stdout and meant
+    // `senso update --output json` did not emit one JSON document. It is
+    // captured and relayed to stderr instead, where commentary belongs.
     registryReturns(NEWER);
 
     await runCli(["update"]);
 
-    expect(child.execSync.mock.calls[0]?.[1]).toMatchObject({ stdio: "inherit" });
+    expect(child.execSync.mock.calls[0]?.[1]).toMatchObject({
+      stdio: ["ignore", "pipe", "pipe"],
+    });
   });
 
   it("names the version it moved to, on stderr", async () => {
@@ -179,7 +182,7 @@ describe("update, when the registry has something newer", () => {
     const res = await runCli(["update", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toMatchObject({
+    expect(res.data()).toMatchObject({
       updated: true,
       previous: version,
       latest: NEWER,

@@ -90,7 +90,7 @@ describe("permissions list, when the request fails", () => {
 
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("not your fault");
+    expect(res.stderr).toContain("server-side failure");
   });
 
   it("reports a malformed body rather than throwing a parse error at the user", async () => {
@@ -149,7 +149,7 @@ describe("permissions list, on success", () => {
     const res = await runCli(["permissions", "list", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual(PERMISSIONS);
+    expect(res.data()).toEqual(PERMISSIONS);
     expect(res.stderr).toBe("");
   });
 
@@ -159,7 +159,9 @@ describe("permissions list, on success", () => {
     const res = await runCli(["permissions", "list", "--output", "table"]);
 
     expect(res.exitCode).toBe(0);
-    for (const column of ["key", "name", "category", "description"]) {
+    // `name` and `description` are derived boilerplate; the table shows the
+    // two fields a role editor acts on, and --output json still carries all four.
+    for (const column of ["key", "category"]) {
       expect(res.stdout).toContain(column);
     }
     expect(res.stdout).toContain("content.write");

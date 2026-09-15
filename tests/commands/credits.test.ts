@@ -71,7 +71,10 @@ describe("credits balance, when the request fails", () => {
 
     expect(res.exitCode).toBe(4);
     expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("Not found");
+    // The 404 names the resource now. "Not found." on its own left a caller
+    // unable to tell which of five id spaces it had got wrong.
+    expect(res.stderr).toContain("Organization");
+    expect(res.stderr).toContain("not found");
   });
 
   it("exits 1 on a 500 and says it is not the caller's fault", async () => {
@@ -83,7 +86,7 @@ describe("credits balance, when the request fails", () => {
 
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("not your fault");
+    expect(res.stderr).toContain("server-side failure");
   });
 
   it("exits 5 when the API rate-limits the poll, because retrying is the right answer", async () => {
@@ -146,7 +149,7 @@ describe("credits balance, on success", () => {
     const res = await runCli(["credits", "balance", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual(BALANCE);
+    expect(res.data()).toEqual(BALANCE);
     // json implies quiet: no banner and no commentary next to the payload.
     expect(res.stderr).toBe("");
   });

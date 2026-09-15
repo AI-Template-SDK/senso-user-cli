@@ -130,14 +130,14 @@ has to change for the CLI to be able to say the right thing. Check items off in 
 
 ## Part C — The agent skills (`senso-contextos/skills/*/SKILL.md`)
 
-- [ ] Replace every `senso credits --output json --quiet` with `senso credits balance --output json` (senso-search, senso-ingest, senso-content-gen, senso-onboarding).
-- [ ] senso-search and senso-ingest: knowledge-base documents are read and polled with `senso kb get <kb_node_id>` (and `kb get-content`), never `content get <content_id>` — the API rejects that by design. Rewrite the "Retrieving Full Content" and "Verify Processing" sections.
-- [ ] Drop `--quiet` from every example; `--output json` already implies it.
-- [ ] Error tables keyed on exit code and `error.code`, not HTTP status, which the CLI never shows.
-- [ ] Every `jq` path moves under `.data` once A1 ships.
-- [ ] Name the two id spaces once, up front: `kb_node_id` for every `kb` command, `content_id` for `--content-ids`, `gaps answer`, `evals content`, `content *` (generated content only).
-- [ ] senso-ingest: the `existing_content_id` guidance depends on A2 (409 body preserved).
-- [ ] Add the gap-report loop (`gaps list --status weak` after probes, `--no-gap-signals` on tests) to senso-search.
+- [x] Replace every `senso credits --output json --quiet` with `senso credits balance --output json` (senso-search, senso-ingest, senso-content-gen, senso-onboarding).
+- [x] senso-search and senso-ingest: knowledge-base documents are read and polled with `senso kb get <kb_node_id>` (and `kb get-content`), never `content get <content_id>` — the API rejects that by design. Rewrite the "Retrieving Full Content" and "Verify Processing" sections.
+- [x] Drop `--quiet` from every example; `--output json` already implies it.
+- [x] Error tables keyed on exit code and `error.code`, not HTTP status, which the CLI never shows.
+- [x] Every `jq` path moves under `.data` once A1 ships.
+- [x] Name the two id spaces once, up front: `kb_node_id` for every `kb` command, `content_id` for `--content-ids`, `gaps answer`, `evals content`, `content *` (generated content only).
+- [x] senso-ingest: the `existing_content_id` guidance depends on A2 (409 body preserved).
+- [x] Add the gap-report loop (`gaps list --status weak` after probes, `--no-gap-signals` on tests) to senso-search.
 - [ ] Policy test in the CLI repo that every `senso …` command named in a SKILL.md exists in the command tree (the reference list is `docs/reference/commands.md`).
 
 ---
@@ -1248,16 +1248,16 @@ has to change for the CLI to be able to say the right thing. Check items off in 
 
 **`senso credits`** · group
 
-- [ ] Make 'senso credits' run the balance action by default: register the balance handler on the group command itself (credits.action(runAction(...)) alongside the 'balance' subcommand, or mark balance with { isDefault: true }). Keep 'senso credits balance' working. Add a CHANGELOG entry and an e2e test 'senso credits --output json exits 0 and prints the balance'.
-- [ ] In parallel, fix the three skills to 'senso credits balance --output json --quiet' so they work on every published CLI version.
-- [ ] Group description: explain dedicated vs partner-billed balances and which field to watch.
+- [x] Make 'senso credits' run the balance action by default: register the balance handler on the group command itself (credits.action(runAction(...)) alongside the 'balance' subcommand, or mark balance with { isDefault: true }). Keep 'senso credits balance' working. Add a CHANGELOG entry and an e2e test 'senso credits --output json exits 0 and prints the balance'.
+- [x] In parallel, fix the three skills to 'senso credits balance --output json --quiet' so they work on every published CLI version.
+- [x] Group description: explain dedicated vs partner-billed balances and which field to watch.
 
 **`senso credits balance`** · 🟠 medium
 
-- [ ] Plain: render null explicitly ('credits_available unlimited (billed to partner, no spend limit)') via a small hand-written plain renderer; keep JSON raw.
-- [ ] Help: Returns section with the dedicated/partner branching and the 402 rule; Examples with jq.
-- [ ] Fix the test fixture field name.
-- [ ] Make the command the default of the credits group.
+- [x] Plain: render null explicitly ('credits_available unlimited (billed to partner, no spend limit)') via a small hand-written plain renderer; keep JSON raw.
+- [x] Help: Returns section with the dedicated/partner branching and the 402 rule; Examples with jq.
+- [x] Fix the test fixture field name.
+- [x] Make the command the default of the credits group.
 
 ### `senso questions` <sub>21 items</sub>
 
@@ -1557,12 +1557,12 @@ has to change for the CLI to be able to say the right thing. Check items off in 
 
 **`senso permissions`** · group
 
-- [ ] Group description: 'The catalog of permission keys a role can hold (the same for every org). Not your key's permissions — an org API key is not subject to them.'
+- [x] Group description: 'The catalog of permission keys a role can hold (the same for every org). Not your key's permissions — an org API key is not subject to them.'
 
 **`senso permissions list`** · 🟢 low
 
-- [ ] Help: say the list is static and platform-wide, that no CLI command consumes a key, and what category means (the resource part of the key).
-- [ ] Table columns: key, category (name/description add nothing).
+- [x] Help: say the list is static and platform-wide, that no CLI command consumes a key, and what category means (the resource part of the key).
+- [x] Table columns: key, category (name/description add nothing).
 
 ### `senso tags` <sub>25 items</sub>
 
@@ -1663,13 +1663,13 @@ has to change for the CLI to be able to say the right thing. Check items off in 
 
 **`senso roles`** · group
 
-- [ ] Add 'See also: senso permissions list' and note that roles cannot be created or edited over the API.
+- [x] Add 'See also: senso permissions list' and note that roles cannot be created or edited over the API.
 
 **`senso roles list`** · 🟢 low
 
-- [ ] Table columns: role_id, name, is_system, description.
-- [ ] Help: Returns section; say is_system marks the built-ins; say to ignore rows with deleted_at; mention that permission keys per role are not exposed (senso permissions list shows the universe).
-- [ ] Plain: numbered blocks, role_id first.
+- [x] Table columns: role_id, name, is_system, description.
+- [x] Help: Returns section; say is_system marks the built-ins; say to ignore rows with deleted_at; mention that permission keys per role are not exposed (senso permissions list shows the universe).
+- [x] Plain: numbered blocks, role_id first.
 
 ### `senso competitors` <sub>32 items</sub>
 
@@ -2040,21 +2040,21 @@ has to change for the CLI to be able to say the right thing. Check items off in 
 
 **`senso update`** · 🟠 medium
 
-- [ ] Capture npm's output and relay it to stderr (log.raw) instead of stdio: 'inherit', so stdout stays the payload.
-- [ ] Install the exact version reported (`@<latest>`), and after the install verify process.argv[1] is under npm's global root, else exit 1 with the path.
-- [ ] Network failure message: name the host and the timeout; keep exit 5.
-- [ ] Help per §2.1.
+- [x] Capture npm's output and relay it to stderr (log.raw) instead of stdio: 'inherit', so stdout stays the payload.
+- [x] Install the exact version reported (`@<latest>`), and after the install verify process.argv[1] is under npm's global root, else exit 1 with the path.
+- [x] Network failure message: name the host and the timeout; keep exit 5.
+- [x] Help per §2.1.
 
 ### `senso uninstall` <sub>6 items</sub>
 
 **`senso uninstall`** · 🟠 medium
 
-- [ ] Capture npm's output and relay it to stderr; keep stdout for the payload.
-- [ ] Check runningBinaryPath() before removing anything and surface it in --dry-run (cli.path, cli.npmGlobal: bool); refuse up front (exit 1) with nothing removed when the running copy is not npm's.
-- [ ] Treat shipables 'not installed' for a recorded skill as skipped (reason 'files already gone'), not as a failure that aborts.
-- [ ] Canceled prompt: exit 0 with nothing on stdout; 'Uninstall canceled' on stderr; under json emit {canceled: true}.
-- [ ] Gate the SENSO_API_KEY warning on !quiet and put it in warnings[] in the envelope.
-- [ ] Help per §2.1 with the ordered steps and Exit codes.
+- [x] Capture npm's output and relay it to stderr; keep stdout for the payload.
+- [x] Check runningBinaryPath() before removing anything and surface it in --dry-run (cli.path, cli.npmGlobal: bool); refuse up front (exit 1) with nothing removed when the running copy is not npm's.
+- [x] Treat shipables 'not installed' for a recorded skill as skipped (reason 'files already gone'), not as a failure that aborts.
+- [x] Canceled prompt: exit 0 with nothing on stdout; 'Uninstall canceled' on stderr; under json emit {canceled: true}.
+- [x] Gate the SENSO_API_KEY warning on !quiet and put it in warnings[] in the envelope.
+- [x] Help per §2.1 with the ordered steps and Exit codes.
 
 ---
 

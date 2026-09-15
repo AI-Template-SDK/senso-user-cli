@@ -128,17 +128,48 @@ describe("`senso --help`", () => {
 });
 
 describe("`senso` with no arguments", () => {
-  it("shows the help text rather than failing silently", async () => {
+  it("says it needs a subcommand and lists them, in one line each", async () => {
     const res = await runSenso([]);
 
-    expect(res.stderr).toContain("Usage: senso");
-    expect(res.stderr).toContain("Commands:");
-    // Commander treats "no command" as a usage error and prints help on stderr.
-    // Exit 2 is consistent with the rest of the table — the caller did not name
-    // anything to run — and stdout stays empty, so a pipe gets nothing rather
-    // than a screenful of help it would try to parse.
+    // Commander's own answer is to dump the entire help to stderr. For a person
+    // that is fine; for an agent it is a screenful to parse before learning the
+    // one fact it needed, which is the list of names. Exit 2 is consistent with
+    // the rest of the table — the caller did not name anything to run — and
+    // stdout stays empty so a pipe gets nothing rather than help text.
     expect(res.code).toBe(2);
     expect(res.stdout).toBe("");
+    expect(res.stderr).toContain("needs a subcommand");
+    expect(res.stderr).toContain("kb");
+    expect(res.stderr).toContain("senso --help");
+  });
+
+  it("answers in JSON when the caller asked for JSON", async () => {
+    // The README promised "errors are JSON too" and this whole class of usage
+    // failure ignored it, printing English whatever --output said.
+    const res = await runSenso(["--output", "json"]);
+
+    expect(res.code).toBe(2);
+    expect(res.stdout).toBe("");
+    const parsed = JSON.parse(res.stderr) as {
+      ok: boolean;
+      error: { code: string; allowed: string[] };
+    };
+    expect(parsed.ok).toBe(false);
+    expect(parsed.error.code).toBe("usage");
+    expect(parsed.error.allowed).toContain("kb");
+  });
+
+  it("names a group's subcommands rather than dumping its help", async () => {
+    const res = await runSenso(["kb", "--output", "json"]);
+
+    expect(res.code).toBe(2);
+    const parsed = JSON.parse(res.stderr) as {
+      command: string;
+      error: { message: string; allowed: string[] };
+    };
+    expect(parsed.command).toBe("kb");
+    expect(parsed.error.message).toContain("`senso kb` needs a subcommand");
+    expect(parsed.error.allowed).toContain("my-files");
   });
 });
 

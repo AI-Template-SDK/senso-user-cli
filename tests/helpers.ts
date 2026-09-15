@@ -29,8 +29,16 @@ export interface CliResult {
    * here — a test asserting `exitCode: 0` should not have to know that.
    */
   exitCode: number;
-  /** stdout parsed as JSON. Throws with the raw text if it will not parse. */
+  /** stdout parsed as JSON. The whole envelope, including ok/command/page. */
   json: <T = unknown>() => T;
+  /**
+   * The payload: the envelope's `data`, with the envelope shape asserted.
+   *
+   * This is what almost every assertion means. Reading `json().data` by hand
+   * would let a command that had been left emitting a bare payload pass
+   * silently, which is the regression the envelope exists to prevent.
+   */
+  data: <T = unknown>() => T;
 }
 
 export interface RunOptions {
@@ -107,7 +115,7 @@ export async function runCli(args: string[], opts: RunOptions = {}): Promise<Cli
   process.exitCode = undefined;
 
   const out = stdout.join("\n");
-  return {
+  const result: CliResult = {
     stdout: out,
     stderr: stderr.join("\n"),
     exitCode: code,
@@ -118,7 +126,9 @@ export async function runCli(args: string[], opts: RunOptions = {}): Promise<Cli
         throw new Error(`stdout was not valid JSON:\n${out || "(empty)"}`);
       }
     },
+    data: <T>(): T => envelope<T>(result).data,
   };
+  return result;
 }
 
 /**
