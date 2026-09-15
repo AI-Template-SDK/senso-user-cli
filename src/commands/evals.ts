@@ -190,6 +190,9 @@ async function waitForRun(
   while (Date.now() < deadline) {
     const run = await apiRequest<{ status?: string }>({
       path: `/org/evals/runs/${runId}`,
+      // A poll can 404 too — the run id could belong to another organization —
+      // and "Not found." mid-wait would say nothing about what was being polled.
+      resource: runResource(runId),
       apiKey: opts.apiKey,
       baseUrl: opts.baseUrl,
     });

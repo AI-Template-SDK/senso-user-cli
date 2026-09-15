@@ -208,760 +208,760 @@ has to change for the CLI to be able to say the right thing. Check items off in 
 
 **`senso login`** · 🟢 low
 
-- [ ] Help: say it is interactive only, name the two non-interactive alternatives and their precedence (--api-key > SENSO_API_KEY > stored), the config path, what is stored, that the key is verified with GET /org/me before saving, and that --base-url is stored alongside when given.
-- [ ] On success in json mode emit {ok, command:'login', data:{org_id, name, slug, is_free_tier, config_path}} to stdout.
-- [ ] Map a 404 from /org/me during login to exit 3 'This API key belongs to no organization.'
-- [ ] Welcome text: 'Create a key at https://app.senso.ai → Settings → API keys'.
+- [x] Help: say it is interactive only, name the two non-interactive alternatives and their precedence (--api-key > SENSO_API_KEY > stored), the config path, what is stored, that the key is verified with GET /org/me before saving, and that --base-url is stored alongside when given.
+- [x] On success in json mode emit {ok, command:'login', data:{org_id, name, slug, is_free_tier, config_path}} to stdout.
+- [x] Map a 404 from /org/me during login to exit 3 'This API key belongs to no organization.'
+- [x] Welcome text: 'Create a key at https://app.senso.ai → Settings → API keys'.
 
 **`senso logout`** · 🟢 low
 
-- [ ] Report which path was cleared and whether anything was stored: '✓ Removed stored credentials from <path>.' or 'Nothing was stored at <path>.' (exit 0 both).
-- [ ] When SENSO_API_KEY is set, warn on stderr: 'SENSO_API_KEY is still set in this shell; commands will keep authenticating with it.'
-- [ ] json: {ok, command:'logout', data:{action:'deleted', resource:'credentials', path, had_credentials}, warnings}.
-- [ ] Help: name the file, the env-var caveat, Exit codes and an Example.
+- [x] Report which path was cleared and whether anything was stored: '✓ Removed stored credentials from <path>.' or 'Nothing was stored at <path>.' (exit 0 both).
+- [x] When SENSO_API_KEY is set, warn on stderr: 'SENSO_API_KEY is still set in this shell; commands will keep authenticating with it.'
+- [x] json: {ok, command:'logout', data:{action:'deleted', resource:'credentials', path, had_credentials}, warnings}.
+- [x] Help: name the file, the env-var caveat, Exit codes and an Example.
 
 **`senso whoami`** · 🟠 medium
 
-- [ ] Emit snake_case: data {org_id, name, slug, is_free_tier, api_key_prefix, credential_source ('flag' | 'env' | 'config'), config_path, cached}. Keep the current camelCase keys for one release as a documented breaking change in CHANGELOG (or emit both and deprecate).
-- [ ] Fall back to the cache only on network/timeout (exit 5 family); pass 404/5xx through with their exit codes.
-- [ ] Add credential_source so an agent can tell which of --api-key / SENSO_API_KEY / config is in effect.
-- [ ] Help: Returns block with the enum for credential_source, the cached flag, Exit codes, Examples, and 'for products, websites and limits use senso org get'.
-- [ ] JSON envelope {ok, command:'whoami', data, warnings:['Could not reach the API; values are from the last login'] when cached}.
+- [x] Emit snake_case: data {org_id, name, slug, is_free_tier, api_key_prefix, credential_source ('flag' | 'env' | 'config'), config_path, cached}. Keep the current camelCase keys for one release as a documented breaking change in CHANGELOG (or emit both and deprecate).
+- [x] Fall back to the cache only on network/timeout (exit 5 family); pass 404/5xx through with their exit codes.
+- [x] Add credential_source so an agent can tell which of --api-key / SENSO_API_KEY / config is in effect.
+- [x] Help: Returns block with the enum for credential_source, the cached flag, Exit codes, Examples, and 'for products, websites and limits use senso org get'.
+- [x] JSON envelope {ok, command:'whoami', data, warnings:['Could not reach the API; values are from the last login'] when cached}.
 
 ### `senso org` <sub>15 items</sub>
 
 **`senso org`** · group
 
-- [ ] Group description: name the id space (none — the org is the key's org), list the four commands as a workflow (get → update / set-industry / set-runs), and point to industries list for set-industry.
+- [x] Group description: name the id space (none — the org is the key's org), list the four commands as a workflow (get → update / set-industry / set-runs), and point to industries list for set-industry.
 
 **`senso org get`** · 🟠 medium
 
-- [ ] Plain renderer: render websites/locations/models/publishers as numbered sub-blocks (generic fix in lib/output.ts keyValueLines: nested object → indented block, array of objects → numbered blocks).
-- [ ] Help: add Returns with field meanings, say arrays are omitted when empty, say org_website_id/org_location_id are read-only ids that update rejects, add Examples and See also.
-- [ ] JSON envelope per §2.2 with next: [org update, org set-industry when industry_id is absent].
-- [ ] Fix test fixtures to the DTO shape.
+- [x] Plain renderer: render websites/locations/models/publishers as numbered sub-blocks (generic fix in lib/output.ts keyValueLines: nested object → indented block, array of objects → numbered blocks).
+- [x] Help: add Returns with field meanings, say arrays are omitted when empty, say org_website_id/org_location_id are read-only ids that update rejects, add Examples and See also.
+- [x] JSON envelope per §2.2 with next: [org update, org set-industry when industry_id is absent].
+- [x] Fix test fixtures to the DTO shape.
 
 **`senso org set-industry`** · 🟠 medium
 
-- [ ] Validate <industryId> as a UUID → exit 2 before the request, hint senso industries list.
-- [ ] 404 message: 'Industry <id> not found in the public catalog.' hint senso industries list.
-- [ ] Special-case the 500 read-back message: treat as success-with-warning or at least hint 'The industry was set; run senso org get to confirm.'
-- [ ] Help: Arguments section, Returns (industry_id, industry_name), Exit codes, Examples.
+- [x] Validate <industryId> as a UUID → exit 2 before the request, hint senso industries list.
+- [x] 404 message: 'Industry <id> not found in the public catalog.' hint senso industries list.
+- [x] Special-case the 500 read-back message: treat as success-with-warning or at least hint 'The industry was set; run senso org get to confirm.'
+- [x] Help: Arguments section, Returns (industry_id, industry_name), Exit codes, Examples.
 
 **`senso org set-runs`** · 🟢 low
 
-- [ ] Help: explain the semantics (schedule switch, no in-flight cancel), name the field it flips (enable_runs), add Exit codes and Examples.
-- [ ] Plain confirmation: '✓ Org-wide runs disabled (enable_runs=false).'
+- [x] Help: explain the semantics (schedule switch, no in-flight cancel), name the field it flips (enable_runs), add Exit codes and Examples.
+- [x] Plain confirmation: '✓ Org-wide runs disabled (enable_runs=false).'
 
 **`senso org update`** · 🔴 high
 
-- [ ] Validate --data before the request: known keys only (name, slug, logo_url, websites, locations) → unknown key exits 2 naming it; website entries must be {url} only → org_website_id exits 2; country_code must be 2 letters; name/slug 1-255. Exit 2 with field/received/allowed.
-- [ ] When websites or locations is present, GET /org/me first and diff: emit warnings ['websites replaced the whole list (2 entries removed: https://old.example, https://blog.example)'] in the JSON envelope and on stderr in plain mode.
-- [ ] Map API 400 validation errors to exit 2 code 'validation' with the field list passed through, prefixed 'Updating organization: '.
-- [ ] 409: 'Conflict updating organization: Organization with that slug already exists' with hint senso org get to see the current slug.
+- [x] Validate --data before the request: known keys only (name, slug, logo_url, websites, locations) → unknown key exits 2 naming it; website entries must be {url} only → org_website_id exits 2; country_code must be 2 letters; name/slug 1-255. Exit 2 with field/received/allowed.
+- [x] When websites or locations is present, GET /org/me first and diff: emit warnings ['websites replaced the whole list (2 entries removed: https://old.example, https://blog.example)'] in the JSON envelope and on stderr in plain mode.
+- [x] Map API 400 validation errors to exit 2 code 'validation' with the field list passed through, prefixed 'Updating organization: '.
+- [x] 409: 'Conflict updating organization: Organization with that slug already exists' with hint senso org get to see the current slug.
 
 ### `senso users` <sub>32 items</sub>
 
 **`senso users`** · group
 
-- [ ] Group description: name the id spaces (user_id vs org_user_id vs role_id), point to members list for email lookup and roles list for role ids, and give the three-way rule: invite (new person), invite-existing (has a Senso account), add (you already hold their user_id).
+- [x] Group description: name the id spaces (user_id vs org_user_id vs role_id), point to members list for email lookup and roles list for role ids, and give the three-way rule: invite (new person), invite-existing (has a Senso account), add (you already hold their user_id).
 
 **`senso users add`** · 🟠 medium
 
-- [ ] Validate --data: user_id and role_id present and UUIDs, is_current boolean, no other keys → exit 2 naming the field.
-- [ ] 400 'Invalid role ID for this organization' → 'Adding user: Invalid role ID for this organization (role_id <id>)' with hint senso roles list; keep exit 1.
-- [ ] 404 → 'User <user_id> not found.' hint senso members list --search <email>.
-- [ ] 409 → 'User <user_id> is already a member of this organization.' hint senso users update <user_id> --data '{"role_id": …}'.
-- [ ] Help: Arguments/Options per §2.1 naming id sources, Returns, Exit codes, Examples.
+- [x] Validate --data: user_id and role_id present and UUIDs, is_current boolean, no other keys → exit 2 naming the field.
+- [x] 400 'Invalid role ID for this organization' → 'Adding user: Invalid role ID for this organization (role_id <id>)' with hint senso roles list; keep exit 1.
+- [x] 404 → 'User <user_id> not found.' hint senso members list --search <email>.
+- [x] 409 → 'User <user_id> is already a member of this organization.' hint senso users update <user_id> --data '{"role_id": …}'.
+- [x] Help: Arguments/Options per §2.1 naming id sources, Returns, Exit codes, Examples.
 
 **`senso users get`** · 🟠 medium
 
-- [ ] Validate <userId> as UUID → exit 2, hint members list.
-- [ ] Pass 404 message through: 'User <id> not found.' vs 'User <id> is not a member of this organization.' with hints.
-- [ ] Help: Arguments naming user_id and its source, Returns, Exit codes, Examples, See also members list for email.
+- [x] Validate <userId> as UUID → exit 2, hint members list.
+- [x] Pass 404 message through: 'User <id> not found.' vs 'User <id> is not a member of this organization.' with hints.
+- [x] Help: Arguments naming user_id and its source, Returns, Exit codes, Examples, See also members list for email.
 
 **`senso users invite`** · 🟠 medium
 
-- [ ] Validate --email (contains @), --role-id UUID, names non-empty → exit 2.
-- [ ] Map API 400 field errors to exit 2 code validation with field names.
-- [ ] 400 'Invalid role ID' → 'Inviting <email>: Invalid role ID for this organization (role_id …)' hint senso roles list.
-- [ ] 409 → 'User <email> is already a member of this organization.' hint senso users update.
-- [ ] Help: correct the invite vs invite-existing rule after confirming with the API team; add Returns/Exit codes/Examples.
+- [x] Validate --email (contains @), --role-id UUID, names non-empty → exit 2.
+- [x] Map API 400 field errors to exit 2 code validation with field names.
+- [x] 400 'Invalid role ID' → 'Inviting <email>: Invalid role ID for this organization (role_id …)' hint senso roles list.
+- [x] 409 → 'User <email> is already a member of this organization.' hint senso users update.
+- [x] Help: correct the invite vs invite-existing rule after confirming with the API team; add Returns/Exit codes/Examples.
 
 **`senso users invite-existing`** · 🟠 medium
 
-- [ ] 404 → 'No Senso user with email <email>.' hint senso users invite --email <email> --given-name … --family-name … --role-id ….
-- [ ] Validate --email and --role-id → exit 2; map API field errors to exit 2.
-- [ ] Help per §2.1.
+- [x] 404 → 'No Senso user with email <email>.' hint senso users invite --email <email> --given-name … --family-name … --role-id ….
+- [x] Validate --email and --role-id → exit 2; map API field errors to exit 2.
+- [x] Help per §2.1.
 
 **`senso users list`** · 🟠 medium
 
-- [ ] Help: say exactly which fields come back, that emails/names are in senso members list, that role_id resolves via senso roles list, that the API page size defaults to 10 with no total.
-- [ ] Validate --limit (integer >= 1) and --offset (integer >= 0) → exit 2.
-- [ ] Plain: numbered blocks with user_id first; stderr 'Showing 1–10 (page size 10). Next page: senso users list --offset 10' whenever returned == limit; empty → 'No memberships found.'
-- [ ] JSON envelope: page {offset, limit, returned, has_more: unknown|bool, next}.
+- [x] Help: say exactly which fields come back, that emails/names are in senso members list, that role_id resolves via senso roles list, that the API page size defaults to 10 with no total.
+- [x] Validate --limit (integer >= 1) and --offset (integer >= 0) → exit 2.
+- [x] Plain: numbered blocks with user_id first; stderr 'Showing 1–10 (page size 10). Next page: senso users list --offset 10' whenever returned == limit; empty → 'No memberships found.'
+- [x] JSON envelope: page {offset, limit, returned, has_more: unknown|bool, next}.
 
 **`senso users remove`** · 🟢 low
 
-- [ ] Validate UUID → exit 2.
-- [ ] JSON success: data {action: 'removed', resource: 'org_user', user_id}.
-- [ ] 404 pass-through with id; help warn about last-admin.
+- [x] Validate UUID → exit 2.
+- [x] JSON success: data {action: 'removed', resource: 'org_user', user_id}.
+- [x] 404 pass-through with id; help warn about last-admin.
 
 **`senso users set-current`** · 🟢 low
 
-- [ ] emit the OrgUserResponse payload instead of a confirmation.
-- [ ] Validate UUID → exit 2; pass 404 messages through.
-- [ ] Help: define 'current org', note equivalence to users update --data '{"role_id": …, "is_current": true}' without needing role_id.
+- [x] emit the OrgUserResponse payload instead of a confirmation.
+- [x] Validate UUID → exit 2; pass 404 messages through.
+- [x] Help: define 'current org', note equivalence to users update --data '{"role_id": …, "is_current": true}' without needing role_id.
 
 **`senso users update`** · 🟠 medium
 
-- [ ] Validate <userId> UUID and --data {role_id: uuid required, is_current?: bool, nothing else} → exit 2.
-- [ ] 400 'Invalid role ID' → prefix 'Updating user <id>:', include role_id sent, hint senso roles list.
-- [ ] 404s: pass the API message through with the id.
-- [ ] Confirmation: '✓ Updated user <id>: role_id → <role_id>.'
-- [ ] Help per §2.1.
+- [x] Validate <userId> UUID and --data {role_id: uuid required, is_current?: bool, nothing else} → exit 2.
+- [x] 400 'Invalid role ID' → prefix 'Updating user <id>:', include role_id sent, hint senso roles list.
+- [x] 404s: pass the API message through with the id.
+- [x] Confirmation: '✓ Updated user <id>: role_id → <role_id>.'
+- [x] Help per §2.1.
 
 ### `senso api-keys` <sub>26 items</sub>
 
 **`senso api-keys`** · group
 
-- [ ] Remove create, update, delete, revoke, kb-permissions-set, kb-permissions-delete (or hide them and make them exit 3 immediately with 'API keys can only be managed in the dashboard at https://app.senso.ai/settings/api-keys') — do not make a request that is guaranteed to 403. Update docs/reference/excluded-endpoints.md from 'Unresolved' to 'JWT-only, excluded'.
-- [ ] Group description: read-only over the API; explain id vs secret and scoped/grants; workflow list → get → kb-permissions-get.
+- [x] Remove create, update, delete, revoke, kb-permissions-set, kb-permissions-delete (or hide them and make them exit 3 immediately with 'API keys can only be managed in the dashboard at https://app.senso.ai/settings/api-keys') — do not make a request that is guaranteed to 403. Update docs/reference/excluded-endpoints.md from 'Unresolved' to 'JWT-only, excluded'.
+- [x] Group description: read-only over the API; explain id vs secret and scoped/grants; workflow list → get → kb-permissions-get.
 
 **`senso api-keys create`** · 🔴 high
 
-- [ ] Remove the command (preferred), or keep a stub that exits 3 before any request with: 'API keys can only be created by a signed-in user in the Senso dashboard (Settings → API keys). The API refuses API-key auth for this action.' and a JSON error {code: forbidden, hint: 'https://app.senso.ai/settings/api-keys'}.
-- [ ] Update excluded-endpoints.md and the README command table; add a CHANGELOG entry.
-- [ ] If ever re-enabled (JWT support in the CLI): stderr warning 'Store this key now; it is never shown again.' and next: [senso api-keys kb-permissions-set <id>].
+- [x] Remove the command (preferred), or keep a stub that exits 3 before any request with: 'API keys can only be created by a signed-in user in the Senso dashboard (Settings → API keys). The API refuses API-key auth for this action.' and a JSON error {code: forbidden, hint: 'https://app.senso.ai/settings/api-keys'}.
+- [x] Update excluded-endpoints.md and the README command table; add a CHANGELOG entry.
+- [x] If ever re-enabled (JWT support in the CLI): stderr warning 'Store this key now; it is never shown again.' and next: [senso api-keys kb-permissions-set <id>].
 
 **`senso api-keys delete`** · 🔴 high
 
-- [ ] Remove the command, or stub it to exit 3 before any request: 'API keys can only be deleted by a signed-in user in the Senso dashboard.'
-- [ ] Update docs/reference/excluded-endpoints.md and README.
+- [x] Remove the command, or stub it to exit 3 before any request: 'API keys can only be deleted by a signed-in user in the Senso dashboard.'
+- [x] Update docs/reference/excluded-endpoints.md and README.
 
 **`senso api-keys get`** · 🟠 medium
 
-- [ ] Validate <keyId> UUID → exit 2 with 'The argument is the key's id from senso api-keys list, not the secret.'
-- [ ] 404 → 'API key <id> not found in this organization.' hint senso api-keys list.
-- [ ] Help per §2.1 with Returns explaining scoped/revoked_at/expires_at and a next: kb-permissions-get when scoped.
+- [x] Validate <keyId> UUID → exit 2 with 'The argument is the key's id from senso api-keys list, not the secret.'
+- [x] 404 → 'API key <id> not found in this organization.' hint senso api-keys list.
+- [x] Help per §2.1 with Returns explaining scoped/revoked_at/expires_at and a next: kb-permissions-get when scoped.
 
 **`senso api-keys kb-permissions-delete`** · 🔴 high
 
-- [ ] Remove the command, or stub it to exit 3 before any request: 'API keys can only be unscoped by a signed-in user in the Senso dashboard.'
-- [ ] Update docs/reference/excluded-endpoints.md and README.
+- [x] Remove the command, or stub it to exit 3 before any request: 'API keys can only be unscoped by a signed-in user in the Senso dashboard.'
+- [x] Update docs/reference/excluded-endpoints.md and README.
 
 **`senso api-keys kb-permissions-get`** · 🟠 medium
 
-- [ ] Validate UUID → exit 2.
-- [ ] Empty result: stdout 'No KB grants: key <id> has full organization access (or the id is unknown — confirm with senso api-keys get <id>).'
-- [ ] Help: name node_id as kb_node_id, list roles and their actions, explain [].
-- [ ] Optionally call GET /org/api-keys/{id} first to turn 'unknown id' into a real exit 4.
+- [x] Validate UUID → exit 2.
+- [x] Empty result: stdout 'No KB grants: key <id> has full organization access (or the id is unknown — confirm with senso api-keys get <id>).'
+- [x] Help: name node_id as kb_node_id, list roles and their actions, explain [].
+- [x] Optionally call GET /org/api-keys/{id} first to turn 'unknown id' into a real exit 4.
 
 **`senso api-keys kb-permissions-set`** · 🔴 high
 
-- [ ] Remove the command, or stub it to exit 3 before any request: 'API keys can only be scoped by a signed-in user in the Senso dashboard.'
-- [ ] Update docs/reference/excluded-endpoints.md and README.
+- [x] Remove the command, or stub it to exit 3 before any request: 'API keys can only be scoped by a signed-in user in the Senso dashboard.'
+- [x] Update docs/reference/excluded-endpoints.md and README.
 
 **`senso api-keys list`** · 🟠 medium
 
-- [ ] Table columns: id, name, scoped, revoked_at, expires_at, last_used_at.
-- [ ] Plain: numbered blocks with id first, then stderr 'Showing 1–10 of 23. Next page: senso api-keys list --offset 10'.
-- [ ] Validate --limit/--offset → exit 2. JSON envelope with page {offset, limit, returned, total, has_more, next}.
-- [ ] Help: explain scoped, revoked_at, expires_at, omitted-when-null; name id as the argument for get/kb-permissions-get.
+- [x] Table columns: id, name, scoped, revoked_at, expires_at, last_used_at.
+- [x] Plain: numbered blocks with id first, then stderr 'Showing 1–10 of 23. Next page: senso api-keys list --offset 10'.
+- [x] Validate --limit/--offset → exit 2. JSON envelope with page {offset, limit, returned, total, has_more, next}.
+- [x] Help: explain scoped, revoked_at, expires_at, omitted-when-null; name id as the argument for get/kb-permissions-get.
 
 **`senso api-keys revoke`** · 🔴 high
 
-- [ ] Remove the command, or stub it to exit 3 before any request: 'API keys can only be revoked by a signed-in user in the Senso dashboard.'
-- [ ] Update docs/reference/excluded-endpoints.md and README.
+- [x] Remove the command, or stub it to exit 3 before any request: 'API keys can only be revoked by a signed-in user in the Senso dashboard.'
+- [x] Update docs/reference/excluded-endpoints.md and README.
 
 **`senso api-keys update`** · 🔴 high
 
-- [ ] Remove the command, or stub it to exit 3 before any request: 'API keys can only be renamed or re-dated by a signed-in user in the Senso dashboard.'
-- [ ] Update docs/reference/excluded-endpoints.md and README.
+- [x] Remove the command, or stub it to exit 3 before any request: 'API keys can only be renamed or re-dated by a signed-in user in the Senso dashboard.'
+- [x] Update docs/reference/excluded-endpoints.md and README.
 
 ### `senso search` <sub>26 items</sub>
 
 **`senso search`** · group
 
-- [ ] Group help: state the id spaces (kb_node_id vs content_id), the four variants in one table (answer? chunks? deduplicated?), the ordered workflow, and that all five commands cost credits and record a turn.
-- [ ] Say explicitly: read a source with `senso kb get <kb_node_id>`; `senso content get` is for generated content and rejects KB content.
-- [ ] Fix the senso-search skill (SKILL.md lines 45-49, 106-117): add kb_node_id to the documented result fields, replace `senso content get <content_id>` with `senso kb get <kb_node_id>`, and change the 402 row to 403 with the actual message.
+- [x] Group help: state the id spaces (kb_node_id vs content_id), the four variants in one table (answer? chunks? deduplicated?), the ordered workflow, and that all five commands cost credits and record a turn.
+- [x] Say explicitly: read a source with `senso kb get <kb_node_id>`; `senso content get` is for generated content and rejects KB content.
+- [x] Fix the senso-search skill (SKILL.md lines 45-49, 106-117): add kb_node_id to the documented result fields, replace `senso content get <content_id>` with `senso kb get <kb_node_id>`, and change the 402 row to 403 with the actual message.
 
 **`senso search <query>`** · 🔴 high
 
-- [ ] Give the leaf its own help (the block below): what it returns, the two id spaces, Returns/Exit codes/Examples.
-- [ ] Plain, no hits: print 'No results for "<query>".' on stdout; on stderr 'This search was filed as a gap. Review: senso gaps list --origin api_unanswered_question --status open' (or 'Not filed as a gap (--no-gap-signals).'). Never emit a payload made only of blank lines.
-- [ ] Plain, hits: show score and chunk_index on each hit ('score 0.91 chunk 2') and label the ids; end with 'Next: senso kb get <kb_node_id>' on stderr.
-- [ ] Validate --max-results as an integer in 1-20 and exit 2 with field/received/allowed; validate each --content-ids value as a UUID; exit 2 when --require-scoped-ids is given without --content-ids. Reject a query over 2000 characters before the request.
-- [ ] Map the three 403 credit messages from the search endpoints to code insufficient_credits, exit 1, hint 'Check credits: senso credits' (match on the message until the API returns 402).
-- [ ] JSON: wrap in the standard envelope {ok, command:"search", data, next, warnings}; when results is empty add warnings ['No results; filed as an API search gap'] and next [{why:'Review the gap', command:'senso gaps list --origin api_unanswered_question --status open'}].
-- [ ] Fix the senso-search skill per the wording in issues.
+- [x] Give the leaf its own help (the block below): what it returns, the two id spaces, Returns/Exit codes/Examples.
+- [x] Plain, no hits: print 'No results for "<query>".' on stdout; on stderr 'This search was filed as a gap. Review: senso gaps list --origin api_unanswered_question --status open' (or 'Not filed as a gap (--no-gap-signals).'). Never emit a payload made only of blank lines.
+- [x] Plain, hits: show score and chunk_index on each hit ('score 0.91 chunk 2') and label the ids; end with 'Next: senso kb get <kb_node_id>' on stderr.
+- [x] Validate --max-results as an integer in 1-20 and exit 2 with field/received/allowed; validate each --content-ids value as a UUID; exit 2 when --require-scoped-ids is given without --content-ids. Reject a query over 2000 characters before the request.
+- [x] Map the three 403 credit messages from the search endpoints to code insufficient_credits, exit 1, hint 'Check credits: senso credits' (match on the message until the API returns 402).
+- [x] JSON: wrap in the standard envelope {ok, command:"search", data, next, warnings}; when results is empty add warnings ['No results; filed as an API search gap'] and next [{why:'Review the gap', command:'senso gaps list --origin api_unanswered_question --status open'}].
+- [x] Fix the senso-search skill per the wording in issues.
 
 **`senso search content`** · 🔴 high
 
-- [ ] Help: Returns block naming `contents[]` and `total`; say --max-results counts documents; Examples with jq on .data.contents.
-- [ ] Plain: numbered rows 'title kb_node_id content_id'; empty → 'No documents matched "<query>".'
-- [ ] Validate flags → exit 2; map 403 credit messages → insufficient_credits.
-- [ ] JSON envelope with next: [kb get <kb_node_id>, search --content-ids ...].
-- [ ] Fix SKILL.md line 77 and lines 106-117 per the wording in issues.
+- [x] Help: Returns block naming `contents[]` and `total`; say --max-results counts documents; Examples with jq on .data.contents.
+- [x] Plain: numbered rows 'title kb_node_id content_id'; empty → 'No documents matched "<query>".'
+- [x] Validate flags → exit 2; map 403 credit messages → insufficient_credits.
+- [x] JSON envelope with next: [kb get <kb_node_id>, search --content-ids ...].
+- [x] Fix SKILL.md line 77 and lines 106-117 per the wording in issues.
 
 **`senso search context`** · 🟠 medium
 
-- [ ] Plain: numbered blocks with score and chunk_index on the header line, the passage, then both ids labeled; 'No results for "<query>".' when empty.
-- [ ] Validate --max-results (1-20), --content-ids UUIDs, --require-scoped-ids needs --content-ids → exit 2.
-- [ ] Map the 403 credit messages to insufficient_credits/exit 1.
-- [ ] JSON envelope {ok, command:"search context", data, next:[kb get <kb_node_id>]}.
-- [ ] Help: Returns/Exit codes/Examples; say it is billed and recorded but never filed as a gap.
+- [x] Plain: numbered blocks with score and chunk_index on the header line, the passage, then both ids labeled; 'No results for "<query>".' when empty.
+- [x] Validate --max-results (1-20), --content-ids UUIDs, --require-scoped-ids needs --content-ids → exit 2.
+- [x] Map the 403 credit messages to insufficient_credits/exit 1.
+- [x] JSON envelope {ok, command:"search context", data, next:[kb get <kb_node_id>]}.
+- [x] Help: Returns/Exit codes/Examples; say it is billed and recorded but never filed as a gap.
 
 **`senso search full`** · 🔴 high
 
-- [ ] Register `full` with the same renderer as the default search (share the plain block), or make it a true alias so the two cannot drift.
-- [ ] Everything listed for `search`: no-results line plus gap notice, validation → exit 2, 403 credit mapping, JSON envelope, help with Returns/Exit codes/Examples.
+- [x] Register `full` with the same renderer as the default search (share the plain block), or make it a true alias so the two cannot drift.
+- [x] Everything listed for `search`: no-results line plus gap notice, validation → exit 2, 403 credit mapping, JSON envelope, help with Returns/Exit codes/Examples.
 
 **`senso search stream`** · 🟠 medium
 
-- [ ] Label the ids on each source ('kb_node_id …' and 'content_id …'), show score and chunk index.
-- [ ] No sources: 'No results for "<query>".' plus the gap notice on stderr.
-- [ ] json: {ok, command:"search stream", data:{query, search_type, answer, results, total_results, max_results}, next}.
-- [ ] Validation → exit 2; 403 credit mapping; help with Returns/Exit codes/Examples and a note that json is emitted once at the end.
+- [x] Label the ids on each source ('kb_node_id …' and 'content_id …'), show score and chunk index.
+- [x] No sources: 'No results for "<query>".' plus the gap notice on stderr.
+- [x] json: {ok, command:"search stream", data:{query, search_type, answer, results, total_results, max_results}, next}.
+- [x] Validation → exit 2; 403 credit mapping; help with Returns/Exit codes/Examples and a note that json is emitted once at the end.
 
 ### `senso ingest` <sub>17 items</sub>
 
 **`senso ingest`** · group
 
-- [ ] Group help: the workflow (upload → note kb_node_id → poll senso kb get until content.processing_status is complete → search), the supported types with the .md and .json/.xml caveats, the 10-file limit, the 100 MB limit, and that kb upload is the same command.
-- [ ] Fix senso-ingest SKILL.md: lines 41 (formats), 55 (add kb_node_id), 129-141 and 163 (poll with senso kb get <kb_node_id>), 184-191 (409 is not how duplicates surface; 422 means every file in the batch was skipped).
+- [x] Group help: the workflow (upload → note kb_node_id → poll senso kb get until content.processing_status is complete → search), the supported types with the .md and .json/.xml caveats, the 10-file limit, the 100 MB limit, and that kb upload is the same command.
+- [x] Fix senso-ingest SKILL.md: lines 41 (formats), 55 (add kb_node_id), 129-141 and 163 (poll with senso kb get <kb_node_id>), 184-191 (409 is not how duplicates surface; 422 means every file in the batch was skipped).
 
 **`senso ingest reprocess`** · 🟠 medium
 
-- [ ] Rename the argument to <kb_node_id>; validate it as a UUID → exit 2.
-- [ ] Pre-flight the file type against the API's allowed list and reject .md/.markdown with exit 2 (hint: senso kb update-raw <kb_node_id> for editable documents).
-- [ ] Plain: print the result block on stdout (kb_node_id, content_id, ingestion_run_id, status); stderr '✓ Replaced file on KB node <id>.' then 'Next: senso kb get <id>' (poll content.processing_status).
-- [ ] 404: 'KB node <id> not found or not shared with this API key.' when the API says Node not found; 'KB node <id> is a folder, not a document.' when it says Content not found. 409: 'This exact file is already ingested for KB node <id>; nothing to do.' exit 1, no retry hint.
-- [ ] Strip upload_url/expires_in from output; JSON envelope with next.
+- [x] Rename the argument to <kb_node_id>; validate it as a UUID → exit 2.
+- [x] Pre-flight the file type against the API's allowed list and reject .md/.markdown with exit 2 (hint: senso kb update-raw <kb_node_id> for editable documents).
+- [x] Plain: print the result block on stdout (kb_node_id, content_id, ingestion_run_id, status); stderr '✓ Replaced file on KB node <id>.' then 'Next: senso kb get <id>' (poll content.processing_status).
+- [x] 404: 'KB node <id> not found or not shared with this API key.' when the API says Node not found; 'KB node <id> is a folder, not a document.' when it says Content not found. 409: 'This exact file is already ingested for KB node <id>; nothing to do.' exit 1, no retry hint.
+- [x] Strip upload_url/expires_in from output; JSON envelope with next.
 
 **`senso ingest upload`** · 🔴 high
 
-- [ ] Plain: after the S3 uploads, print each result on stdout as a numbered block with filename, status, kb_node_id, content_id (and error/existing_content_id when skipped); keep progress on stderr; end with 'Next: senso kb get <kb_node_id> (poll until content.processing_status is complete)' on stderr.
-- [ ] Validate --folder-id as a UUID → exit 2 with field/received.
-- [ ] Before the request, reject .md/.markdown with exit 2 and the hint 'senso kb create-raw --data …', and reject extensions outside the API's allowed list (drop .json/.xml from the MIME table or map them to a pre-flight error).
-- [ ] Add a case for markdown_requires_raw_ingestion in uploadStatusToReason.
-- [ ] When stdin is not a TTY and --folder-id is absent, say on stderr 'Uploading to the root folder (no --folder-id).'
-- [ ] 422 whole-batch: JSON error {code:'validation', status:422, message:'No files were accepted (3 skipped).', data or details: results[]}; plain lists each file with status and reason (already does).
-- [ ] 404: 'Folder <id> not found or not shared with this API key.' hint 'senso kb my-files'. 403: pass the API text through and say the folder's owner can grant the role.
-- [ ] Strip upload_url/expires_in from json and table output (or move them under a debug flag); they are consumed by the CLI itself.
-- [ ] JSON envelope: {ok, command:'ingest upload', data: <API response>, warnings: one per skipped file, next: [kb get for each accepted kb_node_id]}.
-- [ ] Fix senso-ingest SKILL.md per the wording in issues.
+- [x] Plain: after the S3 uploads, print each result on stdout as a numbered block with filename, status, kb_node_id, content_id (and error/existing_content_id when skipped); keep progress on stderr; end with 'Next: senso kb get <kb_node_id> (poll until content.processing_status is complete)' on stderr.
+- [x] Validate --folder-id as a UUID → exit 2 with field/received.
+- [x] Before the request, reject .md/.markdown with exit 2 and the hint 'senso kb create-raw --data …', and reject extensions outside the API's allowed list (drop .json/.xml from the MIME table or map them to a pre-flight error).
+- [x] Add a case for markdown_requires_raw_ingestion in uploadStatusToReason.
+- [x] When stdin is not a TTY and --folder-id is absent, say on stderr 'Uploading to the root folder (no --folder-id).'
+- [x] 422 whole-batch: JSON error {code:'validation', status:422, message:'No files were accepted (3 skipped).', data or details: results[]}; plain lists each file with status and reason (already does).
+- [x] 404: 'Folder <id> not found or not shared with this API key.' hint 'senso kb my-files'. 403: pass the API text through and say the folder's owner can grant the role.
+- [x] Strip upload_url/expires_in from json and table output (or move them under a debug flag); they are consumed by the CLI itself.
+- [x] JSON envelope: {ok, command:'ingest upload', data: <API response>, warnings: one per skipped file, next: [kb get for each accepted kb_node_id]}.
+- [x] Fix senso-ingest SKILL.md per the wording in issues.
 
 ### `senso website-import` <sub>11 items</sub>
 
 **`senso website-import`** · group
 
-- [ ] Group help: the gate (GEO product + update:brand_kit), the source of the URL, the two commands with the polling model (current vs latest_completed), the status and error_code enums, and the workflow start → status → kb children of the 'Website' folder.
+- [x] Group help: the gate (GEO product + update:brand_kit), the source of the URL, the two commands with the polling model (current vs latest_completed), the status and error_code enums, and the workflow start → status → kb children of the 'Website' folder.
 
 **`senso website-import start`** · 🟠 medium
 
-- [ ] 422: 'Cannot import: no website is on file for this organization (API: No website on file for this organization).' code validation, hint 'senso org update --data '{"websites":["https://…"]}'' (or the app setting), keep error_code in the JSON error.
-- [ ] 503: code error (not server_error), message 'Website import is not enabled in this environment.' with no retry hint.
-- [ ] 403 product: 'Website import needs the GEO product, which this organization does not have.' hint 'Contact Senso to enable GEO.' 403 permission: 'This API key lacks update:brand_kit.' hint 'An org admin can grant it in API keys.'
-- [ ] 409: include current.run_id and started_at; hint 'senso website-import status'.
-- [ ] --no-wait: stderr 'Next: senso website-import status' and JSON next.
-- [ ] Help: Returns with both enums, Exit codes, Examples, the 180 s/2 s polling note.
-- [ ] JSON envelope {ok, command:'website-import start', data: run, next: [kb find --query Website, brand-kit get when generated]}.
+- [x] 422: 'Cannot import: no website is on file for this organization (API: No website on file for this organization).' code validation, hint 'senso org update --data '{"websites":["https://…"]}'' (or the app setting), keep error_code in the JSON error.
+- [x] 503: code error (not server_error), message 'Website import is not enabled in this environment.' with no retry hint.
+- [x] 403 product: 'Website import needs the GEO product, which this organization does not have.' hint 'Contact Senso to enable GEO.' 403 permission: 'This API key lacks update:brand_kit.' hint 'An org admin can grant it in API keys.'
+- [x] 409: include current.run_id and started_at; hint 'senso website-import status'.
+- [x] --no-wait: stderr 'Next: senso website-import status' and JSON next.
+- [x] Help: Returns with both enums, Exit codes, Examples, the 180 s/2 s polling note.
+- [x] JSON envelope {ok, command:'website-import start', data: run, next: [kb find --query Website, brand-kit get when generated]}.
 
 **`senso website-import status`** · 🟢 low
 
-- [ ] Plain: two labeled sections 'In flight: none' / 'In flight: <run>' and 'Last finished: <run>'; never-imported → 'No website imports yet.' on stdout.
-- [ ] Help: polling rule, enums, gate, Examples with jq on .data.current and .data.latest_completed.status.
-- [ ] 403/503 messages as for start. JSON envelope with next: [website-import start when nothing is in flight].
+- [x] Plain: two labeled sections 'In flight: none' / 'In flight: <run>' and 'Last finished: <run>'; never-imported → 'No website imports yet.' on stdout.
+- [x] Help: polling rule, enums, gate, Examples with jq on .data.current and .data.latest_completed.status.
+- [x] 403/503 messages as for start. JSON envelope with next: [website-import start when nothing is in flight].
 
 ### `senso content` <sub>102 items</sub>
 
 **`senso content`** · group
 
-- [ ] Rewrite the group description to say these commands operate on GENERATED content (source_type=content_engine) and that knowledge-base documents are `senso kb ...`.
-- [ ] Name the two id spaces explicitly: content_id (from `content verification`, `generated-content list`, `engine draft`/`engine publish`) and version_id (from `content versions`, used by reject/restore).
-- [ ] Add an ordered workflow list to the group help.
-- [ ] Either remove `content list` or rename it so it is not mistaken for a listing of the ids the other subcommands take.
+- [x] Rewrite the group description to say these commands operate on GENERATED content (source_type=content_engine) and that knowledge-base documents are `senso kb ...`.
+- [x] Name the two id spaces explicitly: content_id (from `content verification`, `generated-content list`, `engine draft`/`engine publish`) and version_id (from `content versions`, used by reject/restore).
+- [x] Add an ordered workflow list to the group help.
+- [x] Either remove `content list` or rename it so it is not mistaken for a listing of the ids the other subcommands take.
 
 **`senso content citation-details`** · 🔴 high
 
-- [ ] Validate <id> as a UUID; validate --start-date / --end-date as YYYY-MM-DD and reject start > end; validate every --models entry against the server allow-list - all at exit 2 before the request.
-- [ ] List the accepted --models values in the flag help.
-- [ ] Help: correct the id source to `senso content verification --status published`.
-- [ ] Plain output: key/value for the header, a numbered block per destination, and a compact date/citations table for `trend`.
-- [ ] State the default window (all-time when the flags are omitted) and that a --locations typo yields an empty result rather than an error.
-- [ ] 404: "Content <id> not found in organization <slug>." with hint `senso content verification --status published`.
+- [x] Validate <id> as a UUID; validate --start-date / --end-date as YYYY-MM-DD and reject start > end; validate every --models entry against the server allow-list - all at exit 2 before the request.
+- [x] List the accepted --models values in the flag help.
+- [x] Help: correct the id source to `senso content verification --status published`.
+- [x] Plain output: key/value for the header, a numbered block per destination, and a compact date/citations table for `trend`.
+- [x] State the default window (all-time when the flags are omitted) and that a --locations typo yields an empty result rather than an error.
+- [x] 404: "Content <id> not found in organization <slug>." with hint `senso content verification --status published`.
 
 **`senso content citation-prompts`** · 🟠 medium
 
-- [ ] Validate <id> as a UUID, the two dates as YYYY-MM-DD with start <= end, and each --models entry against the allow-list -> exit 2.
-- [ ] Add mention_rate_lift and avg_sov_lift to the table columns, since they are the command's stated purpose.
-- [ ] Supply a plain renderer that prints content_id, date_range, models and external_urls as a header block before the prompt rows.
-- [ ] Help: correct the id source; document every returned field including that the two *_lift fields are null when no baseline exists.
-- [ ] Warn on stderr when --destinations contains a slug absent from the response (the API ignores unknown slugs silently).
-- [ ] Empty result: say why - `tracked_url_count` 0 on the item, or no runs in the window - and suggest `senso content citation-details <id>`.
+- [x] Validate <id> as a UUID, the two dates as YYYY-MM-DD with start <= end, and each --models entry against the allow-list -> exit 2.
+- [x] Add mention_rate_lift and avg_sov_lift to the table columns, since they are the command's stated purpose.
+- [x] Supply a plain renderer that prints content_id, date_range, models and external_urls as a header block before the prompt rows.
+- [x] Help: correct the id source; document every returned field including that the two *_lift fields are null when no baseline exists.
+- [x] Warn on stderr when --destinations contains a slug absent from the response (the API ignores unknown slugs silently).
+- [x] Empty result: say why - `tracked_url_count` 0 on the item, or no runs in the window - and suggest `senso content citation-details <id>`.
 
 **`senso content delete`** · 🔴 high
 
-- [ ] Validate <id> as a UUID -> exit 2.
-- [ ] Help: say generated content only, name `senso kb delete` for KB nodes, document the 409 retry case and the non-atomic external delete.
-- [ ] Add a --yes flag and, when stdin is a TTY and --yes is absent, require confirmation. Agents pass --yes.
-- [ ] 404: "Content <id> not found in organization <slug>." hint `senso content verification`.
-- [ ] 409: pass the API message through, prefixed "Could not delete content <id>: ...", with hint `senso content get <id>` to check processing_status.
-- [ ] Emit a real JSON payload: {"action":"deleted","resource":"content","id":"..."}.
+- [x] Validate <id> as a UUID -> exit 2.
+- [x] Help: say generated content only, name `senso kb delete` for KB nodes, document the 409 retry case and the non-atomic external delete.
+- [x] Add a --yes flag and, when stdin is a TTY and --yes is absent, require confirmation. Agents pass --yes.
+- [x] 404: "Content <id> not found in organization <slug>." hint `senso content verification`.
+- [x] 409: pass the API message through, prefixed "Could not delete content <id>: ...", with hint `senso content get <id>` to check processing_status.
+- [x] Emit a real JSON payload: {"action":"deleted","resource":"content","id":"..."}.
 
 **`senso content get`** · 🔴 high
 
-- [ ] Help: state in the first paragraph that this returns GENERATED content only, and that a knowledge-base content_id is rejected with 400 - link to `senso kb get` / `senso kb content`.
-- [ ] Correct the summary: it returns the current version's title/summary/text and editorial_status, NOT a versions list and NOT publish records. Point at `senso content versions` and `senso content verification` for those.
-- [ ] Validate <id> as a UUID -> exit 2 before the request.
-- [ ] Special-case the 400 "Knowledge base content..." body: message "Content <id> is a knowledge base document; `senso content get` only serves generated content." with hint "senso kb find --q <name>", keeping exit 1.
-- [ ] 404 message: "Content <id> not found in organization <slug>." with hint `senso content verification`.
-- [ ] 403: distinguish the product guard ("Your organization does not have the GEO product") from the permission guard ("This key lacks read:content").
-- [ ] Plain output: render tags / org_tags / uploaded_by as indented sub-blocks, not inline JSON.
-- [ ] Add Returns / Exit codes / Examples / See also sections and document the editorial_status and processing_status value sets.
-- [ ] Fix `content unpublish`'s help, which points here for publish_record_ids.
+- [x] Help: state in the first paragraph that this returns GENERATED content only, and that a knowledge-base content_id is rejected with 400 - link to `senso kb get` / `senso kb content`.
+- [x] Correct the summary: it returns the current version's title/summary/text and editorial_status, NOT a versions list and NOT publish records. Point at `senso content versions` and `senso content verification` for those.
+- [x] Validate <id> as a UUID -> exit 2 before the request.
+- [x] Special-case the 400 "Knowledge base content..." body: message "Content <id> is a knowledge base document; `senso content get` only serves generated content." with hint "senso kb find --q <name>", keeping exit 1.
+- [x] 404 message: "Content <id> not found in organization <slug>." with hint `senso content verification`.
+- [x] 403: distinguish the product guard ("Your organization does not have the GEO product") from the permission guard ("This key lacks read:content").
+- [x] Plain output: render tags / org_tags / uploaded_by as indented sub-blocks, not inline JSON.
+- [x] Add Returns / Exit codes / Examples / See also sections and document the editorial_status and processing_status value sets.
+- [x] Fix `content unpublish`'s help, which points here for publish_record_ids.
 
 **`senso content list`** · 🔴 high
 
-- [ ] Fix the table mapping: `status: r.content?.processing_status`.
-- [ ] Validate --limit as an integer in 1..50 and --offset as an integer >= 0 with parseIntFlag, exiting 2 before the request instead of letting the API clamp silently.
-- [ ] Help: state that the ids are kb_node_id values, that they are NOT accepted by `content get`, and point at `senso kb get <kb_node_id>`.
-- [ ] Show `Showing 1-10 of 42. Next page: senso content list --offset 10` on stderr, from the `total` the API already returns.
-- [ ] Empty result: `No content found.` on stdout plus a stderr line naming `senso kb my-files` and `senso kb find`.
-- [ ] Mark the command deprecated in its description in favor of `senso kb my-files`.
+- [x] Fix the table mapping: `status: r.content?.processing_status`.
+- [x] Validate --limit as an integer in 1..50 and --offset as an integer >= 0 with parseIntFlag, exiting 2 before the request instead of letting the API clamp silently.
+- [x] Help: state that the ids are kb_node_id values, that they are NOT accepted by `content get`, and point at `senso kb get <kb_node_id>`.
+- [x] Show `Showing 1-10 of 42. Next page: senso content list --offset 10` on stderr, from the `total` the API already returns.
+- [x] Empty result: `No content found.` on stdout plus a stderr line naming `senso kb my-files` and `senso kb find`.
+- [x] Mark the command deprecated in its description in favor of `senso kb my-files`.
 
 **`senso content owners`** · 🟢 low
 
-- [ ] Validate <id> as a UUID -> exit 2.
-- [ ] Empty result: `No owners assigned.` on stdout plus a stderr hint `senso content set-owners <id> --user-ids <user_id>` and `senso members list` for the ids.
-- [ ] Help: name `senso members list` as the source of user_id values, say owners are advisory metadata surfaced on `content verification`, and add Returns / Exit codes / Examples.
-- [ ] 404: "Content <id> not found in organization <slug>."
+- [x] Validate <id> as a UUID -> exit 2.
+- [x] Empty result: `No owners assigned.` on stdout plus a stderr hint `senso content set-owners <id> --user-ids <user_id>` and `senso members list` for the ids.
+- [x] Help: name `senso members list` as the source of user_id values, say owners are advisory metadata surfaced on `content verification`, and add Returns / Exit codes / Examples.
+- [x] 404: "Content <id> not found in organization <slug>."
 
 **`senso content provenance`** · 🔴 high
 
-- [ ] Fix the cross-reference: replace "'publish-records list' is where those URLs come from" with `senso content verification --status published`.
-- [ ] Validate --url with `new URL(...)` and require an http/https scheme -> exit 2 with the reason before the request.
-- [ ] 404: "No live publish record matches <url> in organization <slug>." with the hint naming the verification command that lists real URLs.
-- [ ] Plain output: one block per stage with its status, applicability, what_can_be_proven and missing_evidence as bullet lines; keep --output json as the raw payload.
-- [ ] Document overall_status / status / applicability value sets and the five stages in the help.
+- [x] Fix the cross-reference: replace "'publish-records list' is where those URLs come from" with `senso content verification --status published`.
+- [x] Validate --url with `new URL(...)` and require an http/https scheme -> exit 2 with the reason before the request.
+- [x] 404: "No live publish record matches <url> in organization <slug>." with the hint naming the verification command that lists real URLs.
+- [x] Plain output: one block per stage with its status, applicability, what_can_be_proven and missing_evidence as bullet lines; keep --output json as the raw payload.
+- [x] Document overall_status / status / applicability value sets and the five stages in the help.
 
 **`senso content record-edits`** · 🔴 high
 
-- [ ] Validate each event's event_type against the 8 allowed values and edit_source against manual|ai|system, and require client_event_id to be a UUID when present - all at exit 2, before anything is written.
-- [ ] Validate <id> as a UUID -> exit 2.
-- [ ] List both closed sets in the --data help text.
-- [ ] Confirmation: `Recorded N new event(s), skipped M duplicate(s) for content <id>.` from the response.
-- [ ] Help: state explicitly that a mid-batch failure leaves earlier events written and the API does not report how many, so every event should carry a client_event_id and the whole batch should be retried.
-- [ ] 404: name generation_run_id, not the content id, as the thing that was not found.
+- [x] Validate each event's event_type against the 8 allowed values and edit_source against manual|ai|system, and require client_event_id to be a UUID when present - all at exit 2, before anything is written.
+- [x] Validate <id> as a UUID -> exit 2.
+- [x] List both closed sets in the --data help text.
+- [x] Confirmation: `Recorded N new event(s), skipped M duplicate(s) for content <id>.` from the response.
+- [x] Help: state explicitly that a mid-batch failure leaves earlier events written and the API does not report how many, so every event should carry a client_event_id and the whole batch should be retried.
+- [x] 404: name generation_run_id, not the content id, as the thing that was not found.
 
 **`senso content reject`** · 🔴 high
 
-- [ ] Validate <versionId> as a UUID -> exit 2.
-- [ ] Help: name `senso content versions <content_id>` and `senso content verification` (items[].version_id) as the sources, and say plainly that a content_id will 404.
-- [ ] 404: "Content version <id> not found in organization <slug>. (This takes a version_id, not a content_id.)" with hint `senso content versions <content_id>`.
-- [ ] Emit {"action":"rejected","resource":"content_version","id":"...","reason":"..."} as the JSON payload.
-- [ ] Add a stderr next step: `senso content restore <version_id>` to undo, and `senso content verification --status rejected` to review.
-- [ ] Recommend --reason in the help (it is the only record of why) rather than presenting it as an afterthought.
+- [x] Validate <versionId> as a UUID -> exit 2.
+- [x] Help: name `senso content versions <content_id>` and `senso content verification` (items[].version_id) as the sources, and say plainly that a content_id will 404.
+- [x] 404: "Content version <id> not found in organization <slug>. (This takes a version_id, not a content_id.)" with hint `senso content versions <content_id>`.
+- [x] Emit {"action":"rejected","resource":"content_version","id":"...","reason":"..."} as the JSON payload.
+- [x] Add a stderr next step: `senso content restore <version_id>` to undo, and `senso content verification --status rejected` to review.
+- [x] Recommend --reason in the help (it is the only record of why) rather than presenting it as an afterthought.
 
 **`senso content remove-owner`** · 🟠 medium
 
-- [ ] Validate both arguments as UUIDs -> exit 2, naming which argument failed.
-- [ ] Help: label the arguments explicitly - <id> is a content_id, <userId> is a user_id from `senso content owners <id>` - and say the call is idempotent.
-- [ ] 404: "Content <id> not found in organization <slug>. (The first argument is the content_id, the second the user_id.)"
-- [ ] Emit {"action":"removed","resource":"content_owner","content_id":"...","user_id":"..."}.
-- [ ] Add a next-step hint: `senso content owners <id>`.
+- [x] Validate both arguments as UUIDs -> exit 2, naming which argument failed.
+- [x] Help: label the arguments explicitly - <id> is a content_id, <userId> is a user_id from `senso content owners <id>` - and say the call is idempotent.
+- [x] 404: "Content <id> not found in organization <slug>. (The first argument is the content_id, the second the user_id.)"
+- [x] Emit {"action":"removed","resource":"content_owner","content_id":"...","user_id":"..."}.
+- [x] Add a next-step hint: `senso content owners <id>`.
 
 **`senso content restore`** · 🟠 medium
 
-- [ ] Validate <versionId> as a UUID -> exit 2.
-- [ ] Help: say the endpoint sets the version to draft regardless of its current status, and warn that restoring a published version does NOT unpublish it - use `senso content unpublish` for that.
-- [ ] Name the sources of a version_id, and say a content_id will 404.
-- [ ] 404: "Content version <id> not found in organization <slug>. (This takes a version_id, not a content_id.)"
-- [ ] Emit {"action":"restored","resource":"content_version","id":"...","editorial_status":"draft"}.
-- [ ] Add next-step hints: `senso content verification --status draft` and `senso engine publish`.
+- [x] Validate <versionId> as a UUID -> exit 2.
+- [x] Help: say the endpoint sets the version to draft regardless of its current status, and warn that restoring a published version does NOT unpublish it - use `senso content unpublish` for that.
+- [x] Name the sources of a version_id, and say a content_id will 404.
+- [x] 404: "Content version <id> not found in organization <slug>. (This takes a version_id, not a content_id.)"
+- [x] Emit {"action":"restored","resource":"content_version","id":"...","editorial_status":"draft"}.
+- [x] Add next-step hints: `senso content verification --status draft` and `senso engine publish`.
 
 **`senso content set-owners`** · 🟠 medium
 
-- [ ] Capture and emit the response: `const data = await apiRequest(...); emit(ctx, data)` so the resulting owner set is on stdout.
-- [ ] Validate <id> and every --user-ids value as UUIDs -> exit 2 naming the offending value.
-- [ ] Fetch the current owners first (or diff against the response) and emit a warning naming every owner removed by the replacement.
-- [ ] Add a --clear flag (or accept `--user-ids none`) so the list can be emptied, since the API supports it.
-- [ ] Help: name `senso members list` as the source of user_id values, say plainly that this replaces rather than adds, and point at `senso content remove-owner` for a single removal.
-- [ ] 400 "User is not a member": prefix with the attempted operation and, where possible, name the id.
+- [x] Capture and emit the response: `const data = await apiRequest(...); emit(ctx, data)` so the resulting owner set is on stdout.
+- [x] Validate <id> and every --user-ids value as UUIDs -> exit 2 naming the offending value.
+- [x] Fetch the current owners first (or diff against the response) and emit a warning naming every owner removed by the replacement.
+- [x] Add a --clear flag (or accept `--user-ids none`) so the list can be emptied, since the API supports it.
+- [x] Help: name `senso members list` as the source of user_id values, say plainly that this replaces rather than adds, and point at `senso content remove-owner` for a single removal.
+- [x] 400 "User is not a member": prefix with the attempted operation and, where possible, name the id.
 
 **`senso content unpublish`** · 🔴 high
 
-- [ ] Validate every --publish-record-ids value as a UUID -> exit 2 before the request. This alone closes the unpublish-everything footgun.
-- [ ] Validate <id> as a UUID -> exit 2.
-- [ ] Build the confirmation from the response: `Unpublished N of M record(s) from content <id>.` using data.unpublished_count, and when failures.length > 0 exit 1 and print each failure, or at minimum emit them as warnings.
-- [ ] Help: correct the publish_record_id source to `senso content verification --status published --output json | jq -r '.data.items[].destinations[].publish_record_id'`.
-- [ ] Help: state the two response shapes explicitly, and normalize them in the JSON envelope so `data` always carries {unpublished_count, failures}.
-- [ ] Document the 409 cases and translate 400 "Content type does not support unpublish" into "Content <id> is not generated content (only content created by `senso engine publish` can be unpublished)."
-- [ ] Add a --yes confirmation for the no-flag form, which takes the page down everywhere.
+- [x] Validate every --publish-record-ids value as a UUID -> exit 2 before the request. This alone closes the unpublish-everything footgun.
+- [x] Validate <id> as a UUID -> exit 2.
+- [x] Build the confirmation from the response: `Unpublished N of M record(s) from content <id>.` using data.unpublished_count, and when failures.length > 0 exit 1 and print each failure, or at minimum emit them as warnings.
+- [x] Help: correct the publish_record_id source to `senso content verification --status published --output json | jq -r '.data.items[].destinations[].publish_record_id'`.
+- [x] Help: state the two response shapes explicitly, and normalize them in the JSON envelope so `data` always carries {unpublished_count, failures}.
+- [x] Document the 409 cases and translate 400 "Content type does not support unpublish" into "Content <id> is not generated content (only content created by `senso engine publish` can be unpublished)."
+- [x] Add a --yes confirmation for the no-flag form, which takes the page down everywhere.
 
 **`senso content verification`** · 🔴 high
 
-- [ ] Pass an explicit table/plain rendering so the items array is not stringified: `emit(ctx, data, { table: { rows: data.items, columns: ["content_id","title","editorial_status","published_at","citation_rate"] } })` plus numbered plain blocks. (Alternatively add draft_count/rejected_count/pending_published_draft_count to ENVELOPE_KEYS in lib/output.ts - but they are counts, not pagination, so the per-command override is the right fix.)
-- [ ] Help: say plainly that `review` is an alias for `draft` server-side, or drop `review` from the accepted set.
-- [ ] Add `unpublished` to VERIFICATION_SUBSTATUSES and validate the --status/--substatus pairing locally (pending_draft requires published; unpublished requires draft) -> exit 2.
-- [ ] Expose --tag-ids and --sort with their documented value sets.
-- [ ] Validate --limit (1..100) and --offset (>=0) with parseIntFlag -> exit 2.
-- [ ] Document the returned fields, especially destinations[].publish_record_id as the input to `content unpublish --publish-record-ids` and `publish-records retry`.
-- [ ] Show `Showing 1-10 of 42. Next page: senso content verification --offset 10` on stderr, and an explicit `No content found.` plus a widening hint on an empty page.
+- [x] Pass an explicit table/plain rendering so the items array is not stringified: `emit(ctx, data, { table: { rows: data.items, columns: ["content_id","title","editorial_status","published_at","citation_rate"] } })` plus numbered plain blocks. (Alternatively add draft_count/rejected_count/pending_published_draft_count to ENVELOPE_KEYS in lib/output.ts - but they are counts, not pagination, so the per-command override is the right fix.)
+- [x] Help: say plainly that `review` is an alias for `draft` server-side, or drop `review` from the accepted set.
+- [x] Add `unpublished` to VERIFICATION_SUBSTATUSES and validate the --status/--substatus pairing locally (pending_draft requires published; unpublished requires draft) -> exit 2.
+- [x] Expose --tag-ids and --sort with their documented value sets.
+- [x] Validate --limit (1..100) and --offset (>=0) with parseIntFlag -> exit 2.
+- [x] Document the returned fields, especially destinations[].publish_record_id as the input to `content unpublish --publish-record-ids` and `publish-records retry`.
+- [x] Show `Showing 1-10 of 42. Next page: senso content verification --offset 10` on stderr, and an explicit `No content found.` plus a widening hint on an empty page.
 
 **`senso content verification-counts`** · 🟠 medium
 
-- [ ] Render the counts as key/value and published_domain_summaries as a numbered sub-block (or a table when --output table), not as inline JSON.
-- [ ] Help: document every returned field, including that citation_rate is null (not 0) when there were no qualifying runs, and what citation_window_days / citation_missing_days_excluded mean.
-- [ ] Add next-step hints on stderr: `senso content verification --status draft` and `senso content verification-velocity`.
-- [ ] Document the GEO 403.
+- [x] Render the counts as key/value and published_domain_summaries as a numbered sub-block (or a table when --output table), not as inline JSON.
+- [x] Help: document every returned field, including that citation_rate is null (not 0) when there were no qualifying runs, and what citation_window_days / citation_missing_days_excluded mean.
+- [x] Add next-step hints on stderr: `senso content verification --status draft` and `senso content verification-velocity`.
+- [x] Document the GEO 403.
 
 **`senso content verification-velocity`** · 🟠 medium
 
-- [ ] Render `destinations` as a table (columns publisher_name, total_live_pages, pages_with_citations, avg_days_to_first_citation) and as numbered plain sub-blocks.
-- [ ] Help: document each field, state that nulls mean "nothing measured yet", and explain the org-vs-destination grain difference.
-- [ ] Say explicitly that the figures are all-time with no date filter.
-- [ ] Add next-step hints: `senso content verification --status published` and `senso content citation-details <content_id>`.
+- [x] Render `destinations` as a table (columns publisher_name, total_live_pages, pages_with_citations, avg_days_to_first_citation) and as numbered plain sub-blocks.
+- [x] Help: document each field, state that nulls mean "nothing measured yet", and explain the org-vs-destination grain difference.
+- [x] Say explicitly that the figures are all-time with no date filter.
+- [x] Add next-step hints: `senso content verification --status published` and `senso content citation-details <content_id>`.
 
 **`senso content versions`** · 🔴 high
 
-- [ ] Render the list properly: `emit(ctx, data, { table: { rows: data.versions, columns: ["version_id","version_num","editorial_status","is_current","updated_at"] } })` plus numbered plain blocks with the content_id as a header line.
-- [ ] Validate <id> as a UUID -> exit 2.
-- [ ] Help: state that version_id is the input to `content reject` and `content restore`, list the editorial_status values, and say the response is unpaginated.
-- [ ] 404: "Content <id> not found in organization <slug>." with hint `senso content verification`.
-- [ ] Add a next-step hint naming the current version's id.
+- [x] Render the list properly: `emit(ctx, data, { table: { rows: data.versions, columns: ["version_id","version_num","editorial_status","is_current","updated_at"] } })` plus numbered plain blocks with the content_id as a header line.
+- [x] Validate <id> as a UUID -> exit 2.
+- [x] Help: state that version_id is the input to `content reject` and `content restore`, list the editorial_status values, and say the response is unpaginated.
+- [x] 404: "Content <id> not found in organization <slug>." with hint `senso content verification`.
+- [x] Add a next-step hint naming the current version's id.
 
 ### `senso content tags` <sub>23 items</sub>
 
 **`senso content tags`** · group
 
-- [ ] Add to the group help: these four commands accept BOTH knowledge-base and generated content_id values, unlike the rest of `senso content`, and they need no GEO product.
-- [ ] Name the id sources: content_id from `senso kb my-files` (content.id) or `senso content verification` (items[].content_id); tag ids from `senso tags list`.
-- [ ] Call out the --names/--ids (set) vs --name/--id (add/remove) split explicitly.
-- [ ] Warn in the group help that `set` replaces the whole collection and that calling it with no flags empties it.
+- [x] Add to the group help: these four commands accept BOTH knowledge-base and generated content_id values, unlike the rest of `senso content`, and they need no GEO product.
+- [x] Name the id sources: content_id from `senso kb my-files` (content.id) or `senso content verification` (items[].content_id); tag ids from `senso tags list`.
+- [x] Call out the --names/--ids (set) vs --name/--id (add/remove) split explicitly.
+- [x] Warn in the group help that `set` replaces the whole collection and that calling it with no flags empties it.
 
 **`senso content tags add`** · 🟠 medium
 
-- [ ] Validate <id> and --id as UUIDs -> exit 2.
-- [ ] Reject --name and --id together at exit 2 rather than silently preferring --id.
-- [ ] Confirmation: `Attached tag <name-or-id> to content <id>.`
-- [ ] Follow the 204 with a `GET /org/content/{id}/tags` and emit the resulting collection, so a JSON caller learns the tag_id of a newly created tag.
-- [ ] Help: say the call is idempotent, that unknown names are created, and where tag ids come from (`senso tags list`).
+- [x] Validate <id> and --id as UUIDs -> exit 2.
+- [x] Reject --name and --id together at exit 2 rather than silently preferring --id.
+- [x] Confirmation: `Attached tag <name-or-id> to content <id>.`
+- [x] Follow the 204 with a `GET /org/content/{id}/tags` and emit the resulting collection, so a JSON caller learns the tag_id of a newly created tag.
+- [x] Help: say the call is idempotent, that unknown names are created, and where tag ids come from (`senso tags list`).
 
 **`senso content tags list`** · 🟢 low
 
-- [ ] Validate <id> as a UUID -> exit 2.
-- [ ] Help: say KB and generated content ids are both accepted, name the sources of each, and document `curated`.
-- [ ] Empty result: `No tags attached.` plus a stderr hint `senso content tags add <id> --name <name>`.
-- [ ] 404: "Content <id> not found in organization <slug>."
+- [x] Validate <id> as a UUID -> exit 2.
+- [x] Help: say KB and generated content ids are both accepted, name the sources of each, and document `curated`.
+- [x] Empty result: `No tags attached.` plus a stderr hint `senso content tags add <id> --name <name>`.
+- [x] 404: "Content <id> not found in organization <slug>."
 
 **`senso content tags remove`** · 🟠 medium
 
-- [ ] Validate <id> and --id as UUIDs, and reject a blank --name -> exit 2.
-- [ ] Reject --name and --id together at exit 2 instead of preferring --id.
-- [ ] Follow the 204 with a `GET /org/content/{id}/tags` so the resulting collection is on stdout and a caller can see whether anything changed; emit a warning when the named tag was not attached.
-- [ ] Confirmation: `Detached tag <name-or-id> from content <id>.`
-- [ ] Help: say explicitly that detaching an unknown or unattached tag is a silent success.
+- [x] Validate <id> and --id as UUIDs, and reject a blank --name -> exit 2.
+- [x] Reject --name and --id together at exit 2 instead of preferring --id.
+- [x] Follow the 204 with a `GET /org/content/{id}/tags` so the resulting collection is on stdout and a caller can see whether anything changed; emit a warning when the named tag was not attached.
+- [x] Confirmation: `Detached tag <name-or-id> from content <id>.`
+- [x] Help: say explicitly that detaching an unknown or unattached tag is a silent success.
 
 **`senso content tags set`** · 🔴 high
 
-- [ ] Require at least one of --names / --ids, and add an explicit --clear flag for the empty case -> exit 2 when neither is present. This is the single most important fix in the tags subgroup.
-- [ ] Validate each --ids value as a UUID -> exit 2 naming the offending value.
-- [ ] Fetch the current tags first and emit a warning naming every tag removed by the replacement, and every name that was newly created.
-- [ ] Help: say plainly that this REPLACES, that --clear (not a bare invocation) is how to empty the list, and that unknown names are created.
-- [ ] 404 and the tag 400s: prefix with the attempted operation and name the flag and the value.
+- [x] Require at least one of --names / --ids, and add an explicit --clear flag for the empty case -> exit 2 when neither is present. This is the single most important fix in the tags subgroup.
+- [x] Validate each --ids value as a UUID -> exit 2 naming the offending value.
+- [x] Fetch the current tags first and emit a warning naming every tag removed by the replacement, and every name that was newly created.
+- [x] Help: say plainly that this REPLACES, that --clear (not a bare invocation) is how to empty the list, and that unknown names are created.
+- [x] 404 and the tag 400s: prefix with the attempted operation and name the flag and the value.
 
 ### `senso ctas` <sub>21 items</sub>
 
 **`senso ctas`** · group
 
-- [ ] Add id spaces, permissions, and an ordered workflow (upload-url -> PUT -> create -> set-default -> set-for-content) to the group description.
+- [x] Add id spaces, permissions, and an ordered workflow (upload-url -> PUT -> create -> set-default -> set-for-content) to the group description.
 
 **`senso ctas clear-default`** · 🟢 low
 
-- [ ] Help in §2.1 shape; JSON data {action: cleared, resource: default_cta}.
+- [x] Help in §2.1 shape; JSON data {action: cleared, resource: default_cta}.
 
 **`senso ctas create`** · 🟠 medium
 
-- [ ] Validate --data before the request: required title/button_label/target_url non-blank, target_url/image_url absolute URLs, lengths (255/120/2048/2000/120), is_default bool, image_position {x,y} numbers 0-1, unknown keys named -> exit 2.
-- [ ] Help: full key table with limits, Returns (cta_id, resolved_agent_text, live_update_*), Exit codes, Examples; JSON next: set-default / set-for-content.
-- [ ] Pass validation 400s through as code validation with field.
+- [x] Validate --data before the request: required title/button_label/target_url non-blank, target_url/image_url absolute URLs, lengths (255/120/2048/2000/120), is_default bool, image_position {x,y} numbers 0-1, unknown keys named -> exit 2.
+- [x] Help: full key table with limits, Returns (cta_id, resolved_agent_text, live_update_*), Exit codes, Examples; JSON next: set-default / set-for-content.
+- [x] Pass validation 400s through as code validation with field.
 
 **`senso ctas delete`** · 🟢 low
 
-- [ ] Validate <ctaId> UUID -> exit 2; add hint `senso ctas clear-default` to the 409; name the id in the 404.
-- [ ] Help: restructure into §2.1 (Returns, Exit codes with 409, Examples).
-- [ ] JSON: data {action: deleted, resource: cta_template, id} (keep the API body under data.raw if needed).
+- [x] Validate <ctaId> UUID -> exit 2; add hint `senso ctas clear-default` to the 409; name the id in the 404.
+- [x] Help: restructure into §2.1 (Returns, Exit codes with 409, Examples).
+- [x] JSON: data {action: deleted, resource: cta_template, id} (keep the API body under data.raw if needed).
 
 **`senso ctas for-content`** · 🟢 low
 
-- [ ] Validate <contentId> UUID -> exit 2; 404 'Content <id> not found in this organization (only content-engine content has a CTA selection)'.
-- [ ] Plain: template as an indented sub-block; help in §2.1 shape with the implicit-default note.
+- [x] Validate <contentId> UUID -> exit 2; 404 'Content <id> not found in this organization (only content-engine content has a CTA selection)'.
+- [x] Plain: template as an indented sub-block; help in §2.1 shape with the implicit-default note.
 
 **`senso ctas list`** · 🟢 low
 
-- [ ] Help: add Returns with resolved_agent_text and image_position, Exit codes, Examples; empty: 'No CTA templates found.' + hint `senso ctas create`.
+- [x] Help: add Returns with resolved_agent_text and image_position, Exit codes, Examples; empty: 'No CTA templates found.' + hint `senso ctas create`.
 
 **`senso ctas set-default`** · 🟢 low
 
-- [ ] Validate <ctaId> UUID -> exit 2; 404 names the id; help in §2.1 shape.
+- [x] Validate <ctaId> UUID -> exit 2; 404 names the id; help in §2.1 shape.
 
 **`senso ctas set-for-content`** · 🟠 medium
 
-- [ ] Validate <contentId> and --cta-id as UUIDs -> exit 2.
-- [ ] Distinguish the two 404s by the API message: 'Content <id> not found' vs 'CTA template <id> not found' with the matching list command as hint.
-- [ ] Help: document the default-collapse behavior, Returns, Exit codes, Examples; JSON warnings when the stored selection differs from the requested one.
+- [x] Validate <contentId> and --cta-id as UUIDs -> exit 2.
+- [x] Distinguish the two 404s by the API message: 'Content <id> not found' vs 'CTA template <id> not found' with the matching list command as hint.
+- [x] Help: document the default-collapse behavior, Returns, Exit codes, Examples; JSON warnings when the stored selection differs from the requested one.
 
 **`senso ctas update`** · 🟠 medium
 
-- [ ] Validate <ctaId> UUID and --data as for create -> exit 2.
-- [ ] Help: restructure into §2.1 with the key table, Returns (live_update_count), Exit codes, Examples.
-- [ ] 404: 'CTA template <id> not found in this organization.' + hint `senso ctas list`.
+- [x] Validate <ctaId> UUID and --data as for create -> exit 2.
+- [x] Help: restructure into §2.1 with the key table, Returns (live_update_count), Exit codes, Examples.
+- [x] 404: 'CTA template <id> not found in this organization.' + hint `senso ctas list`.
 
 **`senso ctas upload-url`** · 🟢 low
 
-- [ ] Check the filename extension against --content-type client-side -> exit 2; check --filename length ≤ 255.
-- [ ] Help: add a curl example, the expiry note, Returns, Exit codes; plain: upload_headers as indented lines; JSON next: the curl command with the real URL and headers filled in.
-- [ ] Consider `--file <path>` to derive filename/content-type/size and perform the PUT, removing the manual step.
+- [x] Check the filename extension against --content-type client-side -> exit 2; check --filename length ≤ 255.
+- [x] Help: add a curl example, the expiry note, Returns, Exit codes; plain: upload_headers as indented lines; JSON next: the curl command with the real URL and headers filled in.
+- [x] Consider `--file <path>` to derive filename/content-type/size and perform the PUT, removing the manual step.
 
 ### `senso evals` <sub>33 items</sub>
 
 **`senso evals`** · group
 
-- [ ] Add a Lifecycle block: queued -> running -> completed (scored) | gated (pre-check found nothing to judge; no model spend, no score) | failed (error_code / error_message); canceled is reserved.
-- [ ] Add an ordered Workflow list and an Id spaces block (eval_run_id vs content_id vs kb_node_id).
-- [ ] Say that `--wait` is client-side polling with a 180-second budget, and that a timeout is exit 5 with the run still running.
-- [ ] Mention that judging one text for both evaluators is two runs, deliberately (routes comment at router.go:1726) — a caller that expects one call to answer both will otherwise be surprised.
+- [x] Add a Lifecycle block: queued -> running -> completed (scored) | gated (pre-check found nothing to judge; no model spend, no score) | failed (error_code / error_message); canceled is reserved.
+- [x] Add an ordered Workflow list and an Id spaces block (eval_run_id vs content_id vs kb_node_id).
+- [x] Say that `--wait` is client-side polling with a 180-second budget, and that a timeout is exit 5 with the run still running.
+- [x] Mention that judging one text for both evaluators is two runs, deliberately (routes comment at router.go:1726) — a caller that expects one call to answer both will otherwise be surprised.
 
 **`senso evals claims`** · 🟠 medium
 
-- [ ] Help: add Returns explaining verdict per evaluator, passed's null, both bucket vocabularies, about_brand/verifiable, confidence, grounding_failed and evidence_was_cited; add Exit codes, Examples and See also.
-- [ ] Add the paging line and next-page command on stderr, and a `page` block in the JSON envelope.
-- [ ] Print 'No claims found.' on stdout when empty; when --run-id was given, add the stderr hint 'Check the run exists and finished: senso evals get <runId>'.
-- [ ] Add a next step pointing at `senso gaps list --problem no_source` for unsupported claims.
+- [x] Help: add Returns explaining verdict per evaluator, passed's null, both bucket vocabularies, about_brand/verifiable, confidence, grounding_failed and evidence_was_cited; add Exit codes, Examples and See also.
+- [x] Add the paging line and next-page command on stderr, and a `page` block in the JSON envelope.
+- [x] Print 'No claims found.' on stdout when empty; when --run-id was given, add the stderr hint 'Check the run exists and finished: senso evals get <runId>'.
+- [x] Add a next step pointing at `senso gaps list --problem no_source` for unsupported claims.
 
 **`senso evals content`** · 🔴 high
 
-- [ ] Validate <contentId> as a UUID before the request — exit 2, with the hint `gaps answer` already uses: 'Content ids are the `id` from `senso kb create-raw`, or `content_id` from `senso kb get`.'
-- [ ] Help: add an Arguments block naming the content_id space and saying explicitly that a kb_node_id will 404; add Returns, Exit codes, Examples, See also.
-- [ ] 404: 'Content <id> not found in this organization.' with hint 'If you have a kb_node_id, get its content_id first: senso kb get <kb_node_id>.'
-- [ ] Pass the 422 text through with a prefix and a hint: 'This document stores a file or a crawled page rather than text of its own. Judge text directly with `senso evals text --text-file <path>`.'
-- [ ] Same 503 and gated-run fixes as `evals text`.
+- [x] Validate <contentId> as a UUID before the request — exit 2, with the hint `gaps answer` already uses: 'Content ids are the `id` from `senso kb create-raw`, or `content_id` from `senso kb get`.'
+- [x] Help: add an Arguments block naming the content_id space and saying explicitly that a kb_node_id will 404; add Returns, Exit codes, Examples, See also.
+- [x] 404: 'Content <id> not found in this organization.' with hint 'If you have a kb_node_id, get its content_id first: senso kb get <kb_node_id>.'
+- [x] Pass the 422 text through with a prefix and a hint: 'This document stores a file or a crawled page rather than text of its own. Judge text directly with `senso evals text --text-file <path>`.'
+- [x] Same 503 and gated-run fixes as `evals text`.
 
 **`senso evals evaluators`** · 🟢 low
 
-- [ ] Help: add Returns explaining key, evaluation_unit values, scope, latest_version, subjects (and that it predicts the 422) and metrics; add Exit codes and Examples.
-- [ ] Add a stderr next step: 'Judge text with the newest version: senso evals text --text "..." --evaluator kb_accuracy --evaluator-version <latest_version>'.
-- [ ] Print 'No evaluators found.' on stdout for an empty list, with the reason on stderr.
-- [ ] Note in --help that --evaluator is validated against a list compiled into this CLI, so an evaluator newer than the CLI must be passed to a newer CLI.
+- [x] Help: add Returns explaining key, evaluation_unit values, scope, latest_version, subjects (and that it predicts the 422) and metrics; add Exit codes and Examples.
+- [x] Add a stderr next step: 'Judge text with the newest version: senso evals text --text "..." --evaluator kb_accuracy --evaluator-version <latest_version>'.
+- [x] Print 'No evaluators found.' on stdout for an empty list, with the reason on stderr.
+- [x] Note in --help that --evaluator is validated against a list compiled into this CLI, so an evaluator newer than the CLI must be passed to a newer CLI.
 
 **`senso evals get`** · 🔴 high
 
-- [ ] Validate <runId> as a UUID before the request — exit 2 with the same hint `evals claims --run-id` already uses ('Run ids come from `senso evals runs` or the output of a trigger.').
-- [ ] 404: 'Eval run <id> not found in this organization.' with hint 'senso evals runs lists recent runs.'
-- [ ] Give the command a hand-written plain renderer: header (run, evaluator, status, score, band, counts, cost), then one block per claim (claim_text, verdict, passed, confidence, quote, reasoning, suggested_fix), then the searches. Today's inline-JSON rendering is the worst plain output in the two groups reviewed.
-- [ ] Help: add Arguments, Returns (every enum above), Exit codes, Examples, See also.
-- [ ] Add stderr next steps: `senso evals claims --run-id <id>` for the flat view, and for a failed run the error_code with what it means.
+- [x] Validate <runId> as a UUID before the request — exit 2 with the same hint `evals claims --run-id` already uses ('Run ids come from `senso evals runs` or the output of a trigger.').
+- [x] 404: 'Eval run <id> not found in this organization.' with hint 'senso evals runs lists recent runs.'
+- [x] Give the command a hand-written plain renderer: header (run, evaluator, status, score, band, counts, cost), then one block per claim (claim_text, verdict, passed, confidence, quote, reasoning, suggested_fix), then the searches. Today's inline-JSON rendering is the worst plain output in the two groups reviewed.
+- [x] Help: add Arguments, Returns (every enum above), Exit codes, Examples, See also.
+- [x] Add stderr next steps: `senso evals claims --run-id <id>` for the flat view, and for a failed run the error_code with what it means.
 
 **`senso evals runs`** · 🟠 medium
 
-- [ ] Add the paging line on stderr — 'Showing 1–25 of 312.' plus 'Next page: add --offset 25' — matching `gaps list`, and a `page` block in the JSON envelope.
-- [ ] Print 'No eval runs found.' on stdout when items is empty, with the likely reason on stderr (filters, or nothing has been judged yet: 'senso evals text --text "..."').
-- [ ] Help: list the known --subject-type values (content, content_generation_run_item, builder_workspace_version, question_run, search_turn, inline) as documentation while keeping the flag unvalidated, and say that an unknown value yields an empty page rather than an error.
-- [ ] Help: add Returns explaining status / band / accuracy_pct / claims_scored / error_code, plus Exit codes and Examples.
-- [ ] Add a next step: 'Open one run: senso evals get <eval_run_id>'.
+- [x] Add the paging line on stderr — 'Showing 1–25 of 312.' plus 'Next page: add --offset 25' — matching `gaps list`, and a `page` block in the JSON envelope.
+- [x] Print 'No eval runs found.' on stdout when items is empty, with the likely reason on stderr (filters, or nothing has been judged yet: 'senso evals text --text "..."').
+- [x] Help: list the known --subject-type values (content, content_generation_run_item, builder_workspace_version, question_run, search_turn, inline) as documentation while keeping the flag unvalidated, and say that an unknown value yields an empty page rather than an error.
+- [x] Help: add Returns explaining status / band / accuracy_pct / claims_scored / error_code, plus Exit codes and Examples.
+- [x] Add a next step: 'Open one run: senso evals get <eval_run_id>'.
 
 **`senso evals text`** · 🔴 high
 
-- [ ] Help: add Returns (status values with meanings, band thresholds, claims_total vs claims_scored, accuracy_pct nullability, error_code/error_message, total_cost recorded-not-billed), Exit codes and Examples.
-- [ ] Correct the --wait sentence: exit 0 means completed OR gated; say that gated carries no score and how to tell (status == 'gated', accuracy_pct absent).
-- [ ] Special-case 503 so the API message survives: 'Evals are not enabled in this environment.' with code `unavailable`-style hint 'This environment has no eval worker configured; retrying will not help.' — today lib/errors.ts replaces it with a retry hint.
-- [ ] Give the 422s specific messages with hints: for judge model, 'Run `senso evals evaluators` to see the configured model, or omit --judge-model to use the evaluator default.'
-- [ ] JSON: envelope with `next` ({why: 'Read the finished run', command: 'senso evals get <id>'}) and `warnings` for gated runs.
-- [ ] Add a hint to the --text-file read failure naming the resolved path and the likely cause.
+- [x] Help: add Returns (status values with meanings, band thresholds, claims_total vs claims_scored, accuracy_pct nullability, error_code/error_message, total_cost recorded-not-billed), Exit codes and Examples.
+- [x] Correct the --wait sentence: exit 0 means completed OR gated; say that gated carries no score and how to tell (status == 'gated', accuracy_pct absent).
+- [x] Special-case 503 so the API message survives: 'Evals are not enabled in this environment.' with code `unavailable`-style hint 'This environment has no eval worker configured; retrying will not help.' — today lib/errors.ts replaces it with a retry hint.
+- [x] Give the 422s specific messages with hints: for judge model, 'Run `senso evals evaluators` to see the configured model, or omit --judge-model to use the evaluator default.'
+- [x] JSON: envelope with `next` ({why: 'Read the finished run', command: 'senso evals get <id>'}) and `warnings` for gated runs.
+- [x] Add a hint to the --text-file read failure naming the resolved path and the likely cause.
 
 ### `senso gaps` <sub>26 items</sub>
 
 **`senso gaps`** · group
 
-- [ ] Split the description into: one-sentence purpose; a 'Vocabulary' block (problem / status / origin / kind values with meanings, which is today's prose); an 'Id spaces' block; an ordered 'Workflow' list; and 'Notes' for the product gate and the json/stderr rule.
-- [ ] State in the group help that under --output json every hint disappears and that the JSON envelope's `next` array carries the same guidance (once the envelope of STANDARDS 2.2 exists).
-- [ ] Add 'See also: senso search --no-gap-signals (stop probe searches filing gaps), senso kb create-raw (write the answer), senso tags list (--tag ids)'.
+- [x] Split the description into: one-sentence purpose; a 'Vocabulary' block (problem / status / origin / kind values with meanings, which is today's prose); an 'Id spaces' block; an ordered 'Workflow' list; and 'Notes' for the product gate and the json/stderr rule.
+- [x] State in the group help that under --output json every hint disappears and that the JSON envelope's `next` array carries the same guidance (once the envelope of STANDARDS 2.2 exists).
+- [x] Add 'See also: senso search --no-gap-signals (stop probe searches filing gaps), senso kb create-raw (write the answer), senso tags list (--tag ids)'.
 
 **`senso gaps answer`** · 🟠 medium
 
-- [ ] Help: add Arguments, Returns, Exit codes, Examples; state that both --updated and the default land the gap in `addressed`, and that the content id is not verified by the API.
-- [ ] JSON: `next` should carry {why: 'Confirm the gap closed after the next search or evaluation', command: 'senso gaps get <gapId>'} and the undo command; `warnings` should carry 'The API does not verify content ids; check that <id> is the document you meant.'
-- [ ] Consider a --verify flag (or a default check) that reads `senso kb get <content-id>` before recording, turning a typo into exit 2 instead of a false fix.
+- [x] Help: add Arguments, Returns, Exit codes, Examples; state that both --updated and the default land the gap in `addressed`, and that the content id is not verified by the API.
+- [x] JSON: `next` should carry {why: 'Confirm the gap closed after the next search or evaluation', command: 'senso gaps get <gapId>'} and the undo command; `warnings` should carry 'The API does not verify content ids; check that <id> is the document you meant.'
+- [x] Consider a --verify flag (or a default check) that reads `senso kb get <content-id>` before recording, turning a typo into exit 2 instead of a false fix.
 
 **`senso gaps dismiss`** · 🟠 medium
 
-- [ ] Help: add Arguments, Returns, Exit codes, Examples; contrast dismissed with not_relevant and with we_dont_do_this in one line each.
-- [ ] JSON: `warnings` should carry 'A dismissed gap stays closed even if it is seen again.' and `next` the undo command plus the --no-gap-signals suggestion when origin.kind is api_unanswered_question.
+- [x] Help: add Arguments, Returns, Exit codes, Examples; contrast dismissed with not_relevant and with we_dont_do_this in one line each.
+- [x] JSON: `warnings` should carry 'A dismissed gap stays closed even if it is seen again.' and `next` the undo command plus the --no-gap-signals suggestion when origin.kind is api_unanswered_question.
 
 **`senso gaps get`** · 🔴 high
 
-- [ ] Help: add Arguments (gap_id, where it comes from, what it is not), Returns (the three sections, and the meaning of retrieval counts, awaiting_update, suggested vs contradicting content), Exit codes and Examples.
-- [ ] JSON: put nextSteps() into the envelope's `next` array (each entry {why, command}) so the guidance survives --output json, and add a `meanings` block or inline `_meaning` keys for problem/status/origin — the values the plain renderer already knows.
-- [ ] 404: 'Gap <id> not found in this organization.' with hint 'It may belong to another organization, or the id may be a content_id. `senso gaps list --status all` lists every gap.' — mirror what recordResolution's notFoundAware already does for the 400 case.
-- [ ] Say in help that the id is a gap_id and that content ids printed in the output belong to a different space.
+- [x] Help: add Arguments (gap_id, where it comes from, what it is not), Returns (the three sections, and the meaning of retrieval counts, awaiting_update, suggested vs contradicting content), Exit codes and Examples.
+- [x] JSON: put nextSteps() into the envelope's `next` array (each entry {why, command}) so the guidance survives --output json, and add a `meanings` block or inline `_meaning` keys for problem/status/origin — the values the plain renderer already knows.
+- [x] 404: 'Gap <id> not found in this organization.' with hint 'It may belong to another organization, or the id may be a content_id. `senso gaps list --status all` lists every gap.' — mirror what recordResolution's notFoundAware already does for the 400 case.
+- [x] Say in help that the id is a gap_id and that content ids printed in the output belong to a different space.
 
 **`senso gaps list`** · 🔴 high
 
-- [ ] Help: add Returns (naming problem/status/origin/kind values, the three demand counters, awaiting_update, latest_resolution, origin.kb_node_id/session_id/geo_question_id), Exit codes, and two Examples.
-- [ ] Help: explain each --sort value in one clause.
-- [ ] JSON: emit the STANDARDS 2.2 envelope with `page` {offset, limit, returned, total, has_more, next} and a `next` array carrying what stderr says today — for an empty default view, {why: 'A gap seen once is weak and hidden from the default list', command: 'senso gaps list --status weak'} and the --status all variant.
-- [ ] Plain: print 'No gaps found.' on stdout for an empty result, keeping the why on stderr; move `gap_id` to the first line of each block.
-- [ ] 403: say 'This organization does not have the fetch product, which the gap report requires. An org admin can enable it.' instead of the generic scope sentence.
+- [x] Help: add Returns (naming problem/status/origin/kind values, the three demand counters, awaiting_update, latest_resolution, origin.kb_node_id/session_id/geo_question_id), Exit codes, and two Examples.
+- [x] Help: explain each --sort value in one clause.
+- [x] JSON: emit the STANDARDS 2.2 envelope with `page` {offset, limit, returned, total, has_more, next} and a `next` array carrying what stderr says today — for an empty default view, {why: 'A gap seen once is weak and hidden from the default list', command: 'senso gaps list --status weak'} and the --status all variant.
+- [x] Plain: print 'No gaps found.' on stdout for an empty result, keeping the why on stderr; move `gap_id` to the first line of each block.
+- [x] 403: say 'This organization does not have the fetch product, which the gap report requires. An org admin can enable it.' instead of the generic scope sentence.
 
 **`senso gaps resolve`** · 🟠 medium
 
-- [ ] Help: reformat the type table as one line per type; add Arguments, Returns (resolution_id and what takes it), Exit codes and Examples.
-- [ ] Help: state that --ruling-side is informational only and is not validated against --type, and that an org API key records the decision with no author.
-- [ ] JSON: envelope with `next` carrying {why: 'Retract this decision if it was wrong', command: 'senso gaps undo <gapId> <resolutionId>'} and, for the two no-status-change rulings, {why: 'The gap stays open until the losing document is corrected', command: 'senso gaps answer <gapId> --content-id <id> --updated'}.
-- [ ] Map the API's 400 'Invalid request body' to a usage error (exit 2) naming the body key, since every field the CLI sends is already validated locally — reaching it means the CLI built a bad body.
+- [x] Help: reformat the type table as one line per type; add Arguments, Returns (resolution_id and what takes it), Exit codes and Examples.
+- [x] Help: state that --ruling-side is informational only and is not validated against --type, and that an org API key records the decision with no author.
+- [x] JSON: envelope with `next` carrying {why: 'Retract this decision if it was wrong', command: 'senso gaps undo <gapId> <resolutionId>'} and, for the two no-status-change rulings, {why: 'The gap stays open until the losing document is corrected', command: 'senso gaps answer <gapId> --content-id <id> --updated'}.
+- [x] Map the API's 400 'Invalid request body' to a usage error (exit 2) naming the body key, since every field the CLI sends is already validated locally — reaching it means the CLI built a bad body.
 
 **`senso gaps undo`** · 🟠 medium
 
-- [ ] Help: add an Arguments block naming both id spaces and their sources, plus Returns, Exit codes and Examples.
-- [ ] Distinguish the two 404s using the API message: 'Gap <gapId> not found in this organization.' vs 'Resolution <resolutionId> does not belong to gap <gapId>, or was already undone.'
-- [ ] Detect the transposed-argument case (resolutionId matches a known gap id shape only after the fact is not possible locally, but the 'Gap not found' 404 with two ids present can add the hint 'Check the order: <gapId> first, then <resolutionId>.').
-- [ ] JSON: emit { action: 'undone', resource: 'gap_resolution', id: <resolutionId>, gap_id } as `data`, and add `next` {why: 'Read the recomputed status', command: 'senso gaps get <gapId>'}.
-- [ ] Better still: follow the DELETE with a GET of the gap when not --quiet, so the new status can be reported instead of being described as 'recomputed'.
+- [x] Help: add an Arguments block naming both id spaces and their sources, plus Returns, Exit codes and Examples.
+- [x] Distinguish the two 404s using the API message: 'Gap <gapId> not found in this organization.' vs 'Resolution <resolutionId> does not belong to gap <gapId>, or was already undone.'
+- [x] Detect the transposed-argument case (resolutionId matches a known gap id shape only after the fact is not possible locally, but the 'Gap not found' 404 with two ids present can add the hint 'Check the order: <gapId> first, then <resolutionId>.').
+- [x] JSON: emit { action: 'undone', resource: 'gap_resolution', id: <resolutionId>, gap_id } as `data`, and add `next` {why: 'Read the recomputed status', command: 'senso gaps get <gapId>'}.
+- [x] Better still: follow the DELETE with a GET of the gap when not --quiet, so the new status can be reported instead of being described as 'recomputed'.
 
 ### `senso generate` <sub>41 items</sub>
 
 **`senso generate`** · group
 
-- [ ] Rewrite the group description to name the id spaces, the typical workflow as an ordered list, the GEO requirement and which subcommands are billable.
-- [ ] Add `generate sample-status <sampleJobId>` (GET /org/content-generation/sample-jobs/{id}) so `--no-wait` and the 180 s timeout hand back a runnable poll command.
+- [x] Rewrite the group description to name the id spaces, the typical workflow as an ordered list, the GEO requirement and which subcommands are billable.
+- [x] Add `generate sample-status <sampleJobId>` (GET /org/content-generation/sample-jobs/{id}) so `--no-wait` and the 180 s timeout hand back a runnable poll command.
 
 **`senso generate industry-draft`** · 🟠 medium
 
-- [ ] Validate --industry-prompt-id, --content-type-id and each --product-line-ids entry as UUIDs -> exit 2.
-- [ ] Help: keep the billing/not-stored statements as the second line of the description; add Returns (document_markdown, citations, retrieval.context_chunks_used, notes), Exit codes with 402/422/504, Examples, and See also (industries prompts, content draft).
-- [ ] On 402 keep code insufficient_credits but carry the API's code (insufficient_credits vs spending_limit_reached) in the message; on 422 hint `senso org set-industry`; on 404 name 'Industry prompt <id> not found in your organization's industry' with hint `senso industries prompts`.
-- [ ] Plain: document_markdown as an indented block after the metadata, citations as a numbered sub-block, notes on stderr as warnings; JSON: warnings from notes[], next = content draft.
+- [x] Validate --industry-prompt-id, --content-type-id and each --product-line-ids entry as UUIDs -> exit 2.
+- [x] Help: keep the billing/not-stored statements as the second line of the description; add Returns (document_markdown, citations, retrieval.context_chunks_used, notes), Exit codes with 402/422/504, Examples, and See also (industries prompts, content draft).
+- [x] On 402 keep code insufficient_credits but carry the API's code (insufficient_credits vs spending_limit_reached) in the message; on 422 hint `senso org set-industry`; on 404 name 'Industry prompt <id> not found in your organization's industry' with hint `senso industries prompts`.
+- [x] Plain: document_markdown as an indented block after the metadata, citations as a numbered sub-block, notes on stderr as warnings; JSON: warnings from notes[], next = content draft.
 
 **`senso generate job-context`** · 🟠 medium
 
-- [ ] Plain: print the summary first as key/value, then prompts as numbered blocks with geo_question_id first; table columns geo_question_id, queue_type, question_text, editorial_status, content_id.
-- [ ] Help: explain queue_type, nullable fields, citeables_action, and that this is the set `generate run` processes; add Returns/Exit codes/Examples.
+- [x] Plain: print the summary first as key/value, then prompts as numbered blocks with geo_question_id first; table columns geo_question_id, queue_type, question_text, editorial_status, content_id.
+- [x] Help: explain queue_type, nullable fields, citeables_action, and that this is the set `generate run` processes; add Returns/Exit codes/Examples.
 
 **`senso generate run`** · 🔴 high
 
-- [ ] Validate --prompt-ids, --content-type-id, --publisher-ids as UUIDs -> exit 2 naming the flag and the bad value.
-- [ ] Help: id spaces, billing, prerequisites (generation enabled), semantics of omitting each flag, Returns (run_id), terminal statuses, Exit codes with the 409, Examples.
-- [ ] Pass the 400 messages through prefixed 'Could not start run:' with a hint to `senso prompts list` / `senso destinations list` / `senso content-types list` by field; on 409 hint `senso generate runs-list --active-only`.
-- [ ] Plain: print `✓ Run <run_id> accepted.` on stderr and `Next: senso generate runs-get <run_id>`; JSON: next with runs-get and runs-items.
+- [x] Validate --prompt-ids, --content-type-id, --publisher-ids as UUIDs -> exit 2 naming the flag and the bad value.
+- [x] Help: id spaces, billing, prerequisites (generation enabled), semantics of omitting each flag, Returns (run_id), terminal statuses, Exit codes with the 409, Examples.
+- [x] Pass the 400 messages through prefixed 'Could not start run:' with a hint to `senso prompts list` / `senso destinations list` / `senso content-types list` by field; on 409 hint `senso generate runs-list --active-only`.
+- [x] Plain: print `✓ Run <run_id> accepted.` on stderr and `Next: senso generate runs-get <run_id>`; JSON: next with runs-get and runs-items.
 
 **`senso generate runs-get`** · 🔴 high
 
-- [ ] Unwrap `run` for plain/table (emit data.run with columns) while leaving JSON as the API's shape.
-- [ ] Validate <runId> as a UUID -> exit 2.
-- [ ] Help: id space, status enum with meanings, terminal set, Returns, Exit codes, Examples; JSON next: runs-items when terminal, runs-get again when not.
-- [ ] 404: 'Run <id> not found in this organization.' with hint `senso generate runs-list`.
+- [x] Unwrap `run` for plain/table (emit data.run with columns) while leaving JSON as the API's shape.
+- [x] Validate <runId> as a UUID -> exit 2.
+- [x] Help: id space, status enum with meanings, terminal set, Returns, Exit codes, Examples; JSON next: runs-items when terminal, runs-get again when not.
+- [x] 404: 'Run <id> not found in this organization.' with hint `senso generate runs-list`.
 
 **`senso generate runs-items`** · 🟠 medium
 
-- [ ] Validate --status with parseEnumFlag -> exit 2; validate <runId> UUID and --limit/--offset ranges.
-- [ ] Help: statuses and failed_at_step meanings, id spaces, Returns, Exit codes, Examples.
-- [ ] Table columns: run_item_id, status, queue_type, question_text, content_id, failed_at_step. Plain: 'No items found.' + paging line; JSON page and next (generated-content get <content_id> for succeeded items).
-- [ ] 404: 'Run <id> not found in this organization.'
+- [x] Validate --status with parseEnumFlag -> exit 2; validate <runId> UUID and --limit/--offset ranges.
+- [x] Help: statuses and failed_at_step meanings, id spaces, Returns, Exit codes, Examples.
+- [x] Table columns: run_item_id, status, queue_type, question_text, content_id, failed_at_step. Plain: 'No items found.' + paging line; JSON page and next (generated-content get <content_id> for succeeded items).
+- [x] 404: 'Run <id> not found in this organization.'
 
 **`senso generate runs-list`** · 🔴 high
 
-- [ ] Validate --status with parseEnumFlag over [queued, running, completed, partial_failed, failed, dispatch_failed, blocked, skipped, stopped] -> exit 2; validate --limit (>=1) and --offset (>=0) with parseIntFlag; validate dates as YYYY-MM-DD or RFC3339 before the request.
-- [ ] Help: list and explain every run status, say which are terminal, note --active-only ≡ status in (queued, running), add Returns/Exit codes/Examples.
-- [ ] Plain: 'No runs found.' on stdout plus stderr explanation of active filters; stderr 'Showing 1–20 of 57. Next page: senso generate runs-list --offset 20'; JSON: page {offset, limit, returned, total, has_more, next}.
-- [ ] Table: default columns run_id, status, trigger_mode, succeeded_items, failed_items, created_at.
+- [x] Validate --status with parseEnumFlag over [queued, running, completed, partial_failed, failed, dispatch_failed, blocked, skipped, stopped] -> exit 2; validate --limit (>=1) and --offset (>=0) with parseIntFlag; validate dates as YYYY-MM-DD or RFC3339 before the request.
+- [x] Help: list and explain every run status, say which are terminal, note --active-only ≡ status in (queued, running), add Returns/Exit codes/Examples.
+- [x] Plain: 'No runs found.' on stdout plus stderr explanation of active filters; stderr 'Showing 1–20 of 57. Next page: senso generate runs-list --offset 20'; JSON: page {offset, limit, returned, total, has_more, next}.
+- [x] Table: default columns run_id, status, trigger_mode, succeeded_items, failed_items, created_at.
 
 **`senso generate runs-logs`** · 🟢 low
 
-- [ ] Validate <runId> UUID and --limit/--offset -> exit 2.
-- [ ] Help: Returns (level, event_type, run_item_id), Exit codes, Examples.
-- [ ] Plain: 'No log entries found.' + paging line; table columns created_at, level, event_type, message, run_item_id.
-- [ ] 404: 'Run <id> not found in this organization.'
+- [x] Validate <runId> UUID and --limit/--offset -> exit 2.
+- [x] Help: Returns (level, event_type, run_item_id), Exit codes, Examples.
+- [x] Plain: 'No log entries found.' + paging line; table columns created_at, level, event_type, message, run_item_id.
+- [x] 404: 'Run <id> not found in this organization.'
 
 **`senso generate sample`** · 🔴 high
 
-- [ ] Help: name id spaces and sources, list --destination as a slug from `senso destinations list` (.slug), state billing, the 180 s wait, the job statuses and every error.code with meaning, Returns, Exit codes, Examples.
-- [ ] Validate --prompt-id and --content-type-id as UUIDs and --destination length 1-64 -> exit 2 before the request.
-- [ ] Map job error.code insufficient_credits to CliError code insufficient_credits (still exit 1); pass other job codes through as error.code with the operator message.
-- [ ] Add `generate sample-status <sampleJobId>` and make the --no-wait output and the timeout hint point at it.
-- [ ] Plain: print raw_markdown as an indented block, publish_results as a numbered sub-block; JSON: add next = generated-content get <content_id>.
-- [ ] Stream each status change to stderr (already done) and add elapsed seconds.
+- [x] Help: name id spaces and sources, list --destination as a slug from `senso destinations list` (.slug), state billing, the 180 s wait, the job statuses and every error.code with meaning, Returns, Exit codes, Examples.
+- [x] Validate --prompt-id and --content-type-id as UUIDs and --destination length 1-64 -> exit 2 before the request.
+- [x] Map job error.code insufficient_credits to CliError code insufficient_credits (still exit 1); pass other job codes through as error.code with the operator message.
+- [x] Add `generate sample-status <sampleJobId>` and make the --no-wait output and the timeout hint point at it.
+- [x] Plain: print raw_markdown as an indented block, publish_results as a numbered sub-block; JSON: add next = generated-content get <content_id>.
+- [x] Stream each status change to stderr (already done) and add elapsed seconds.
 
 **`senso generate settings`** · 🟠 medium
 
-- [ ] Help: add Returns (field meanings, day-of-week mapping, omitempty note), Exit codes (3 = GEO), Examples, See also.
-- [ ] Plain: render `publishers` as a numbered sub-block with publisher_id first.
-- [ ] Emit a `next` hint when enable_content_generation is false or selected_content_type_id is missing: the update-settings call that fixes it.
+- [x] Help: add Returns (field meanings, day-of-week mapping, omitempty note), Exit codes (3 = GEO), Examples, See also.
+- [x] Plain: render `publishers` as a numbered sub-block with publisher_id first.
+- [x] Emit a `next` hint when enable_content_generation is false or selected_content_type_id is missing: the update-settings call that fixes it.
 
 **`senso generate update-settings`** · 🔴 high
 
-- [ ] Validate --data before the request: reject unknown keys (name them), enforce bool/array/uuid-or-null types, enforce 0-6 on content_schedule; exit 2 with field/received/allowed.
-- [ ] Help: document each key with its type and semantics (PATCH: omitted = unchanged, null clears selected_content_type_id), list exit codes 2/3/1(400 not-own content type, 422 no publishers).
-- [ ] Pass the 422 and the 'does not belong' 400 through prefixed with 'Could not update content generation settings:' and add the hint `senso destinations list` / `senso content-types list`.
-- [ ] Emit `warnings` in JSON when the request enabled generation and publishers is still empty.
+- [x] Validate --data before the request: reject unknown keys (name them), enforce bool/array/uuid-or-null types, enforce 0-6 on content_schedule; exit 2 with field/received/allowed.
+- [x] Help: document each key with its type and semantics (PATCH: omitted = unchanged, null clears selected_content_type_id), list exit codes 2/3/1(400 not-own content type, 422 no publishers).
+- [x] Pass the 422 and the 'does not belong' 400 through prefixed with 'Could not update content generation settings:' and add the hint `senso destinations list` / `senso content-types list`.
+- [x] Emit `warnings` in JSON when the request enabled generation and publishers is still empty.
 
 ### `senso engine` <sub>19 items</sub>
 
 **`senso engine`** · group
 
-- [ ] Group help: name the GEO product and update:content permission.
-- [ ] Document `content_id` as the create-vs-update switch, at group level and in both subcommands.
-- [ ] Name the id sources: geo_question_id from `senso questions list`, content_id from `senso generated-content list --status drafts`, publisher_ids from `senso destinations list`.
-- [ ] Add the workflow and cross-reference `senso content verification`, `senso content unpublish` and `senso publish-records retry`.
+- [x] Group help: name the GEO product and update:content permission.
+- [x] Document `content_id` as the create-vs-update switch, at group level and in both subcommands.
+- [x] Name the id sources: geo_question_id from `senso questions list`, content_id from `senso generated-content list --status drafts`, publisher_ids from `senso destinations list`.
+- [x] Add the workflow and cross-reference `senso content verification`, `senso content unpublish` and `senso publish-records retry`.
 
 **`senso engine draft`** · 🔴 high
 
-- [ ] Validate --data locally: raw_markdown and seo_title non-blank, UUID fields parse, builder workspace fields paired, unknown top-level keys named -> exit 2 before the request.
-- [ ] Correct the help: only raw_markdown and seo_title are required; geo_question_id is optional.
-- [ ] Document content_id as the update switch and warn that omitting it creates a new item on every call.
-- [ ] Say that a draft MAY contain `[Missing approved evidence: ...]` placeholders but `senso engine publish` will refuse them.
-- [ ] Confirmation: `Saved draft <content_id> (version <version_num>).`
-- [ ] Add next-step hints: `senso generated-content get <content_id>` and `senso engine publish --data '{"content_id": ...}'`.
-- [ ] Document the 409 family and the 404 family with their exact messages.
+- [x] Validate --data locally: raw_markdown and seo_title non-blank, UUID fields parse, builder workspace fields paired, unknown top-level keys named -> exit 2 before the request.
+- [x] Correct the help: only raw_markdown and seo_title are required; geo_question_id is optional.
+- [x] Document content_id as the update switch and warn that omitting it creates a new item on every call.
+- [x] Say that a draft MAY contain `[Missing approved evidence: ...]` placeholders but `senso engine publish` will refuse them.
+- [x] Confirmation: `Saved draft <content_id> (version <version_num>).`
+- [x] Add next-step hints: `senso generated-content get <content_id>` and `senso engine publish --data '{"content_id": ...}'`.
+- [x] Document the 409 family and the 404 family with their exact messages.
 
 **`senso engine publish`** · 🔴 high
 
-- [ ] Treat publish_status !== "success" as a failure: print the failing destinations and their error_msg, and exit 1. This is the highest-value change in the batch.
-- [ ] Validate --data locally: require raw_markdown and seo_title (non-blank), reject an unknown top-level key by name, check every UUID-shaped field parses, enforce builder_workspace_id/expected_workspace_version_id togetherness, and reject a `[Missing approved evidence: ...]` placeholder - all exit 2 before the request.
-- [ ] Validate --publisher-ids values as UUIDs -> exit 2.
-- [ ] Correct the help: geo_question_id is OPTIONAL; only raw_markdown and seo_title are required.
-- [ ] Document content_id as the create-vs-update switch, prominently, with the duplicate-creation warning.
-- [ ] Document manual_published_url alongside mark_as_published, and say that omitting it leaves the content published but untracked.
-- [ ] Render publish_destinations as a table/sub-blocks, and give each destination's status and display_url a line.
-- [ ] Document the 409 in-flight case as retryable, and the destinations-not-configured 400 with the `senso destinations list` / `senso generate update-settings` fix.
+- [x] Treat publish_status !== "success" as a failure: print the failing destinations and their error_msg, and exit 1. This is the highest-value change in the batch.
+- [x] Validate --data locally: require raw_markdown and seo_title (non-blank), reject an unknown top-level key by name, check every UUID-shaped field parses, enforce builder_workspace_id/expected_workspace_version_id togetherness, and reject a `[Missing approved evidence: ...]` placeholder - all exit 2 before the request.
+- [x] Validate --publisher-ids values as UUIDs -> exit 2.
+- [x] Correct the help: geo_question_id is OPTIONAL; only raw_markdown and seo_title are required.
+- [x] Document content_id as the create-vs-update switch, prominently, with the duplicate-creation warning.
+- [x] Document manual_published_url alongside mark_as_published, and say that omitting it leaves the content published but untracked.
+- [x] Render publish_destinations as a table/sub-blocks, and give each destination's status and display_url a line.
+- [x] Document the 409 in-flight case as retryable, and the destinations-not-configured 400 with the `senso destinations list` / `senso generate update-settings` fix.
 
 ### `senso destinations` <sub>12 items</sub>
 
 **`senso destinations`** · group
 
-- [ ] Rewrite the group description to name publisher_id vs slug, the permissions, and the workflow as an ordered list; mention how citeables gets seeded.
+- [x] Rewrite the group description to name publisher_id vs slug, the permissions, and the workflow as an ordered list; mention how citeables gets seeded.
 
 **`senso destinations add`** · 🔴 high
 
-- [ ] Drop codeables/cucopilot from --type; accept only citeables (or remove the flag until another type exists) and say why in help.
-- [ ] Validate --domain as a bare hostname (no scheme, no path) -> exit 2.
-- [ ] Help: permission (update:org), idempotency, selected_for_generation side effect, Returns, Exit codes with the 422/502 citeables cases, Examples.
-- [ ] Pass the citeables 422 through prefixed 'Could not register <domain>:' with a hint to check the domain's DNS and retry; JSON next: destinations list.
+- [x] Drop codeables/cucopilot from --type; accept only citeables (or remove the flag until another type exists) and say why in help.
+- [x] Validate --domain as a bare hostname (no scheme, no path) -> exit 2.
+- [x] Help: permission (update:org), idempotency, selected_for_generation side effect, Returns, Exit codes with the 422/502 citeables cases, Examples.
+- [x] Pass the citeables 422 through prefixed 'Could not register <domain>:' with a hint to check the domain's DNS and retry; JSON next: destinations list.
 
 **`senso destinations list`** · 🟠 medium
 
-- [ ] Fix the table columns: publisher_id, name, slug, display_url, scope, live_count, selected_for_generation.
-- [ ] Help: add Returns explaining scope, type, slug vs publisher_id, live_count/last_publish_at, and Exit codes/Examples; plain 'No destinations found.' with a hint to enable generation.
-- [ ] JSON next: when nothing is selected_for_generation, suggest the update-settings call that seeds citeables.
+- [x] Fix the table columns: publisher_id, name, slug, display_url, scope, live_count, selected_for_generation.
+- [x] Help: add Returns explaining scope, type, slug vs publisher_id, live_count/last_publish_at, and Exit codes/Examples; plain 'No destinations found.' with a hint to enable generation.
+- [x] JSON next: when nothing is selected_for_generation, suggest the update-settings call that seeds citeables.
 
 **`senso destinations remove`** · 🔴 high
 
-- [ ] Validate <publisherId> as a UUID (and say a slug is not accepted) -> exit 2; reject --keep-domain without --also-remove-destination -> exit 2.
-- [ ] Refuse --also-remove-destination client-side when the id is a shared destination? Not knowable without a list call; instead map the 404 on that flag to 'Cannot delete shared destination; drop --also-remove-destination' (exit 1) and name the id in the plain 404.
-- [ ] Emit warnings for partial_failures (JSON warnings[], stderr lines) and print the tick as 'Unlinked destination <id>; N of M pages could not be unpublished' when they exist.
-- [ ] Help: id space, irreversibility of delete, Returns explaining each count, Exit codes, Examples.
+- [x] Validate <publisherId> as a UUID (and say a slug is not accepted) -> exit 2; reject --keep-domain without --also-remove-destination -> exit 2.
+- [x] Refuse --also-remove-destination client-side when the id is a shared destination? Not knowable without a list call; instead map the 404 on that flag to 'Cannot delete shared destination; drop --also-remove-destination' (exit 1) and name the id in the plain 404.
+- [x] Emit warnings for partial_failures (JSON warnings[], stderr lines) and print the tick as 'Unlinked destination <id>; N of M pages could not be unpublished' when they exist.
+- [x] Help: id space, irreversibility of delete, Returns explaining each count, Exit codes, Examples.
 
 ### `senso publish-records` <sub>11 items</sub>
 
@@ -986,82 +986,82 @@ has to change for the CLI to be able to say the right thing. Check items off in 
 
 **`senso brand-kit`** · group
 
-- [ ] Say the brand kit is a singleton per organization, always readable, created by the first 'set'.
-- [ ] Name the consumers (content generation) and the alternative producer ('senso website-import').
-- [ ] Add a one-line workflow: get -> patch/set -> get.
+- [x] Say the brand kit is a singleton per organization, always readable, created by the first 'set'.
+- [x] Name the consumers (content generation) and the alternative producer ('senso website-import').
+- [x] Add a one-line workflow: get -> patch/set -> get.
 
 **`senso brand-kit get`** · 🟠 medium
 
-- [ ] Hand-write the plain rendering: one line per guideline key in a fixed order, with '(not set)' for the missing ones, and global_writing_rules as a numbered list.
-- [ ] Detect the synthesized record (zero brand_kit_id / zero timestamps) and say 'No brand kit saved yet.' with 'senso brand-kit set --data ...' and 'senso website-import' as next steps.
-- [ ] Say in the help that brand_kit_id is not used by any command.
+- [x] Hand-write the plain rendering: one line per guideline key in a fixed order, with '(not set)' for the missing ones, and global_writing_rules as a numbered list.
+- [x] Detect the synthesized record (zero brand_kit_id / zero timestamps) and say 'No brand kit saved yet.' with 'senso brand-kit set --data ...' and 'senso website-import' as next steps.
+- [x] Say in the help that brand_kit_id is not used by any command.
 
 **`senso brand-kit patch`** · 🟢 low
 
-- [ ] Distinguish the confirmation: 'Patched brand kit: voice_and_tone.' vs set's 'Brand kit replaced.'
-- [ ] Hand-write the plain rendering of the merged kit, one line per key, as for 'brand-kit get'.
-- [ ] Report the changed keys in warnings[] / on stderr, and say when global_writing_rules replaced a longer list.
-- [ ] Keep everything else — this command is the reference implementation for --data validation in this CLI.
+- [x] Distinguish the confirmation: 'Patched brand kit: voice_and_tone.' vs set's 'Brand kit replaced.'
+- [x] Hand-write the plain rendering of the merged kit, one line per key, as for 'brand-kit get'.
+- [x] Report the changed keys in warnings[] / on stderr, and say when global_writing_rules replaced a longer list.
+- [x] Keep everything else — this command is the reference implementation for --data validation in this CLI.
 
 **`senso brand-kit set`** · 🟠 medium
 
-- [ ] Report the diff: read the current kit first (or accept the extra call behind a flag) and print 'Removed: author_persona, global_writing_rules.' on stderr and in warnings[].
-- [ ] Require a confirmation or an explicit --clear for '{"guidelines":{}}'.
-- [ ] Hand-write the plain rendering of the result, one line per key, as for 'brand-kit get'.
-- [ ] Say in the help why stray top-level keys are rejected locally: the API accepts them with a 200 and drops them.
+- [x] Report the diff: read the current kit first (or accept the extra call behind a flag) and print 'Removed: author_persona, global_writing_rules.' on stderr and in warnings[].
+- [x] Require a confirmation or an explicit --clear for '{"guidelines":{}}'.
+- [x] Hand-write the plain rendering of the result, one line per key, as for 'brand-kit get'.
+- [x] Say in the help why stray top-level keys are rejected locally: the API accepts them with a 200 and drops them.
 
 ### `senso content-types` <sub>30 items</sub>
 
 **`senso content-types`** · group
 
-- [ ] Explain the mechanism in the group help: config.template is the spec, and its headings and word-count phrases are parsed into template_spec and enforced on generated output.
-- [ ] Say template_spec is read-only in practice — supplying it is pointless because it is regenerated from template.
-- [ ] Say names are unique per organization (409 on a duplicate).
-- [ ] Add the workflow: list -> create -> get (to see the derived template_spec) -> use with the generate commands.
+- [x] Explain the mechanism in the group help: config.template is the spec, and its headings and word-count phrases are parsed into template_spec and enforced on generated output.
+- [x] Say template_spec is read-only in practice — supplying it is pointless because it is regenerated from template.
+- [x] Say names are unique per organization (409 on a duplicate).
+- [x] Add the workflow: list -> create -> get (to see the derived template_spec) -> use with the generate commands.
 
 **`senso content-types create`** · 🔴 high
 
-- [ ] Validate --data before the request, the way brand-kit already does: require name (non-blank) and config (object); reject unknown config keys naming the offender with a did-you-mean; type-check each key; require cta_destination to be an absolute URL -> exit 2.
-- [ ] Reject or warn on a supplied template_spec: it is derived from template and will be overwritten.
-- [ ] Help: describe the template parsing (headings -> sections, word phrases -> enforced budgets) and show a realistic template in the example.
-- [ ] 409: 'A content type named "Blog Post" already exists.' with the hint 'senso content-types list' / 'senso content-types patch <id>'.
-- [ ] Note in Returns that config comes back canonicalized with every key present.
+- [x] Validate --data before the request, the way brand-kit already does: require name (non-blank) and config (object); reject unknown config keys naming the offender with a did-you-mean; type-check each key; require cta_destination to be an absolute URL -> exit 2.
+- [x] Reject or warn on a supplied template_spec: it is derived from template and will be overwritten.
+- [x] Help: describe the template parsing (headings -> sections, word phrases -> enforced budgets) and show a realistic template in the example.
+- [x] 409: 'A content type named "Blog Post" already exists.' with the hint 'senso content-types list' / 'senso content-types patch <id>'.
+- [x] Note in Returns that config comes back canonicalized with every key present.
 
 **`senso content-types delete`** · 🟢 low
 
-- [ ] Validate <id> as a UUID -> exit 2; 404 'Content type <id> not found in this organization.' with hint 'senso content-types list'.
-- [ ] Echo the name in the confirmation (fetch it first, or accept that only the id is known and say so).
-- [ ] Say in the help that existing generated content is unaffected but new generation referring to this type will fail.
-- [ ] Emit the documented mutation envelope: data {action: 'deleted', resource: 'content_type', id}.
+- [x] Validate <id> as a UUID -> exit 2; 404 'Content type <id> not found in this organization.' with hint 'senso content-types list'.
+- [x] Echo the name in the confirmation (fetch it first, or accept that only the id is known and say so).
+- [x] Say in the help that existing generated content is unaffected but new generation referring to this type will fail.
+- [x] Emit the documented mutation envelope: data {action: 'deleted', resource: 'content_type', id}.
 
 **`senso content-types get`** · 🔴 high
 
-- [ ] Give this command a hand-written plain rendering: the template printed as text over multiple lines, then template_spec as a numbered section list with each section's word budget, then writing_rules as a numbered list.
-- [ ] Validate <id> as a UUID -> exit 2; 404 'Content type <id> not found in this organization.' with hint 'senso content-types list'.
-- [ ] Explain template_spec in Returns, including that it is read-only.
-- [ ] Add next steps: 'senso content-types patch <id>' and the generate command that consumes it.
+- [x] Give this command a hand-written plain rendering: the template printed as text over multiple lines, then template_spec as a numbered section list with each section's word budget, then writing_rules as a numbered list.
+- [x] Validate <id> as a UUID -> exit 2; 404 'Content type <id> not found in this organization.' with hint 'senso content-types list'.
+- [x] Explain template_spec in Returns, including that it is read-only.
+- [x] Add next steps: 'senso content-types patch <id>' and the generate command that consumes it.
 
 **`senso content-types list`** · 🟠 medium
 
-- [ ] Validate --limit ({min: 1}) and --offset ({min: 0}) with parseIntFlag -> exit 2.
-- [ ] Pass an explicit plain rendering that omits or summarizes config (e.g. 'template: 4 sections, 800-1200 words') and keeps the id and name first.
-- [ ] Empty list: 'No content types found.' with 'senso content-types create --data ...' on stderr.
-- [ ] Say in the help that 'total' counts only this page, so paging must be driven by 'returned == limit', and emit a page object that says so.
-- [ ] Say content_type_id is the id the generate commands take.
+- [x] Validate --limit ({min: 1}) and --offset ({min: 0}) with parseIntFlag -> exit 2.
+- [x] Pass an explicit plain rendering that omits or summarizes config (e.g. 'template: 4 sections, 800-1200 words') and keeps the id and name first.
+- [x] Empty list: 'No content types found.' with 'senso content-types create --data ...' on stderr.
+- [x] Say in the help that 'total' counts only this page, so paging must be driven by 'returned == limit', and emit a page object that says so.
+- [x] Say content_type_id is the id the generate commands take.
 
 **`senso content-types patch`** · 🟠 medium
 
-- [ ] Validate --data client-side: at least one of name/config, non-blank name, closed config key set with types, absolute cta_destination -> exit 2.
-- [ ] Say writing_rules is replaced wholesale by a patch, and that changing template re-derives template_spec and therefore the enforced word budgets.
-- [ ] Distinguish the confirmation: 'Patched content type <id> (config.template).'
-- [ ] Validate <id>; 404 naming the resource.
+- [x] Validate --data client-side: at least one of name/config, non-blank name, closed config key set with types, absolute cta_destination -> exit 2.
+- [x] Say writing_rules is replaced wholesale by a patch, and that changing template re-derives template_spec and therefore the enforced word budgets.
+- [x] Distinguish the confirmation: 'Patched content type <id> (config.template).'
+- [x] Validate <id>; 404 naming the resource.
 
 **`senso content-types update`** · 🔴 high
 
-- [ ] Validate --data client-side exactly as for 'create' (name non-blank, config present, closed key set, types, absolute cta_destination) -> exit 2.
-- [ ] State explicitly that omitted CONFIG keys are cleared, and warn on stderr which previously-set keys the new config drops (the CLI can GET first, or simply name the risk).
-- [ ] Document the 409 and hint at 'content-types list'.
-- [ ] Validate <id>; 404 naming the resource and id.
+- [x] Validate --data client-side exactly as for 'create' (name non-blank, config present, closed key set, types, absolute cta_destination) -> exit 2.
+- [x] State explicitly that omitted CONFIG keys are cleared, and warn on stderr which previously-set keys the new config drops (the CLI can GET first, or simply name the risk).
+- [x] Document the 409 and hint at 'content-types list'.
+- [x] Validate <id>; 404 naming the resource and id.
 
 ### `senso prompts` <sub>22 items</sub>
 
@@ -1234,15 +1234,15 @@ has to change for the CLI to be able to say the right thing. Check items off in 
 
 **`senso members`** · group
 
-- [ ] Group description: name the relationship to senso users (same people, this one has email/name/role name; that one mutates), and that user_id here is the id senso users takes.
+- [x] Group description: name the relationship to senso users (same people, this one has email/name/role name; that one mutates), and that user_id here is the id senso users takes.
 
 **`senso members list`** · 🟠 medium
 
-- [ ] Table columns: user_id, email, given_name, family_name, role_display_name.
-- [ ] parseEnumFlag for --sort; parseIntFlag for --limit (1-1000) and --offset (>=0) → exit 2.
-- [ ] Plain: numbered blocks, user_id first; stderr 'Showing 1–50 of 120. Next page: senso members list --offset 50'; empty with --search → 'No members match "<q>".' + 'Drop --search to list everyone.'
-- [ ] JSON envelope with page.
-- [ ] Help: Returns section naming user_id as the id for senso users, role_display_name vs role_id, groups.
+- [x] Table columns: user_id, email, given_name, family_name, role_display_name.
+- [x] parseEnumFlag for --sort; parseIntFlag for --limit (1-1000) and --offset (>=0) → exit 2.
+- [x] Plain: numbered blocks, user_id first; stderr 'Showing 1–50 of 120. Next page: senso members list --offset 50'; empty with --search → 'No members match "<q>".' + 'Drop --search to list everyone.'
+- [x] JSON envelope with page.
+- [x] Help: Returns section naming user_id as the id for senso users, role_display_name vs role_id, groups.
 
 ### `senso credits` <sub>7 items</sub>
 
@@ -1301,257 +1301,257 @@ has to change for the CLI to be able to say the right thing. Check items off in 
 
 **`senso kb`** · group
 
-- [ ] Rewrite the group description to name the id spaces: kb_node_id addresses the tree, content_id addresses the stored document; every command here takes kb_node_id unless it says otherwise.
-- [ ] Add an ordered workflow block to the group help (browse, add, poll, tag, share, remove).
-- [ ] Add a 'Status values' block listing pending/processing/complete/failed and what an agent should do for each.
-- [ ] Shorten every leaf description to one line so 'senso kb --help' is scannable; move the detail into each leaf's own help.
+- [x] Rewrite the group description to name the id spaces: kb_node_id addresses the tree, content_id addresses the stored document; every command here takes kb_node_id unless it says otherwise.
+- [x] Add an ordered workflow block to the group help (browse, add, poll, tag, share, remove).
+- [x] Add a 'Status values' block listing pending/processing/complete/failed and what an agent should do for each.
+- [x] Shorten every leaf description to one line so 'senso kb --help' is scannable; move the detail into each leaf's own help.
 
 **`senso kb permissions`** · group
 
-- [ ] Group help: name the three ids and where each comes from.
-- [ ] Group help: state that grants inherit down the tree and that effective_role on 'kb get' is the resolved answer.
-- [ ] Group help: define viewer and editor in terms of the kb commands each allows.
-- [ ] Group help: note the org-admin bypass, so an empty grant list is not read as 'nobody has access'.
-- [ ] Add the ordered workflow (list, add, update, remove).
+- [x] Group help: name the three ids and where each comes from.
+- [x] Group help: state that grants inherit down the tree and that effective_role on 'kb get' is the resolved answer.
+- [x] Group help: define viewer and editor in terms of the kb commands each allows.
+- [x] Group help: note the org-admin bypass, so an empty grant list is not read as 'nobody has access'.
+- [x] Add the ordered workflow (list, add, update, remove).
 
 **`senso kb tags`** · group
 
-- [ ] Fix the columns on 'tags list', 'tags set' and 'tags add' from tag_id to id - the current table output shows an empty first column for every row.
-- [ ] Group help: name the id spaces - <id> is a kb_node_id; the tag ids in --ids / --id come from 'senso tags list' (field: id).
-- [ ] Group help: say that auto-tagging runs after ingestion and may add to whatever was set manually.
-- [ ] Add the ordered workflow to the group help.
+- [x] Fix the columns on 'tags list', 'tags set' and 'tags add' from tag_id to id - the current table output shows an empty first column for every row.
+- [x] Group help: name the id spaces - <id> is a kb_node_id; the tag ids in --ids / --id come from 'senso tags list' (field: id).
+- [x] Group help: say that auto-tagging runs after ingestion and may add to whatever was set manually.
+- [x] Add the ordered workflow to the group help.
 
 **`senso kb ancestors`** · 🟠 medium
 
-- [ ] Help: state that ancestors are ordered root-first and whether the node itself is included; add Returns / Exit codes / Examples.
-- [ ] Validate <id> as a UUID before the request - exit 2.
-- [ ] Plain: render the chain as a path line first ('Acme Inc / Policies / Refunds'), then the per-node blocks.
-- [ ] Empty chain: 'This node is at the top level.' on stdout rather than a blank 'ancestors' value.
+- [x] Help: state that ancestors are ordered root-first and whether the node itself is included; add Returns / Exit codes / Examples.
+- [x] Validate <id> as a UUID before the request - exit 2.
+- [x] Plain: render the chain as a path line first ('Acme Inc / Policies / Refunds'), then the per-node blocks.
+- [x] Empty chain: 'This node is at the top level.' on stdout rather than a blank 'ancestors' value.
 
 **`senso kb bulk-delete`** · 🟠 medium
 
-- [ ] Validate every id as a UUID before the request, and report every offending value at once - exit 2.
-- [ ] De-duplicate the list locally and warn on stderr how many duplicates were dropped, so the reported count is real.
-- [ ] 404/403: pass the API's batch wording through ('One or more nodes were not found') and add the hint 'The API does not say which. Re-run one id at a time, or verify with: senso kb get <id>'.
-- [ ] Report {"action": "deleted", "resource": "kb_node", "ids": [...]} in JSON rather than a message string, so a caller can see exactly what was requested.
-- [ ] Add Returns / Exit codes / Examples per the convention.
+- [x] Validate every id as a UUID before the request, and report every offending value at once - exit 2.
+- [x] De-duplicate the list locally and warn on stderr how many duplicates were dropped, so the reported count is real.
+- [x] 404/403: pass the API's batch wording through ('One or more nodes were not found') and add the hint 'The API does not say which. Re-run one id at a time, or verify with: senso kb get <id>'.
+- [x] Report {"action": "deleted", "resource": "kb_node", "ids": [...]} in JSON rather than a message string, so a caller can see exactly what was requested.
+- [x] Add Returns / Exit codes / Examples per the convention.
 
 **`senso kb children`** · 🔴 high
 
-- [ ] Help: name the id space, say it must be a FOLDER node, say the listing is one level deep, and name kb root as the source of the top-level folder id.
-- [ ] Validate <id> as a UUID before the request - exit 2.
-- [ ] Empty folder: 'No children found.' on stdout, and on stderr the active filters plus 'Widen with: senso kb children <id>' when a filter is set.
-- [ ] Pass the 400 'node is not a folder' through with a hint: 'This id is a document. Read it with senso kb get-content <id>.'
-- [ ] Add the 'Showing 1-50 of N. Next page: senso kb children <id> --offset 50' footer on stderr.
+- [x] Help: name the id space, say it must be a FOLDER node, say the listing is one level deep, and name kb root as the source of the top-level folder id.
+- [x] Validate <id> as a UUID before the request - exit 2.
+- [x] Empty folder: 'No children found.' on stdout, and on stderr the active filters plus 'Widen with: senso kb children <id>' when a filter is set.
+- [x] Pass the 400 'node is not a folder' through with a hint: 'This id is a document. Read it with senso kb get-content <id>.'
+- [x] Add the 'Showing 1-50 of N. Next page: senso kb children <id> --offset 50' footer on stderr.
 
 **`senso kb create-folder`** · 🟠 medium
 
-- [ ] Help: say the operation is not idempotent and names are not unique; suggest 'kb find --query <name> --type folder' before creating.
-- [ ] Help: say the returned kb_node_id is what --parent-id, --folder-id (kb upload) and kb_folder_node_id (kb create-raw) all take.
-- [ ] Validate --parent-id as a UUID and reject a blank/whitespace --name before the request - exit 2.
-- [ ] 404: 'Parent folder <id> not found, or your key has no access to it.' with hint 'senso kb root' / 'senso kb find --type folder'.
-- [ ] 403: replace the generic key-scope hint with 'You can see this folder but cannot create in it. Ask an owner to run: senso kb permissions add <parent-id> --grantee-type user --grantee-id <you> --role editor'.
-- [ ] Add a Next line on stderr: 'senso kb upload <file> --folder-id <new id>'.
+- [x] Help: say the operation is not idempotent and names are not unique; suggest 'kb find --query <name> --type folder' before creating.
+- [x] Help: say the returned kb_node_id is what --parent-id, --folder-id (kb upload) and kb_folder_node_id (kb create-raw) all take.
+- [x] Validate --parent-id as a UUID and reject a blank/whitespace --name before the request - exit 2.
+- [x] 404: 'Parent folder <id> not found, or your key has no access to it.' with hint 'senso kb root' / 'senso kb find --type folder'.
+- [x] 403: replace the generic key-scope hint with 'You can see this folder but cannot create in it. Ask an owner to run: senso kb permissions add <parent-id> --grantee-type user --grantee-id <you> --role editor'.
+- [x] Add a Next line on stderr: 'senso kb upload <file> --folder-id <new id>'.
 
 **`senso kb create-raw`** · 🔴 high
 
-- [ ] Help: state in the first Returns line that `id` is the content_id and `kb_node_id` is what every kb command takes; give the jq path in the example.
-- [ ] Help: say the API answers 202 and the document is not searchable until content.processing_status is complete; give the poll command.
-- [ ] Validate --data keys before the request: require text (non-empty), and name any unrecognized key - exit 2. Say that tag_ids is accepted and ignored, so it can be warned about rather than dropped.
-- [ ] Validate kb_folder_node_id as a UUID before the request - exit 2.
-- [ ] Pass the 409 through with a hint: 'A document with identical text already exists. Find it with: senso kb find --query <title>'.
-- [ ] Report the 402 with its own hint (billing), separate from other exit-1 refusals.
-- [ ] Add a Next line on stderr with the poll command, keyed on kb_node_id.
+- [x] Help: state in the first Returns line that `id` is the content_id and `kb_node_id` is what every kb command takes; give the jq path in the example.
+- [x] Help: say the API answers 202 and the document is not searchable until content.processing_status is complete; give the poll command.
+- [x] Validate --data keys before the request: require text (non-empty), and name any unrecognized key - exit 2. Say that tag_ids is accepted and ignored, so it can be warned about rather than dropped.
+- [x] Validate kb_folder_node_id as a UUID before the request - exit 2.
+- [x] Pass the 409 through with a hint: 'A document with identical text already exists. Find it with: senso kb find --query <title>'.
+- [x] Report the 402 with its own hint (billing), separate from other exit-1 refusals.
+- [x] Add a Next line on stderr with the poll command, keyed on kb_node_id.
 
 **`senso kb delete`** · 🔴 high
 
-- [ ] Help: bring it up to the level of 'kb bulk-delete' - subtree recursion, irreversibility, id source, the 409 while ingesting, and that the root cannot be deleted.
-- [ ] Validate <id> as a UUID before the request - exit 2.
-- [ ] 404: 'KB node <id> not found, or your key has no access to it.'; 409: pass the API message through with the poll command 'senso kb get <id>' as the hint.
-- [ ] 403: name the KB grant and the fix, not the API-key scope.
-- [ ] Add on stderr, before a folder delete in an interactive terminal, the child count from 'kb children'; for non-interactive use add --yes to skip it.
+- [x] Help: bring it up to the level of 'kb bulk-delete' - subtree recursion, irreversibility, id source, the 409 while ingesting, and that the root cannot be deleted.
+- [x] Validate <id> as a UUID before the request - exit 2.
+- [x] 404: 'KB node <id> not found, or your key has no access to it.'; 409: pass the API message through with the poll command 'senso kb get <id>' as the hint.
+- [x] 403: name the KB grant and the fix, not the API-key scope.
+- [x] Add on stderr, before a folder delete in an interactive terminal, the child count from 'kb children'; for non-interactive use add --yes to skip it.
 
 **`senso kb download-url`** · 🟠 medium
 
-- [ ] Help: explain both URLs, the one-hour expiry, and that the URL carries its own authorization (do not add --api-key to the fetch).
-- [ ] Validate <id> as a UUID and --rev as an integer >= 1 - exit 2.
-- [ ] Pass the 400 'Content is not a downloadable file' through with the hint 'This is a text document. Read it with: senso kb get-content <id>'.
-- [ ] Add an Examples block that shows the curl one-liner and the jq field to pipe.
-- [ ] Consider a --to <path> flag that performs the download, since that is what every caller does next.
+- [x] Help: explain both URLs, the one-hour expiry, and that the URL carries its own authorization (do not add --api-key to the fetch).
+- [x] Validate <id> as a UUID and --rev as an integer >= 1 - exit 2.
+- [x] Pass the 400 'Content is not a downloadable file' through with the hint 'This is a text document. Read it with: senso kb get-content <id>'.
+- [x] Add an Examples block that shows the curl one-liner and the jq field to pipe.
+- [x] Consider a --to <path> flag that performs the download, since that is what every caller does next.
 
 **`senso kb find`** · 🔴 high
 
-- [ ] Help: say plainly that this matches node names and that 'senso search' searches document text; add it to See also.
-- [ ] Reject an empty or whitespace-only --query with exit 2 before the request.
-- [ ] Render zero results as 'No nodes match "<q>".' on stdout, with 'Searched names only. To search document text: senso search --query "<q>"' on stderr.
-- [ ] Validate --tag-ids as UUIDs before the request.
-- [ ] Print the 'Showing 1-20 of N' footer and the --offset follow-up on stderr.
+- [x] Help: say plainly that this matches node names and that 'senso search' searches document text; add it to See also.
+- [x] Reject an empty or whitespace-only --query with exit 2 before the request.
+- [x] Render zero results as 'No nodes match "<q>".' on stdout, with 'Searched names only. To search document text: senso search --query "<q>"' on stderr.
+- [x] Validate --tag-ids as UUIDs before the request.
+- [x] Print the 'Showing 1-20 of N' footer and the --offset follow-up on stderr.
 
 **`senso kb get`** · 🔴 high
 
-- [ ] Help: name the id space, say where it comes from and what it is NOT; add a Returns block listing processing_status values and effective_role.
-- [ ] Validate <id> as a UUID before the request - exit 2, naming the value and where node ids come from.
-- [ ] 404: 'KB node <id> not found, or your key has no access to it.' with hint 'senso kb find --query <name>'. Say both halves - the API cannot distinguish them, so the CLI must not imply it can.
-- [ ] Plain: render `content` as an indented sub-block, with processing_status first.
-- [ ] Add a Next line on stderr: for processing_status pending/processing, the poll command; for complete, 'senso search'; for failed, 'senso kb get-content <id>' / the error_code.
+- [x] Help: name the id space, say where it comes from and what it is NOT; add a Returns block listing processing_status values and effective_role.
+- [x] Validate <id> as a UUID before the request - exit 2, naming the value and where node ids come from.
+- [x] 404: 'KB node <id> not found, or your key has no access to it.' with hint 'senso kb find --query <name>'. Say both halves - the API cannot distinguish them, so the CLI must not imply it can.
+- [x] Plain: render `content` as an indented sub-block, with processing_status first.
+- [x] Add a Next line on stderr: for processing_status pending/processing, the poll command; for complete, 'senso search'; for failed, 'senso kb get-content <id>' / the error_code.
 
 **`senso kb get-content`** · 🔴 high
 
-- [ ] Help: state explicitly that <id> is a kb_node_id and that the returned `id` is the content_id, which no kb command accepts.
-- [ ] Help: say text is present for raw/markdown/web content only; point uploaded binaries at 'kb download-url'.
-- [ ] Validate --rev with parseIntFlag(min 1) - exit 2, and say the current version number is content.version_num from 'kb get'.
-- [ ] Validate <id> as a UUID - exit 2.
-- [ ] Plain: print the metadata block first, then a separator and the full text, so a long document does not bury the fields.
-- [ ] Pass the 400 'Node has no associated content' through with a hint naming 'kb children <id>' for a folder.
+- [x] Help: state explicitly that <id> is a kb_node_id and that the returned `id` is the content_id, which no kb command accepts.
+- [x] Help: say text is present for raw/markdown/web content only; point uploaded binaries at 'kb download-url'.
+- [x] Validate --rev with parseIntFlag(min 1) - exit 2, and say the current version number is content.version_num from 'kb get'.
+- [x] Validate <id> as a UUID - exit 2.
+- [x] Plain: print the metadata block first, then a separator and the full text, so a long document does not bury the fields.
+- [x] Pass the 400 'Node has no associated content' through with a hint naming 'kb children <id>' for a folder.
 
 **`senso kb move`** · 🔴 high
 
-- [ ] Help: say a folder moves with its entire subtree, and that reindexing is asynchronous - point at 'senso kb sync-status'.
-- [ ] Validate both ids as UUIDs, and reject --parent-id equal to <id>, before the request - exit 2.
-- [ ] 404: 'KB node <id> or destination folder <parent-id> not found, or your key has no access to one of them.' - name both ids, since the API will not say which.
-- [ ] 403: name the KB grant and the 'kb permissions add ... --role editor' fix rather than the API-key-scope hint.
-- [ ] Add a Next line on stderr: 'senso kb sync-status' and 'senso kb ancestors <id>'.
+- [x] Help: say a folder moves with its entire subtree, and that reindexing is asynchronous - point at 'senso kb sync-status'.
+- [x] Validate both ids as UUIDs, and reject --parent-id equal to <id>, before the request - exit 2.
+- [x] 404: 'KB node <id> or destination folder <parent-id> not found, or your key has no access to one of them.' - name both ids, since the API will not say which.
+- [x] 403: name the KB grant and the 'kb permissions add ... --role editor' fix rather than the API-key-scope hint.
+- [x] Add a Next line on stderr: 'senso kb sync-status' and 'senso kb ancestors <id>'.
 
 **`senso kb my-files`** · 🔴 high
 
-- [ ] Help: name the id space (kb_node_id), say the listing is top-level only and grant-filtered, and list the processing_status values.
-- [ ] Validate --tag-ids as a comma-separated list of UUIDs before the request - exit 2 naming the offending value.
-- [ ] Render an empty list as 'No files found.' on stdout, with the active filters echoed on stderr and the widening command.
-- [ ] Print 'Showing 1-50 of 412. Next page: senso kb my-files --offset 50' on stderr whenever total > offset + returned.
-- [ ] Add processing_status to the table columns (kb_node_id, name, type, status) and render content as an indented sub-block in plain, not inline JSON.
-- [ ] Warn on stderr when --limit is above 50 that the API capped the page.
+- [x] Help: name the id space (kb_node_id), say the listing is top-level only and grant-filtered, and list the processing_status values.
+- [x] Validate --tag-ids as a comma-separated list of UUIDs before the request - exit 2 naming the offending value.
+- [x] Render an empty list as 'No files found.' on stdout, with the active filters echoed on stderr and the widening command.
+- [x] Print 'Showing 1-50 of 412. Next page: senso kb my-files --offset 50' on stderr whenever total > offset + returned.
+- [x] Add processing_status to the table columns (kb_node_id, name, type, status) and render content as an indented sub-block in plain, not inline JSON.
+- [x] Warn on stderr when --limit is above 50 that the API capped the page.
 
 **`senso kb patch-raw`** · 🟠 medium
 
-- [ ] Help: lead with the contrast - 'omitted keys are left unchanged; use kb update-raw to replace the whole document'.
-- [ ] Help: say ingestion restarts and give the poll command; say raw documents only.
-- [ ] Validate <id> as a UUID, require at least one of title/summary/text, name unknown keys, and check tag_ids entries are UUIDs - all exit 2 before the request.
-- [ ] Pass 409 and 402 through with their own hints.
-- [ ] Report a tag-write failure after a successful content patch as a partial success, not a bare 500.
+- [x] Help: lead with the contrast - 'omitted keys are left unchanged; use kb update-raw to replace the whole document'.
+- [x] Help: say ingestion restarts and give the poll command; say raw documents only.
+- [x] Validate <id> as a UUID, require at least one of title/summary/text, name unknown keys, and check tag_ids entries are UUIDs - all exit 2 before the request.
+- [x] Pass 409 and 402 through with their own hints.
+- [x] Report a tag-write failure after a successful content patch as a partial success, not a bare 500.
 
 **`senso kb permissions add`** · 🟠 medium
 
-- [ ] Validate --grantee-id as a UUID before the request - exit 2, with the lookup command for the chosen --grantee-type in the hint.
-- [ ] Validate <id> as a UUID - exit 2.
-- [ ] Help: say grants inherit down the tree; say owner cannot be granted; say a 404 'Group not found' may mean the group exists but is invisible to you.
-- [ ] Plain: render grantee as an indented sub-block and label `id` as the permission id.
-- [ ] 409: pass the API message through and add the hint 'Find the existing grant with: senso kb permissions list <id>, then: senso kb permissions update <id> <permission_id> --role <role>'.
-- [ ] Add a Next line on stderr showing the update and remove commands with the new permission id substituted.
+- [x] Validate --grantee-id as a UUID before the request - exit 2, with the lookup command for the chosen --grantee-type in the hint.
+- [x] Validate <id> as a UUID - exit 2.
+- [x] Help: say grants inherit down the tree; say owner cannot be granted; say a 404 'Group not found' may mean the group exists but is invisible to you.
+- [x] Plain: render grantee as an indented sub-block and label `id` as the permission id.
+- [x] 409: pass the API message through and add the hint 'Find the existing grant with: senso kb permissions list <id>, then: senso kb permissions update <id> <permission_id> --role <role>'.
+- [x] Add a Next line on stderr showing the update and remove commands with the new permission id substituted.
 
 **`senso kb permissions list`** · 🟠 medium
 
-- [ ] Render `grantee` as an indented sub-block in plain, and split it into grantee_type / grantee_name / grantee_email columns for table.
-- [ ] Validate <id> as a UUID - exit 2.
-- [ ] Empty list: 'No grants on this node.' on stdout, and on stderr 'Access may still come from a grant on a parent folder - check senso kb ancestors <id> - or from an org-admin key, which bypasses grants.'
-- [ ] Help: say grants inherit and that this shows only the node's own grants; point at 'kb get' effective_role for the resolved answer.
-- [ ] Help: say this needs the share capability, which is why it can 403 where other reads succeed.
-- [ ] 403: name the capability and who can grant it rather than the generic API-key-scope hint.
+- [x] Render `grantee` as an indented sub-block in plain, and split it into grantee_type / grantee_name / grantee_email columns for table.
+- [x] Validate <id> as a UUID - exit 2.
+- [x] Empty list: 'No grants on this node.' on stdout, and on stderr 'Access may still come from a grant on a parent folder - check senso kb ancestors <id> - or from an org-admin key, which bypasses grants.'
+- [x] Help: say grants inherit and that this shows only the node's own grants; point at 'kb get' effective_role for the resolved answer.
+- [x] Help: say this needs the share capability, which is why it can 403 where other reads succeed.
+- [x] 403: name the capability and who can grant it rather than the generic API-key-scope hint.
 
 **`senso kb permissions remove`** · 🟠 medium
 
-- [ ] Use emitConfirmation-style reporting: a tick on stderr naming the grantee, and {action: 'revoked', resource: 'kb_permission', node_id, permission_id} on stdout in json.
-- [ ] Validate both positional ids as UUIDs - exit 2, naming which argument.
-- [ ] Help: say inherited access from a parent folder survives the revoke; point at 'senso kb ancestors <id>' and 'senso kb permissions list' on each ancestor.
-- [ ] 404: 'Permission <permissionId> not found on KB node <id>.' with the list command as the hint.
-- [ ] Pass 'Cannot revoke your own permission' through with the hint that another admin must do it.
+- [x] Use emitConfirmation-style reporting: a tick on stderr naming the grantee, and {action: 'revoked', resource: 'kb_permission', node_id, permission_id} on stdout in json.
+- [x] Validate both positional ids as UUIDs - exit 2, naming which argument.
+- [x] Help: say inherited access from a parent folder survives the revoke; point at 'senso kb ancestors <id>' and 'senso kb permissions list' on each ancestor.
+- [x] 404: 'Permission <permissionId> not found on KB node <id>.' with the list command as the hint.
+- [x] Pass 'Cannot revoke your own permission' through with the hint that another admin must do it.
 
 **`senso kb permissions update`** · 🟠 medium
 
-- [ ] Validate both positional ids as UUIDs - exit 2, naming which argument and where each id comes from.
-- [ ] After a successful PATCH, re-read the grant (or synthesize {action: 'role_changed', node_id, permission_id, role}) so the JSON payload carries something to verify.
-- [ ] Help: say the permission id must belong to this node, and that an invisible group grant also reports not-found.
-- [ ] 404: 'Permission <permissionId> not found on KB node <id>.' with the hint 'It may belong to a different node, or be a grant to a group your key cannot see. List them with: senso kb permissions list <id>'.
-- [ ] Pass 'Cannot modify your own permission' through with the hint that another admin must make the change.
+- [x] Validate both positional ids as UUIDs - exit 2, naming which argument and where each id comes from.
+- [x] After a successful PATCH, re-read the grant (or synthesize {action: 'role_changed', node_id, permission_id, role}) so the JSON payload carries something to verify.
+- [x] Help: say the permission id must belong to this node, and that an invisible group grant also reports not-found.
+- [x] 404: 'Permission <permissionId> not found on KB node <id>.' with the hint 'It may belong to a different node, or be a grant to a group your key cannot see. List them with: senso kb permissions list <id>'.
+- [x] Pass 'Cannot modify your own permission' through with the hint that another admin must make the change.
 
 **`senso kb rename`** · 🟠 medium
 
-- [ ] Help: say this renames the node in the tree only, and name 'kb patch-raw --data {"title":...}' as the way to change a document's title.
-- [ ] Help: say the root cannot be renamed and names are not unique.
-- [ ] Validate <id> as a UUID and reject a blank --name before the request - exit 2.
-- [ ] 404: 'KB node <id> not found, or your key has no access to it.'; 403: name the KB grant and the 'kb permissions add ... --role editor' fix.
-- [ ] Say in Returns that the payload has no content block, unlike 'kb get'.
+- [x] Help: say this renames the node in the tree only, and name 'kb patch-raw --data {"title":...}' as the way to change a document's title.
+- [x] Help: say the root cannot be renamed and names are not unique.
+- [x] Validate <id> as a UUID and reject a blank --name before the request - exit 2.
+- [x] 404: 'KB node <id> not found, or your key has no access to it.'; 403: name the KB grant and the 'kb permissions add ... --role editor' fix.
+- [x] Say in Returns that the payload has no content block, unlike 'kb get'.
 
 **`senso kb root`** · 🟢 low
 
-- [ ] Help: say the returned kb_node_id is the parent for top-level creates and the argument to 'kb children'.
-- [ ] Help: note that the root is not counted by 'kb stats' and cannot be renamed, moved or deleted.
-- [ ] Add Returns / Exit codes / Examples per the convention.
+- [x] Help: say the returned kb_node_id is the parent for top-level creates and the argument to 'kb children'.
+- [x] Help: note that the root is not counted by 'kb stats' and cannot be renamed, moved or deleted.
+- [x] Add Returns / Exit codes / Examples per the convention.
 
 **`senso kb stats`** · 🟢 low
 
-- [ ] Help: state that the counts are org-wide and unfiltered by grants, unlike 'kb my-files'.
-- [ ] Help: state that total_files includes documents whose processing_status is pending, processing or failed; point at 'kb my-files --status failed' to find the broken ones.
-- [ ] Add Returns / Exit codes / Examples per the convention.
+- [x] Help: state that the counts are org-wide and unfiltered by grants, unlike 'kb my-files'.
+- [x] Help: state that total_files includes documents whose processing_status is pending, processing or failed; point at 'kb my-files --status failed' to find the broken ones.
+- [x] Add Returns / Exit codes / Examples per the convention.
 
 **`senso kb sync-status`** · 🟠 medium
 
-- [ ] Help: add Returns explaining both values and what to do - syncing true means a recent move or delete is still propagating to the vector index, so search results may be stale; retry in a few seconds.
-- [ ] Add a poll example using --output json and jq.
-- [ ] On plain output with syncing=true, print on stderr: 'Vector sync in progress. Search results may be stale. Re-run in ~5s.'
+- [x] Help: add Returns explaining both values and what to do - syncing true means a recent move or delete is still propagating to the vector index, so search results may be stale; retry in a few seconds.
+- [x] Add a poll example using --output json and jq.
+- [x] On plain output with syncing=true, print on stderr: 'Vector sync in progress. Search results may be stale. Re-run in ~5s.'
 
 **`senso kb tags add`** · 🟠 medium
 
-- [ ] Help: describe both response shapes explicitly and say --name is the only way to get a newly created tag's id back.
-- [ ] Error (or at least warn) when both --name and --id are given rather than silently preferring --id.
-- [ ] Validate <id> and --id as UUIDs before the request - exit 2.
-- [ ] Change the table columns from tag_id to id.
-- [ ] For the --id path, synthesize a payload ({action: 'tag_attached', kb_node_id, tag_id}) so json callers get something to read instead of a message string.
-- [ ] Help: say the tag is created in the organization's shared library, that the call is additive, and that folders are rejected.
+- [x] Help: describe both response shapes explicitly and say --name is the only way to get a newly created tag's id back.
+- [x] Error (or at least warn) when both --name and --id are given rather than silently preferring --id.
+- [x] Validate <id> and --id as UUIDs before the request - exit 2.
+- [x] Change the table columns from tag_id to id.
+- [x] For the --id path, synthesize a payload ({action: 'tag_attached', kb_node_id, tag_id}) so json callers get something to read instead of a message string.
+- [x] Help: say the tag is created in the organization's shared library, that the call is additive, and that folders are rejected.
 
 **`senso kb tags list`** · 🟠 medium
 
-- [ ] Change the columns to ['id','name','curated'] so the table is not blank in its first column.
-- [ ] Validate <id> as a UUID before the request - exit 2.
-- [ ] Help: name the id space, say the returned `id` is the tag id for --ids/--id, and explain `curated`.
-- [ ] Empty list: 'No tags on this node.' on stdout, and on stderr 'Auto-tagging runs after ingestion; check content.processing_status with senso kb get <id>.'
-- [ ] Help: say a folder returns an empty list (it is not tagged), and point at the document nodes inside it.
+- [x] Change the columns to ['id','name','curated'] so the table is not blank in its first column.
+- [x] Validate <id> as a UUID before the request - exit 2.
+- [x] Help: name the id space, say the returned `id` is the tag id for --ids/--id, and explain `curated`.
+- [x] Empty list: 'No tags on this node.' on stdout, and on stderr 'Auto-tagging runs after ingestion; check content.processing_status with senso kb get <id>.'
+- [x] Help: say a folder returns an empty list (it is not tagged), and point at the document nodes inside it.
 
 **`senso kb tags remove`** · 🟠 medium
 
-- [ ] Read the node's tags first (or compare the before/after set) and say which it was: 'Detached "refunds".' vs 'Node did not have the tag "refunds"; nothing changed.' Report it in the JSON payload as {action, changed: true|false}.
-- [ ] Error when both --name and --id are given.
-- [ ] Validate <id> and --id as UUIDs, and reject a blank --name, before the request - exit 2.
-- [ ] Help: say the tag itself is not deleted, only the link; name 'senso tags delete' for the library.
-- [ ] Help: point at 'kb tags set --clear' for removing everything at once.
+- [x] Read the node's tags first (or compare the before/after set) and say which it was: 'Detached "refunds".' vs 'Node did not have the tag "refunds"; nothing changed.' Report it in the JSON payload as {action, changed: true|false}.
+- [x] Error when both --name and --id are given.
+- [x] Validate <id> and --id as UUIDs, and reject a blank --name, before the request - exit 2.
+- [x] Help: say the tag itself is not deleted, only the link; name 'senso tags delete' for the library.
+- [x] Help: point at 'kb tags set --clear' for removing everything at once.
 
 **`senso kb tags set`** · 🔴 high
 
-- [ ] Refuse 'kb tags set' with neither flag: exit 2 with 'Pass --names and/or --ids, or --clear to remove all tags.' Add an explicit --clear so clearing is deliberate.
-- [ ] Validate --ids entries as UUIDs and <id> as a UUID before the request - exit 2.
-- [ ] Change the columns from tag_id to id.
-- [ ] Help: say this replaces the whole set across both flags, that unknown names are created in the shared library, and that folders are rejected.
-- [ ] Warn on stderr when the node's processing_status is not complete that auto-tagging may still add tags.
-- [ ] Report the difference on stderr: which tags were added and which removed.
+- [x] Refuse 'kb tags set' with neither flag: exit 2 with 'Pass --names and/or --ids, or --clear to remove all tags.' Add an explicit --clear so clearing is deliberate.
+- [x] Validate --ids entries as UUIDs and <id> as a UUID before the request - exit 2.
+- [x] Change the columns from tag_id to id.
+- [x] Help: say this replaces the whole set across both flags, that unknown names are created in the shared library, and that folders are rejected.
+- [x] Warn on stderr when the node's processing_status is not complete that auto-tagging may still add tags.
+- [x] Report the difference on stderr: which tags were added and which removed.
 
 **`senso kb update-file`** · 🔴 high
 
-- [ ] Call assertFilesExist / assertFilesNotEmpty here, as 'kb upload' does - exit 2 with the file named.
-- [ ] Validate <id> as a UUID, and reject .md/.markdown locally naming 'kb update-raw' - exit 2.
-- [ ] Help: name both argument types and their sources, say it works only on nodes created by 'kb upload', list the accepted types and the 100MB cap, and give the poll command.
-- [ ] Redact or drop upload_url from the emitted payload - it has already been used and it is a signed URL.
-- [ ] Pass the 409 through with the hint 'The same bytes are already ingested or in flight. Check: senso kb get <id>'.
-- [ ] Add a Next line on stderr with the poll command.
-- [ ] Remove the unreachable 'else' branch, or make it exit non-zero.
+- [x] Call assertFilesExist / assertFilesNotEmpty here, as 'kb upload' does - exit 2 with the file named.
+- [x] Validate <id> as a UUID, and reject .md/.markdown locally naming 'kb update-raw' - exit 2.
+- [x] Help: name both argument types and their sources, say it works only on nodes created by 'kb upload', list the accepted types and the 100MB cap, and give the poll command.
+- [x] Redact or drop upload_url from the emitted payload - it has already been used and it is a signed URL.
+- [x] Pass the 409 through with the hint 'The same bytes are already ingested or in flight. Check: senso kb get <id>'.
+- [x] Add a Next line on stderr with the poll command.
+- [x] Remove the unreachable 'else' branch, or make it exit non-zero.
 
 **`senso kb update-raw`** · 🔴 high
 
-- [ ] Help: say the payload's `id` is the content_id and kb_node_id is the one to keep using.
-- [ ] Help: say ingestion restarts (processing_status returns to processing) and give the poll command.
-- [ ] Help: say summary is also replaced - omitting it clears it - and that this works only on raw documents.
-- [ ] Validate <id> as a UUID; validate --data locally: require non-empty title and text, name unknown keys, check tag_ids entries are UUIDs - exit 2.
-- [ ] Pass the 409 and 402 through with their own hints.
-- [ ] On a 500 after a successful content write, say so: 'The text was replaced but the tags were not.'
-- [ ] Add a Next line on stderr with the poll command.
+- [x] Help: say the payload's `id` is the content_id and kb_node_id is the one to keep using.
+- [x] Help: say ingestion restarts (processing_status returns to processing) and give the poll command.
+- [x] Help: say summary is also replaced - omitting it clears it - and that this works only on raw documents.
+- [x] Validate <id> as a UUID; validate --data locally: require non-empty title and text, name unknown keys, check tag_ids entries are UUIDs - exit 2.
+- [x] Pass the 409 and 402 through with their own hints.
+- [x] On a 500 after a successful content write, say so: 'The text was replaced but the tags were not.'
+- [x] Add a Next line on stderr with the poll command.
 
 **`senso kb upload`** · 🔴 high
 
-- [ ] Print the accepted files' kb_node_id on stdout in plain mode - the payload is what the caller needs and stdout is currently empty. At minimum, print the poll command per accepted file on stderr with the real id substituted.
-- [ ] Help: list the accepted file types (PDF, DOC/DOCX, TXT, HTML, CSV, XLS/XLSX, PPT/PPTX, images) and say explicitly that .md/.markdown and .json/.xml are rejected, naming 'senso kb create-raw' for markdown.
-- [ ] Help: name the four per-file statuses and what each means, and say the 100MB per-file limit.
-- [ ] Validate the derived content_type locally against the API's accepted set - a file the API will certainly reject should exit 2 before any upload, naming the file and the reason.
-- [ ] Validate --folder-id as a UUID before the request - exit 2.
-- [ ] Exit non-zero (or at least emit a warnings array) on a PARTIAL failure, not only on a total one, so a script can tell 10/10 from 3/10.
-- [ ] Add markdown_requires_raw_ingestion to the UploadResultItem status union and give it its own message naming 'senso kb create-raw'.
+- [x] Print the accepted files' kb_node_id on stdout in plain mode - the payload is what the caller needs and stdout is currently empty. At minimum, print the poll command per accepted file on stderr with the real id substituted.
+- [x] Help: list the accepted file types (PDF, DOC/DOCX, TXT, HTML, CSV, XLS/XLSX, PPT/PPTX, images) and say explicitly that .md/.markdown and .json/.xml are rejected, naming 'senso kb create-raw' for markdown.
+- [x] Help: name the four per-file statuses and what each means, and say the 100MB per-file limit.
+- [x] Validate the derived content_type locally against the API's accepted set - a file the API will certainly reject should exit 2 before any upload, naming the file and the reason.
+- [x] Validate --folder-id as a UUID before the request - exit 2.
+- [x] Exit non-zero (or at least emit a warnings array) on a PARTIAL failure, not only on a total one, so a script can tell 10/10 from 3/10.
+- [x] Add markdown_requires_raw_ingestion to the UploadResultItem status union and give it its own message naming 'senso kb create-raw'.
 
 ### `senso permissions` <sub>3 items</sub>
 
@@ -1794,81 +1794,81 @@ has to change for the CLI to be able to say the right thing. Check items off in 
 
 **`senso analytics`** · group
 
-- [ ] Group help: add 'Requires the GEO product and read:prompt. Dates are YYYY-MM-DD (not the RFC 3339 instants `senso evals` takes). Windows up to 365 days.'
-- [ ] Group help: add the id-space note and an ordered workflow list.
-- [ ] Map the two 403 texts to distinct messages: product 403 -> 'analytics needs the GEO product' with hint to contact the account owner; permission 403 -> name read:prompt.
+- [x] Group help: add 'Requires the GEO product and read:prompt. Dates are YYYY-MM-DD (not the RFC 3339 instants `senso evals` takes). Windows up to 365 days.'
+- [x] Group help: add the id-space note and an ordered workflow list.
+- [x] Map the two 403 texts to distinct messages: product 403 -> 'analytics needs the GEO product' with hint to contact the account owner; permission 403 -> name read:prompt.
 
 **`senso analytics answers`** · 🟠 medium
 
-- [ ] Plain: full text, citations with tier, competitor_mentions; prompt_id on the first line.
-- [ ] Paging line on stderr + JSON page{}.
-- [ ] Validate --limit/--offset, --from/--to, --models (exit 2).
-- [ ] Help: Returns block with enum values; Exit codes; Examples.
+- [x] Plain: full text, citations with tier, competitor_mentions; prompt_id on the first line.
+- [x] Paging line on stderr + JSON page{}.
+- [x] Validate --limit/--offset, --from/--to, --models (exit 2).
+- [x] Help: Returns block with enum values; Exit codes; Examples.
 
 **`senso analytics citations`** · 🟠 medium
 
-- [ ] Shared date/model validation (exit 2); guard totals/metrics.
-- [ ] Plain per bucket: append 'shares owned a% / tracked b% / external c%'.
-- [ ] Help: Returns block stating rate vs share semantics; Exit codes; Examples.
+- [x] Shared date/model validation (exit 2); guard totals/metrics.
+- [x] Plain per bucket: append 'shares owned a% / tracked b% / external c%'.
+- [x] Help: Returns block stating rate vs share semantics; Exit codes; Examples.
 
 **`senso analytics domains`** · 🟠 medium
 
-- [ ] parseIntFlag --limit {min:1,max:100} and --offset {min:0} -> exit 2 (industries.ts already does this).
-- [ ] Print the next page on stderr: 'Showing 1–50 of 213. Next page: senso analytics domains --offset 50'; in JSON add page:{offset,limit,returned,total,has_more,next}.
-- [ ] Shared date/model validation.
-- [ ] Help: Returns (fields + tier values), Exit codes, Examples, See also.
+- [x] parseIntFlag --limit {min:1,max:100} and --offset {min:0} -> exit 2 (industries.ts already does this).
+- [x] Print the next page on stderr: 'Showing 1–50 of 213. Next page: senso analytics domains --offset 50'; in JSON add page:{offset,limit,returned,total,has_more,next}.
+- [x] Shared date/model validation.
+- [x] Help: Returns (fields + tier values), Exit codes, Examples, See also.
 
 **`senso analytics filters`** · 🔴 high
 
-- [ ] Plain/table: print model ids, with the display name in parentheses: '--models chatgpt (ChatGPT), gemini (Gemini), aioverview (Google AI Overviews)'.
-- [ ] Print 'Tracked competitors' with ids and point at `senso competitors list`.
-- [ ] Add a line 'All model ids: gpt-4.1, chatgpt, perplexity, aioverview, gemini, linkup, claude-sonnet-4-6, grok' (or fetch it if the API publishes it).
-- [ ] Help: Returns, Exit codes, Examples (`--output json | jq -r '.data.models[].id'`).
+- [x] Plain/table: print model ids, with the display name in parentheses: '--models chatgpt (ChatGPT), gemini (Gemini), aioverview (Google AI Overviews)'.
+- [x] Print 'Tracked competitors' with ids and point at `senso competitors list`.
+- [x] Add a line 'All model ids: gpt-4.1, chatgpt, perplexity, aioverview, gemini, linkup, claude-sonnet-4-6, grok' (or fetch it if the API publishes it).
+- [x] Help: Returns, Exit codes, Examples (`--output json | jq -r '.data.models[].id'`).
 
 **`senso analytics glossary`** · 🟢 low
 
-- [ ] Table: add gotcha as a column (or fold it into definition).
-- [ ] Help: Returns (fields), Exit codes, Examples; note that it is static.
-- [ ] Consider embedding the glossary in the CLI as an offline fallback so `senso analytics glossary --offline` works with no key / no GEO (source of truth stays the API).
+- [x] Table: add gotcha as a column (or fold it into definition).
+- [x] Help: Returns (fields), Exit codes, Examples; note that it is static.
+- [x] Consider embedding the glossary in the CLI as an offline fallback so `senso analytics glossary --offline` works with no key / no GEO (source of truth stays the API).
 
 **`senso analytics mentions`** · 🟠 medium
 
-- [ ] Render the SoV denominator per bucket: 'SoV 16.1% (36/224)'.
-- [ ] Shared date/model validation from filters.ts (exit 2).
-- [ ] Guard data.metrics/data.totals; throw CliError on an unexpected shape.
-- [ ] Empty series: keep the stdout line, add stderr 'Data exists for 2026-03-02 → 2026-09-14 — run `senso analytics filters`'.
-- [ ] Help: add Returns/Exit codes/Examples; note ISO weeks and additivity ('sum the counts across buckets, never average the rates').
+- [x] Render the SoV denominator per bucket: 'SoV 16.1% (36/224)'.
+- [x] Shared date/model validation from filters.ts (exit 2).
+- [x] Guard data.metrics/data.totals; throw CliError on an unexpected shape.
+- [x] Empty series: keep the stdout line, add stderr 'Data exists for 2026-03-02 → 2026-09-14 — run `senso analytics filters`'.
+- [x] Help: add Returns/Exit codes/Examples; note ISO weeks and additivity ('sum the counts across buckets, never average the rates').
 
 **`senso analytics pages`** · 🟠 medium
 
-- [ ] Plain: print the prompt_id beside each top prompt and do not truncate the text.
-- [ ] Add the stderr next-page line and JSON page{} block.
-- [ ] Validate --limit/--offset (exit 2); shared date/model validation.
-- [ ] Help: Returns/Exit codes/Examples; say which follow-up takes prompt_id.
+- [x] Plain: print the prompt_id beside each top prompt and do not truncate the text.
+- [x] Add the stderr next-page line and JSON page{} block.
+- [x] Validate --limit/--offset (exit 2); shared date/model validation.
+- [x] Help: Returns/Exit codes/Examples; say which follow-up takes prompt_id.
 
 **`senso analytics prompt`** · 🔴 high
 
-- [ ] Validate <promptId> as a UUID -> exit 2 with the id-space hint.
-- [ ] 404: 'Prompt <id> not found in organization <slug>. Org prompt ids come from `senso analytics prompts`; industry prompt ids (`senso industries prompts`) are not accepted here.'
-- [ ] Plain: full response_text, then citations (url [tier]) and competitor_mentions per answer.
-- [ ] Reuse addWindowOptions wording (defaults, max span, filters pointer); shared date/model validation; guard totals/metrics.
-- [ ] Help: Arguments/Returns/Exit codes/Examples.
+- [x] Validate <promptId> as a UUID -> exit 2 with the id-space hint.
+- [x] 404: 'Prompt <id> not found in organization <slug>. Org prompt ids come from `senso analytics prompts`; industry prompt ids (`senso industries prompts`) are not accepted here.'
+- [x] Plain: full response_text, then citations (url [tier]) and competitor_mentions per answer.
+- [x] Reuse addWindowOptions wording (defaults, max span, filters pointer); shared date/model validation; guard totals/metrics.
+- [x] Help: Arguments/Returns/Exit codes/Examples.
 
 **`senso analytics prompts`** · 🟠 medium
 
-- [ ] Plain: prompt_id first line, full text, denominators for SoV and owned citation rate.
-- [ ] Add stderr paging line and JSON page{}.
-- [ ] Validate --limit/--offset; shared date/model validation; guard data.metrics.
-- [ ] Help: Returns block explaining latest vs window; Exit codes; Examples with --order asc.
+- [x] Plain: prompt_id first line, full text, denominators for SoV and owned citation rate.
+- [x] Add stderr paging line and JSON page{}.
+- [x] Validate --limit/--offset; shared date/model validation; guard data.metrics.
+- [x] Help: Returns block explaining latest vs window; Exit codes; Examples with --order asc.
 
 **`senso analytics summary`** · 🔴 high
 
-- [ ] Guard the renderer: if data.totals or data.metrics is missing, throw CliError('Unexpected response from /org/analytics/summary: missing totals/metrics', EXIT.ERROR, {code:'error', hint:'Re-run with SENSO_DEBUG=1 and report the payload.'}) instead of letting a TypeError escape.
-- [ ] Validate --from/--to as YYYY-MM-DD, from <= to, span <= 365 days -> exit 2 before the request (shared in filters.ts so every windowed command gets it).
-- [ ] Validate --models against the fixed id list (gpt-4.1, chatgpt, perplexity, aioverview, gemini, linkup, claude-sonnet-4-6, grok) -> exit 2, hint `senso analytics filters --output json | jq -r '.models[].id'`.
-- [ ] Distinguish the two 403 texts: product -> 'analytics needs the GEO product' with an account-owner hint; permission -> 'this key lacks read:prompt'.
-- [ ] Help: add Returns (metrics, deltas semantics, data_quality levels), Exit codes, Examples, See also.
-- [ ] JSON: wrap in the standard envelope {ok, command, data, next:[{why:'Find the prompts you are invisible on', command:'senso analytics prompts --order asc'}]}.
+- [x] Guard the renderer: if data.totals or data.metrics is missing, throw CliError('Unexpected response from /org/analytics/summary: missing totals/metrics', EXIT.ERROR, {code:'error', hint:'Re-run with SENSO_DEBUG=1 and report the payload.'}) instead of letting a TypeError escape.
+- [x] Validate --from/--to as YYYY-MM-DD, from <= to, span <= 365 days -> exit 2 before the request (shared in filters.ts so every windowed command gets it).
+- [x] Validate --models against the fixed id list (gpt-4.1, chatgpt, perplexity, aioverview, gemini, linkup, claude-sonnet-4-6, grok) -> exit 2, hint `senso analytics filters --output json | jq -r '.models[].id'`.
+- [x] Distinguish the two 403 texts: product -> 'analytics needs the GEO product' with an account-owner hint; permission -> 'this key lacks read:prompt'.
+- [x] Help: add Returns (metrics, deltas semantics, data_quality levels), Exit codes, Examples, See also.
+- [x] JSON: wrap in the standard envelope {ok, command, data, next:[{why:'Find the prompts you are invisible on', command:'senso analytics prompts --order asc'}]}.
 
 ### `senso history-imports` <sub>16 items</sub>
 
