@@ -12,8 +12,17 @@ import { apiRequest } from "../../lib/api-client.js";
 import { emit } from "../../lib/output.js";
 import { runAction } from "../../lib/run-action.js";
 import { parseEnumFlag } from "../../lib/enum-arg.js";
+import { apiExits, describeCommand } from "../../lib/help.js";
 import { addWindowOptions, windowParams, type WindowFilters } from "./filters.js";
-import { count, emitContext, emitNotes, qualityLine, rate, windowLine } from "./render.js";
+import {
+  count,
+  emitContext,
+  emitNotes,
+  qualityLine,
+  rate,
+  requireBlocks,
+  windowLine,
+} from "./render.js";
 import type {
   AnalyticsWindow,
   CitationSeriesPoint,
@@ -27,15 +36,45 @@ const GROUP_BY_VALUES = ["day", "week"] as const;
 
 export function addCitationsCommand(analytics: Command, program: Command): void {
   // ── citations ────────────────────────────────────────────────────────────
-  addWindowOptions(
-    analytics
-      .command("citations")
-      .description(
-        "Citation overview: both denominators (D = cited answers, S = citation instances), every tier numerator, the tier rates (÷D) and tier shares (÷S), and the series underneath.",
-      ),
-  )
-    .option("--group-by <bucket>", "Time bucket: day | week (default: day)")
-    .action(
+  describeCommand(
+    addWindowOptions(
+      analytics
+        .command("citations")
+        .description(
+          "Citation overview: both denominators (D = cited answers, S = citation instances), every tier numerator, the tier rates (÷D) and tier shares (÷S), and the series underneath.",
+        ),
+    ).option(
+      "--group-by <bucket>",
+      "Time bucket: day | week (default: day). Weeks are ISO weeks starting Monday, so the first and last may be partial",
+    ),
+    {
+      returns: [
+        "totals.cited_run_count — D, the answers that cited anything; the denominator of every *_citation_rate",
+        "totals.cited_total — S, the citation instances; the denominator of every *_citation_share",
+        "metrics.primary|tracked|external_citation_rate — that tier's cited answers ÷ D. Tiers overlap: one answer can cite owned and external pages, so the three rates may sum past 100%",
+        "metrics.primary|tracked|external_citation_share — that tier's citations ÷ S. Shares partition S and sum to 100%",
+        "metrics.citations_per_answer — S ÷ D; an intensity, not a percentage",
+        "Each rate is {value, display} or null; null means the denominator was zero, never 0%",
+        "series[] — the same numerators and rates per bucket, with period_start",
+        "tier — primary (Owned) | tracked (a competitor or source you track) | external (everything else)",
+        "data_quality.level — low | medium | high; window; notes[]",
+      ],
+      exitCodes: {
+        ...apiExits,
+        2: "a date that is not YYYY-MM-DD, a window longer than 365 days, or an unknown model, prompt type or bucket",
+        3: "no key, the organization lacks the GEO product, or the key lacks read:prompt",
+      },
+      examples: [
+        { comment: "The default 30-day window, by day", command: "senso analytics citations" },
+        {
+          comment: "Owned-citation trend by week",
+          command:
+            "senso analytics citations --group-by week --output json | jq '.data.series[] | {period_start, primary_citation_rate}'",
+        },
+      ],
+      seeAlso: ["senso analytics domains", "senso analytics pages", "senso analytics glossary"],
+    },
+  ).action(
       runAction(program, async (ctx, cmdOpts: WindowFilters & { groupBy?: string }) => {
         const data = await apiRequest<{
           window: AnalyticsWindow;
@@ -53,6 +92,11 @@ export function addCitationsCommand(analytics: Command, program: Command): void 
           },
           apiKey: ctx.apiKey,
           baseUrl: ctx.baseUrl,
+        });
+
+        requireBlocks("/org/analytics/citations", {
+          totals: data.totals,
+          metrics: data.metrics,
         });
 
         const series = data.series ?? [];
@@ -86,6 +130,9 @@ export function addCitationsCommand(analytics: Command, program: Command): void 
               "owned_share",
             ],
           },
+          empty: "rollup days",
+          emptyHint:
+            "No rollup days fell in this window. `senso analytics filters` shows the date range that has data.",
           plain: [
             ...context,
             "",

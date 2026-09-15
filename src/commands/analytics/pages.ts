@@ -12,7 +12,14 @@ import { apiRequest } from "../../lib/api-client.js";
 import { emit } from "../../lib/output.js";
 import { runAction, type Ctx } from "../../lib/run-action.js";
 import { parseEnumFlag } from "../../lib/enum-arg.js";
-import { addPagingOptions, addWindowOptions, windowParams, type WindowFilters } from "./filters.js";
+import { apiExits, describeCommand } from "../../lib/help.js";
+import {
+  addPagingOptions,
+  addWindowOptions,
+  pagingParams,
+  windowParams,
+  type WindowFilters,
+} from "./filters.js";
 import {
   count,
   emitContext,
@@ -20,6 +27,7 @@ import {
   position,
   qualityLine,
   rate,
+  requireBlocks,
   truncate,
   windowLine,
 } from "./render.js";
@@ -33,21 +41,47 @@ const SORT_VALUES = ["citations", "coverage"] as const;
 
 export function addPagesCommand(analytics: Command, program: Command): void {
   // ── pages ────────────────────────────────────────────────────────────────
-  addPagingOptions(
-    addWindowOptions(
-      analytics
-        .command("pages")
-        .description(
-          "URL-grain citation table plus the prompts driving each page's citations. Same Coverage (÷D) and Share (÷S) denominators as 'analytics domains'.",
-        ),
-      { tag: false },
-    )
-      .option("--tier <tier>", "Filter by tier: primary | tracked | secondary")
-      .option("--domain <domain>", "Restrict to one exact domain")
-      .option("--domain-contains <text>", "Substring filter on the domain")
-      .option("--url-contains <text>", "Substring filter on the URL")
-      .option("--sort <field>", "Sort by: citations | coverage (default: citations)"),
-    50,
+  describeCommand(
+    addPagingOptions(
+      addWindowOptions(
+        analytics
+          .command("pages")
+          .description(
+            "URL-grain citation table plus the prompts driving each page's citations. Same Coverage (÷D) and Share (÷S) denominators as 'analytics domains'.",
+          ),
+        { tag: false },
+      )
+        .option("--tier <tier>", "Filter by tier: primary | tracked | secondary")
+        .option("--domain <domain>", "Restrict to one exact domain (exact match, not a substring)")
+        .option("--domain-contains <text>", "Substring filter on the domain; combines with --domain")
+        .option("--url-contains <text>", "Substring filter on the URL")
+        .option("--sort <field>", "Sort by: citations | coverage (default: citations)"),
+      50,
+    ),
+    {
+      returns: [
+        "denominators.cited_run_count — D, the answers that cited anything; denominators.cited_total — S, the citation instances",
+        "pages[].citation_coverage — this URL's cited answers ÷ D, as {value, display} or null when D is zero",
+        "pages[].citation_share — this URL's citation instances ÷ S, as {value, display} or null when S is zero",
+        "pages[].tier — primary | tracked | secondary (tier_label: Owned | Tracked | External)",
+        "pages[].avg_citation_rank — average position in an answer's citation list; null when never cited",
+        "pages[].top_prompts[] — prompt_id, prompt_text, cited_run_count. The prompt_id is an org prompt id: pass it to `senso analytics prompt <promptId>`",
+        "total / limit / offset — the page; `page.next` in the JSON envelope is the runnable next call",
+      ],
+      exitCodes: {
+        ...apiExits,
+        2: "a date that is not YYYY-MM-DD, a window longer than 365 days, an unknown model or tier, or a --limit outside 1-100",
+        3: "no key, the organization lacks the GEO product, or the key lacks read:prompt",
+      },
+      examples: [
+        { comment: "The URLs the models cite most", command: "senso analytics pages" },
+        {
+          comment: "One competitor's pages, and the prompts that surface them",
+          command: "senso analytics pages --domain example.com",
+        },
+      ],
+      seeAlso: ["senso analytics domains", "senso analytics prompt <promptId>"],
+    },
   ).action(
     runAction(
       program,
@@ -81,12 +115,13 @@ export function addPagesCommand(analytics: Command, program: Command): void {
             domain_contains: cmdOpts.domainContains,
             url_contains: cmdOpts.urlContains,
             sort: parseEnumFlag("--sort", cmdOpts.sort, SORT_VALUES),
-            limit: cmdOpts.limit,
-            offset: cmdOpts.offset,
+            ...pagingParams(cmdOpts),
           },
           apiKey: ctx.apiKey,
           baseUrl: ctx.baseUrl,
         });
+
+        requireBlocks("/org/analytics/citations/pages", { denominators: data.denominators });
 
         const pages = data.pages ?? [];
         const context = [
@@ -110,6 +145,9 @@ export function addPagesCommand(analytics: Command, program: Command): void {
             })),
             columns: ["url", "tier", "answers", "citations", "coverage", "share", "avg_pos"],
           },
+          empty: "cited pages",
+          emptyHint:
+            "No page was cited in this window. Widen --from/--to, drop --tier/--domain, or check `senso analytics filters` for the days that have data.",
           plain: [
             ...context,
             "",
@@ -120,7 +158,10 @@ export function addPagesCommand(analytics: Command, program: Command): void {
                     `     coverage ${rate(p.citation_coverage)} · share ${rate(p.citation_share)} · ${count(p.cited_run_count)} cited answers · ${count(p.cited_total)} citations`,
                     ...(p.top_prompts ?? []).map(
                       (tp) =>
-                        `     ${pc.dim(`↳ ${truncate(tp.prompt_text, 80)} (${count(tp.cited_run_count)} cited answers)`)}`,
+                        // Plain never truncates, and the prompt_id is the whole
+                        // point of the block: it is what `analytics prompt`
+                        // takes.
+                        `     ${pc.dim(`↳ ${tp.prompt_text} (${count(tp.cited_run_count)} cited answers) · prompt_id ${tp.prompt_id}`)}`,
                     ),
                   ].join("\n"),
                 )

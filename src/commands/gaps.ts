@@ -1,9 +1,12 @@
 import { Command } from "commander";
 import pc from "picocolors";
 import { ApiError, apiRequest } from "../lib/api-client.js";
-import { parseEnumFlag, parseIntFlag } from "../lib/enum-arg.js";
+import { parseEnumFlag, parseEnumList, parseIntFlag, requireEnumFlag } from "../lib/enum-arg.js";
 import { CliError, EXIT } from "../lib/errors.js";
-import { emit, emitConfirmation } from "../lib/output.js";
+import { apiExits, describeCommand, idExits } from "../lib/help.js";
+import { parseId, type IdSpec } from "../lib/id-arg.js";
+import { emit, emitConfirmation, type NextStep } from "../lib/output.js";
+import type { ResourceRef } from "../lib/resource.js";
 import { runAction, type Ctx } from "../lib/run-action.js";
 import * as log from "../utils/logger.js";
 
@@ -12,11 +15,17 @@ import * as log from "../utils/logger.js";
  * decided about each.
  *
  * WHO THIS IS WRITTEN FOR. An agent, more often than a person. An agent reads
- * `--help` to learn a command and reads stderr to learn what to do next, so the
- * descriptions below carry the whole lifecycle, every validation names the flag
- * that would fix it, and `get` ends with the concrete commands for this gap's
- * problem and status. None of that guidance touches stdout: under
- * `--output json` the payload is the API's own response and nothing else.
+ * `--help` to learn a command and reads the envelope to learn what to do next,
+ * so the help below carries the whole vocabulary, every validation names the
+ * flag that would fix it, and every command ends with the concrete commands for
+ * this gap's problem and status.
+ *
+ * WHERE THAT GUIDANCE GOES, AND WHY IT MOVED. It used to be written to stderr
+ * with `log.hint`. Under `--output json` — which is what every published Senso
+ * skill passes, and which implies `--quiet` — stderr is silent, so the single
+ * most useful thing this group computes reached nobody. It now travels in the
+ * envelope's `next` and `warnings` arrays, which `emit` also prints on stderr in
+ * plain and table mode. One source, both audiences.
  *
  * WHAT IS CHECKED BEFORE THE REQUEST. Every closed set, every id, and the
  * resolution matrix — a write must name what it produced, a ruling must name the
@@ -77,6 +86,21 @@ const ORIGIN_MEANING: Record<string, string> = {
   documents_didnt_answer: "Quick Search found documents and still could not answer",
   flagged_answer: "a person marked a Quick Search answer wrong",
   api_unanswered_question: "a search through the API, the MCP server or the CLI found nothing",
+};
+
+const KIND_MEANING: Record<string, string> = {
+  missing: "nothing in the knowledge base covers this",
+  conflict: "the knowledge base contradicts a claim made somewhere else",
+  kb_conflict:
+    "two of your own documents contradict each other — the fix is a ruling, not new content",
+  flagged: "a person marked an answer wrong",
+};
+
+const SURFACE_MEANING: Record<string, string> = {
+  search_turn: "a Quick Search answer in the app",
+  content: "a draft or a stored document",
+  question_run: "a tracked GEO prompt's answer",
+  api_search: "a search through the API, the MCP server or this CLI",
 };
 
 const STATUS_MEANING: Record<string, string> = {
@@ -144,21 +168,53 @@ const RESOLUTION_EFFECT: Record<
   },
 };
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/**
+ * The id spaces this group touches, and where each one comes from.
+ *
+ * Three UUID spaces flow through six commands and none of them is
+ * interchangeable: a gap_id addresses the queue row, a resolution_id addresses
+ * one entry in that gap's decision ledger, and a content_id addresses a stored
+ * document. `parseId` rejects a malformed one with exit 2 naming the argument,
+ * and the same descriptor goes to `apiRequest` so a 404 names the resource.
+ */
+const GAP_ID: IdSpec = {
+  label: "<gapId>",
+  type: "Gap",
+  idField: "gap_id",
+  list: "senso gaps list --status all",
+};
 
-/** An id argument or flag. The API answers a malformed id with a 400. */
-function parseUuid(label: string, value: string, hint: string): string {
-  const trimmed = value.trim();
-  if (!UUID_RE.test(trimmed)) {
-    throw new CliError(`Invalid ${label}: "${value}" is not a UUID.`, EXIT.USAGE, {
-      code: "usage",
-      hint,
-    });
-  }
-  return trimmed;
+const TAG_ID: IdSpec = { label: "--tag", type: "Tag", idField: "tag_id", list: "senso tags list" };
+
+/** `--produced-content-id`, `--authority-content-id` and `--content-id`. */
+function contentIdSpec(flag: string): IdSpec {
+  return {
+    label: flag,
+    type: "Content",
+    idField: "content_id",
+    list: "senso kb get <kb_node_id>",
+  };
 }
 
-const GAP_ID_HINT = "Gap ids are the `gap_id` field of `senso gaps list`.";
+/** Scoped to its gap: a resolution id is only valid against the gap it is on. */
+function resolutionIdSpec(gapId: string): IdSpec {
+  return {
+    label: "<resolutionId>",
+    type: "Gap resolution",
+    idField: "resolution_id",
+    list: `senso gaps get ${gapId}`,
+  };
+}
+
+/** What a request addresses, so a 404 names the gap instead of saying "not found". */
+function gapResource(gapId?: string): ResourceRef {
+  return {
+    type: "Gap",
+    ...(gapId === undefined ? {} : { id: gapId }),
+    idField: "gap_id",
+    list: "senso gaps list --status all",
+  };
+}
 
 /** Commander collector for a repeatable, comma-separable flag. */
 function collect(value: string, previous: string[] = []): string[] {
@@ -169,34 +225,6 @@ function collect(value: string, previous: string[] = []): string[] {
       .map((v) => v.trim())
       .filter((v) => v.length > 0),
   ];
-}
-
-/**
- * A value that is present, checked against its closed set.
- *
- * `parseEnumFlag` passes `undefined` through for an omitted optional flag; here
- * the value is always given, so the only outcomes are a member of the set or the
- * usage error naming the valid values.
- */
-function requireEnum<T extends string>(flag: string, value: string, allowed: readonly T[]): T {
-  const parsed = parseEnumFlag(flag, value, allowed);
-  if (parsed === undefined) {
-    throw new CliError(`Missing ${flag}.`, EXIT.USAGE, {
-      code: "usage",
-      hint: `Must be one of: ${allowed.join(", ")}.`,
-    });
-  }
-  return parsed;
-}
-
-/** Every value in a repeatable flag, checked against its closed set. */
-function parseEnumList<T extends string>(
-  flag: string,
-  values: string[] | undefined,
-  allowed: readonly T[],
-): T[] | undefined {
-  if (values === undefined || values.length === 0) return undefined;
-  return values.map((v) => requireEnum(flag, v, allowed));
 }
 
 /**
@@ -214,6 +242,9 @@ function parseStatuses(values: string[] | undefined): string[] | undefined {
     if (match) return match;
     throw new CliError(`Invalid --status: "${value}".`, EXIT.USAGE, {
       code: "usage",
+      field: "--status",
+      received: value,
+      allowed: [...STATUSES, "all"],
       hint: `Must be one of: ${STATUSES.join(", ")} — or all, for every status.`,
     });
   });
@@ -313,16 +344,31 @@ interface GapDetail {
 // Rendering
 // ---------------------------------------------------------------------------
 
-/** Seven columns: the table caps at eight, and a longer list silently drops some. */
+/** Eight columns: the table caps at eight, and a longer list silently drops some. */
 const LIST_COLUMNS = [
   "gap_id",
   "problem",
+  "kind",
   "status",
   "origin",
   "occurrences",
   "last_seen_at",
   "claim_text",
 ];
+
+/** One table row per gap. The column names are the CLI's own, not the API's. */
+function listRow(gap: GapRow): Record<string, unknown> {
+  return {
+    gap_id: gap.gap_id,
+    problem: gap.problem,
+    kind: gap.kind,
+    status: gap.status,
+    origin: gap.origin?.kind,
+    occurrences: gap.occurrence_count,
+    last_seen_at: gap.last_seen_at,
+    claim_text: gap.claim_text,
+  };
+}
 
 function demandLine(gap: GapRow): string {
   const n = gap.occurrence_count ?? 0;
@@ -335,11 +381,14 @@ function listBlocks(gaps: GapRow[], offset: number): string[] {
   const lines: string[] = [""];
   gaps.forEach((gap, i) => {
     lines.push(`  ${pc.dim(`${String(offset + i + 1)}.`)} ${pc.bold(gap.claim_text ?? "")}`);
+    // The id on the second line, before anything else about the gap: it is what
+    // every other command in this group takes, and an agent reading a block
+    // should not have to scan to the bottom of it to find the argument.
+    lines.push(`     ${pc.dim(`gap_id: ${gap.gap_id}`)}`);
     lines.push(
-      `     problem: ${gap.problem ?? "?"}   status: ${gap.status ?? "?"}   origin: ${gap.origin?.kind ?? "unknown"}`,
+      `     problem: ${gap.problem ?? "?"}   status: ${gap.status ?? "?"}   kind: ${gap.kind ?? "?"}   origin: ${gap.origin?.kind ?? "unknown"}`,
     );
     lines.push(`     ${demandLine(gap)}   last seen ${gap.last_seen_at ?? "?"}`);
-    lines.push(`     ${pc.dim(`gap_id: ${gap.gap_id}`)}`);
     lines.push("");
   });
   return lines;
@@ -456,40 +505,65 @@ function detailLines(detail: GapDetail): string[] {
 }
 
 /**
- * What to do about this gap, as commands.
+ * What to do about this gap: runnable commands, plus the facts behind them.
  *
- * Written to stderr after `get`, never to stdout. Built from the problem and the
- * status together because the right act differs by both: a conflict needs a
- * ruling, an unanswered question needs writing, and a closed gap needs nothing
- * unless the decision was wrong.
+ * `next` is the list of commands, each with the one clause that says when to
+ * run it. `notes` is what an agent has to know but cannot run — that a gap is
+ * already closed, that a weak gap is hidden, that a flagged answer has not been
+ * diagnosed yet. They are separated because they land in different places: the
+ * envelope's `next` and `warnings`. Both are printed on stderr in plain and
+ * table mode, and both survive `--output json`, which is the whole point —
+ * everything this function computes used to be written with `log.hint` and was
+ * therefore invisible to every caller that passed `--output json`.
+ *
+ * Built from the problem and the status together because the right act differs
+ * by both: a conflict needs a ruling, an unanswered question needs writing, and
+ * a closed gap needs nothing unless the decision was wrong.
  */
-export function nextSteps(detail: GapDetail): string[] {
+export interface GapGuidance {
+  next: NextStep[];
+  notes: string[];
+}
+
+export function nextSteps(detail: GapDetail): GapGuidance {
   const gap = detail.gap;
-  if (!gap) return [];
+  if (!gap) return { next: [], notes: [] };
   const id = gap.gap_id;
   const latest = detail.resolutions?.[0];
-  const undo = latest
-    ? `If that was wrong, undo the latest decision: senso gaps undo ${id} ${latest.resolution_id}`
+  const undo: NextStep | null = latest
+    ? {
+        why: "Retract the latest decision if it was wrong",
+        command: `senso gaps undo ${id} ${latest.resolution_id}`,
+      }
     : null;
 
   switch (gap.status) {
     case "resolved":
-      return [
-        "Resolved. Nothing to do.",
-        ...(undo ? [undo] : ["It was closed by evidence — a later answer or evaluation."]),
-      ];
+      return {
+        next: undo ? [undo] : [],
+        notes: [
+          "Resolved. Nothing to do.",
+          ...(undo ? [] : ["It was closed by evidence — a later answer or evaluation."]),
+        ],
+      };
     case "dismissed":
-      return ["Dismissed. Seeing it again will not reopen it.", ...(undo ? [undo] : [])];
+      return {
+        next: undo ? [undo] : [],
+        notes: ["Dismissed. Seeing it again will not reopen it."],
+      };
     case "addressed":
-      return [
-        "Addressed. A fix is recorded and the gap resolves when a later search or evaluation confirms it. Nothing to do unless the fix was wrong.",
-        ...(undo ? [undo] : []),
-      ];
+      return {
+        next: undo ? [undo] : [],
+        notes: [
+          "Addressed. A fix is recorded and the gap resolves when a later search or evaluation confirms it. Nothing to do unless the fix was wrong.",
+        ],
+      };
   }
 
-  const steps: string[] = [];
+  const next: NextStep[] = [];
+  const notes: string[] = [];
   if (gap.status === "weak") {
-    steps.push(
+    notes.push(
       "Seen once, so it is hidden from the default list. It opens if it is seen again; you can act now or wait.",
     );
   }
@@ -505,78 +579,94 @@ export function nextSteps(detail: GapDetail): string[] {
         (retrieval.raw_result_count ?? 0) > 0 &&
         retrieval.filtered_result_count === 0
       ) {
-        steps.push(
-          `Something nearly matched. See which documents, without generating an answer: senso search context ${JSON.stringify(gap.claim_text ?? "")}`,
-        );
+        next.push({
+          why: "Something nearly matched — see which documents, without generating an answer",
+          command: `senso search context ${JSON.stringify(gap.claim_text ?? "")}`,
+        });
       }
-      steps.push(`Write the answer into the knowledge base: ${write}`);
-      steps.push(`Then record it: ${record}`);
+      next.push({ why: "Write the answer into the knowledge base", command: write });
+      next.push({ why: "Then record that it answers this gap", command: record });
       const found = (detail.lead_evidence?.sources ?? []).find((s) => s.kb_node_id);
       if (found) {
-        steps.push(
-          `Or improve a document the search already found — "${found.title ?? "untitled"}": senso kb update-raw ${found.kb_node_id ?? ""} --data '{...}', then senso gaps answer ${id} --content-id ${found.content_id ?? ""} --updated`,
-        );
+        next.push({
+          why: `Or improve a document the search already found — "${found.title ?? "untitled"}"`,
+          command: `senso kb update-raw ${found.kb_node_id ?? ""} --data '{...}', then senso gaps answer ${id} --content-id ${found.content_id ?? ""} --updated`,
+        });
       }
       if (gap.origin?.kind === "api_unanswered_question") {
-        steps.push(
+        notes.push(
           "This came from a search through the API, the MCP server or the CLI. It also resolves on its own when a later API search for the same question returns a sourced answer.",
         );
-        steps.push(
-          `If the searches were probes or tests rather than a real need: senso gaps dismiss ${id} — and send future probes with --no-gap-signals.`,
-        );
+        next.push({
+          why: "The searches were probes or tests rather than a real need — send future probes with --no-gap-signals",
+          command: `senso gaps dismiss ${id}`,
+        });
       } else {
-        steps.push(`If nobody actually needs this answered: senso gaps dismiss ${id}`);
+        next.push({
+          why: "Nobody actually needs this answered",
+          command: `senso gaps dismiss ${id}`,
+        });
       }
       break;
     }
     case "no_source":
-      steps.push(`If the claim is true, write it down: ${write}, then ${record}`);
-      steps.push(
-        `If the organization does not do this: senso gaps resolve ${id} --type we_dont_do_this`,
-      );
-      steps.push(
-        `If the claim is wrong and the knowledge base is right: senso gaps resolve ${id} --type ruled_kb_correct`,
-      );
-      steps.push(`If it does not matter: senso gaps dismiss ${id}`);
+      next.push({ why: "The claim is true — write it down", command: `${write}, then ${record}` });
+      next.push({
+        why: "The organization does not do this",
+        command: `senso gaps resolve ${id} --type we_dont_do_this`,
+      });
+      next.push({
+        why: "The claim is wrong and the knowledge base is right",
+        command: `senso gaps resolve ${id} --type ruled_kb_correct`,
+      });
+      next.push({ why: "It does not matter", command: `senso gaps dismiss ${id}` });
       break;
     case "conflict": {
       const doc = gap.contradicting_content_id ?? "<content_id>";
       if (gap.kind === "kb_conflict") {
-        steps.push(
-          `Two documents disagree. Name the one that is right: senso gaps resolve ${id} --type ruled_document --authority-content-id <content_id of the correct document>`,
-        );
+        notes.push("Two of your own documents disagree, so the fix is a ruling, not new content.");
+        next.push({
+          why: "Name the document that is right",
+          command: `senso gaps resolve ${id} --type ruled_document --authority-content-id <content_id of the correct document>`,
+        });
       } else {
-        steps.push(
-          `If the knowledge base is right: senso gaps resolve ${id} --type ruled_kb_correct`,
-        );
-        steps.push(
-          `If the claim is right and the document is stale: senso gaps resolve ${id} --type ruled_claim_correct --authority-content-id ${doc}`,
-        );
+        next.push({
+          why: "The knowledge base is right",
+          command: `senso gaps resolve ${id} --type ruled_kb_correct`,
+        });
+        next.push({
+          why: "The claim is right and the document is stale",
+          command: `senso gaps resolve ${id} --type ruled_claim_correct --authority-content-id ${doc}`,
+        });
       }
-      steps.push(
-        `After updating the stale document: senso gaps answer ${id} --content-id <content_id> --updated`,
-      );
-      steps.push(`If it does not matter: senso gaps dismiss ${id}`);
+      next.push({
+        why: "After updating the stale document",
+        command: `senso gaps answer ${id} --content-id <content_id> --updated`,
+      });
+      next.push({ why: "It does not matter", command: `senso gaps dismiss ${id}` });
       break;
     }
     case "flagged":
-      steps.push("Read the feedback above first — nothing has been diagnosed yet.");
-      steps.push(`If the answer was wrong, write the correct fact: ${write}, then ${record}`);
-      steps.push(
-        `If it used the wrong source: senso gaps resolve ${id} --type source_irrelevant --authority-content-id <content_id of that source>`,
+      notes.push(
+        "Read the feedback above first — nothing has been diagnosed yet: a flagged answer records that a person disagreed, not what was wrong.",
       );
-      steps.push(`If nothing was wrong: senso gaps resolve ${id} --type not_relevant`);
+      next.push({
+        why: "The answer was wrong — write the correct fact",
+        command: `${write}, then ${record}`,
+      });
+      next.push({
+        why: "It used the wrong source",
+        command: `senso gaps resolve ${id} --type source_irrelevant --authority-content-id <content_id of that source>`,
+      });
+      next.push({
+        why: "Nothing was wrong",
+        command: `senso gaps resolve ${id} --type not_relevant`,
+      });
       break;
     default:
-      steps.push(`See what can be recorded: senso gaps resolve --help`);
+      next.push({ why: "See what can be recorded", command: `senso gaps resolve --help` });
   }
-  return steps;
-}
-
-function printSteps(ctx: Ctx, heading: string, steps: string[]): void {
-  if (ctx.quiet || steps.length === 0) return;
-  log.info(heading);
-  for (const step of steps) log.hint(step);
+  return { next, notes };
 }
 
 /**
@@ -591,6 +681,8 @@ function notFoundAware(err: unknown, gapId: string): never {
     throw new CliError(`Gap ${gapId} not found.`, EXIT.NOT_FOUND, {
       code: "not_found",
       status: 400,
+      field: "<gapId>",
+      received: gapId,
       hint: "It may be in another organization, or the id is wrong. `senso gaps list --status all` shows every gap.",
       cause: err,
     });
@@ -608,6 +700,8 @@ interface ResolutionInput {
   authorityContentId?: string;
   rulingSide?: string;
   notes?: string;
+  /** Command-specific follow-ups, appended before the undo command. */
+  extraNext?: NextStep[];
 }
 
 async function recordResolution(ctx: Ctx, gapId: string, input: ResolutionInput): Promise<void> {
@@ -645,6 +739,7 @@ async function recordResolution(ctx: Ctx, gapId: string, input: ResolutionInput)
       method: "POST",
       path: `/org/gaps/${gapId}/resolutions`,
       body,
+      resource: gapResource(gapId),
       apiKey: ctx.apiKey,
       baseUrl: ctx.baseUrl,
     });
@@ -652,15 +747,50 @@ async function recordResolution(ctx: Ctx, gapId: string, input: ResolutionInput)
     notFoundAware(err, gapId);
   }
 
+  // The tick is the only thing left on stderr by hand: it is decoration, and it
+  // has no machine-readable counterpart to duplicate. Everything a caller has to
+  // ACT on — what the gap now is, how to undo this, what the API did not check —
+  // goes through the envelope, which prints to stderr here and to stdout under
+  // --output json.
   if (!ctx.quiet) {
     log.success(`Recorded ${input.type} on gap ${gapId}: ${effect.meaning}.`);
-    if (effect.status) {
-      log.hint(`The gap is now ${effect.status} — ${STATUS_MEANING[effect.status] ?? ""}.`);
-    } else {
-      log.hint("The gap's status does not change until the follow-up is recorded.");
-    }
-    log.hint(`Undo: senso gaps undo ${gapId} ${saved.resolution_id}`);
   }
+
+  const warnings: string[] = [
+    effect.status
+      ? `The gap is now ${effect.status} — ${STATUS_MEANING[effect.status] ?? ""}.`
+      : `${input.type} does not change the gap's status: it does not change until the follow-up is recorded.`,
+  ];
+  if (effect.status === "dismissed") {
+    warnings.push("A dismissed gap stays closed even if the same question is asked again.");
+  }
+  if (input.producedContentId !== undefined) {
+    // The API records whatever content id it is given: a well-formed id that
+    // belongs to nothing, or to another organization, still moves the gap to
+    // addressed. That is the one way this command can quietly do the wrong thing.
+    warnings.push(
+      `The API does not verify content ids: confirm ${input.producedContentId} is the document you meant.`,
+    );
+  }
+
+  const next: NextStep[] = [];
+  if (effect.status === null) {
+    next.push({
+      why: "The gap stays open until the losing document is corrected",
+      command: `senso gaps answer ${gapId} --content-id <content_id of the corrected document> --updated`,
+    });
+  } else if (effect.status === "addressed") {
+    next.push({
+      why: "The gap is addressed, not resolved — check it after the next search or evaluation",
+      command: `senso gaps get ${gapId}`,
+    });
+  }
+  next.push(...(input.extraNext ?? []));
+  next.push({
+    why: "Retract this decision if it was wrong",
+    command: `senso gaps undo ${gapId} ${saved.resolution_id}`,
+  });
+
   emit(ctx, saved, {
     columns: [
       "resolution_id",
@@ -670,10 +800,58 @@ async function recordResolution(ctx: Ctx, gapId: string, input: ResolutionInput)
       "notes",
       "created_at",
     ],
+    next,
+    warnings,
   });
 }
 
+/** The same ten lines as one paragraph, for the command's description. */
 function resolutionTypeTable(): string {
+  return resolutionTypeLines().join(" ");
+}
+
+// ---------------------------------------------------------------------------
+// Help
+// ---------------------------------------------------------------------------
+
+/**
+ * One line per value of a closed set, with what it means.
+ *
+ * The meanings are the same constants the plain renderer and the validation
+ * messages use, so `--help` cannot describe a vocabulary the output does not
+ * speak. An agent that reads `"status": "weak"` and cannot see the set it
+ * belongs to has no way to know whether to act or to wait.
+ */
+function meaningLines(values: readonly string[], meanings: Record<string, string>): string[] {
+  return values.map((v) => `  ${v} — ${meanings[v] ?? ""}`);
+}
+
+/** Every enum on a gap row, for the `Returns` block of `list` and `get`. */
+const GAP_VOCABULARY: string[] = [
+  "problem — which queue the gap is in:",
+  ...meaningLines(PROBLEMS, PROBLEM_MEANING),
+  "status — where it is in its life:",
+  ...meaningLines(STATUSES, STATUS_MEANING),
+  "kind — the shape of the fix:",
+  ...meaningLines(KINDS, KIND_MEANING),
+  "origin.kind — where it came from:",
+  ...meaningLines(ORIGINS, ORIGIN_MEANING),
+  "origin.surface — where it was last seen:",
+  ...meaningLines(SURFACES, SURFACE_MEANING),
+];
+
+/** The demand counters and the flags that change what you do about a gap. */
+const GAP_ROW_RETURNS: string[] = [
+  "gap_id — the id every other gaps command takes",
+  "occurrence_count / asker_count / api_occurrence_count — total sightings, distinct people, and calls from API, MCP or CLI keys, counted separately",
+  "awaiting_update — true when a ruling is recorded and the losing document has not been corrected yet",
+  "contradicting_content_id — verified: this document contradicts the claim",
+  "suggested_content_id — an UNVERIFIED evaluator hint; check it before acting on it",
+  "latest_resolution.resolution_id — what `senso gaps undo` takes",
+];
+
+/** The ten resolution types, one per line, for a help block. */
+function resolutionTypeLines(): string[] {
   return RESOLUTION_TYPES.map((type) => {
     const e = RESOLUTION_EFFECT[type];
     const needs =
@@ -683,8 +861,17 @@ function resolutionTypeTable(): string {
           ? " Needs --authority-content-id."
           : "";
     return `${type} → ${e.status ?? "no status change"}: ${e.meaning}.${needs}`;
-  }).join(" ");
+  });
 }
+
+/** What a resolution comes back as, shared by resolve, answer and dismiss. */
+const RESOLUTION_RETURNS: string[] = [
+  "resolution_id — pass it to `senso gaps undo <gapId> <resolutionId>` to retract this decision",
+  "resolution_type — the type that was recorded, which decides the gap's new status",
+  "produced_content_id / authority_content_id — the ids this decision named, echoed back unverified",
+  "resolved_by_name — empty when the call was made with an organization API key: the ledger entry has no author",
+  "created_at — when it was recorded. Nothing stops the same decision being recorded twice; a second call appends another entry",
+];
 
 // ---------------------------------------------------------------------------
 // Commands
@@ -710,7 +897,7 @@ export function registerGapsCommands(program: Command): void {
       "The gap report: questions and claims your knowledge base could not back up, and what was decided about each — the same queue the Senso app shows. Each gap has a PROBLEM (not_found: a question nothing answered; no_source: a claim nothing backs; conflict: the knowledge base contradicts it; flagged: a person marked an answer wrong), a STATUS (weak: seen once and hidden by default; open; reopened; addressed: a fix is recorded and awaits confirmation; resolved; dismissed; dormant), and an ORIGIN saying where it came from. A search through the API, the MCP server or this CLI that finds nothing files an api_unanswered_question gap: weak on the first call, open on the second, and resolved by a later API search that finds a sourced answer. Typical loop: `gaps list` to find work, `gaps get <id>` for the evidence and the exact next commands, write content with `kb create-raw`, then `gaps answer <id> --content-id <id>`; or `gaps dismiss <id>` for noise. Every decision can be undone with `gaps undo`.",
     );
 
-  gaps
+  const list = gaps
     .command("list")
     .description(
       "List gaps, most severe first. With no --status, only open, reopened and addressed gaps are returned — a gap seen once is weak and hidden, so pass --status weak (or --status all) to see new API search gaps. Repeat a filter or comma-separate it to OR values; different filters are ANDed. Plain output ends with the paging position and the command to read a gap.",
@@ -745,9 +932,7 @@ export function registerGapsCommands(program: Command): void {
           origin_kinds: parseEnumList("--origin", cmdOpts.origin, ORIGINS),
           surfaces: parseEnumList("--surface", cmdOpts.surface, SURFACES),
           kinds: parseEnumList("--kind", cmdOpts.kind, KINDS),
-          tag_ids: cmdOpts.tag?.map((t) =>
-            parseUuid("--tag", t, "Tag ids are the `tag_id` field of `senso tags list`."),
-          ),
+          tag_ids: cmdOpts.tag?.map((t) => parseId(t, TAG_ID)),
           search: cmdOpts.search,
           sort: parseEnumFlag("--sort", cmdOpts.sort, SORTS),
           limit: parseIntFlag("--limit", cmdOpts.limit, { min: 1, max: 100 }),
@@ -757,70 +942,149 @@ export function registerGapsCommands(program: Command): void {
         const data = await apiRequest<GapList>({
           path: "/org/gaps",
           params,
+          resource: gapResource(),
           apiKey: ctx.apiKey,
           baseUrl: ctx.baseUrl,
         });
 
         const rows = data.gaps ?? [];
         const offset = data.offset ?? 0;
-        emit(ctx, data, {
-          table: {
-            rows: rows.map((g) => ({
-              gap_id: g.gap_id,
-              problem: g.problem,
-              status: g.status,
-              origin: g.origin?.kind,
-              occurrences: g.occurrence_count,
-              last_seen_at: g.last_seen_at,
-              claim_text: g.claim_text,
-            })),
-            columns: LIST_COLUMNS,
-          },
-          plain: rows.length === 0 ? [] : listBlocks(rows, offset),
-        });
+        const defaultView = params.statuses === undefined;
 
-        if (ctx.quiet) return;
-        const total = data.total ?? rows.length;
-        if (rows.length === 0) {
-          if (params.statuses === undefined) {
-            log.info(`No gaps in the working view (${DEFAULT_STATUSES.join(", ")}).`);
-            log.hint(
-              "A gap seen once is weak and hidden by default. Try: senso gaps list --status weak — or --status all for everything, closed gaps included.",
-            );
-          } else {
-            log.info("No gaps match these filters.");
-          }
-          return;
+        // An empty default view is the costly case, and it is why this guidance
+        // is in `next` rather than on stderr: `{"gaps":[],"total":0}` reads as
+        // "no work to do" to a JSON caller, when the organization may have
+        // dozens of weak gaps that the default filter hides.
+        const next: NextStep[] = [];
+        const first = rows[0];
+        if (first) {
+          next.push({
+            why: "Read the evidence and the exact commands for one gap",
+            command: `senso gaps get ${first.gap_id}`,
+          });
+        } else if (defaultView) {
+          next.push({
+            why: "A gap seen once is weak and hidden from the default view — these are the new ones",
+            command: "senso gaps list --status weak",
+          });
+          next.push({
+            why: "Every gap, including the closed and dormant ones",
+            command: "senso gaps list --status all",
+          });
         }
-        log.info(
-          `Showing ${String(offset + 1)}–${String(offset + rows.length)} of ${String(total)}.`,
-        );
-        if (offset + rows.length < total) {
-          log.hint(`Next page: add --offset ${String(offset + rows.length)}`);
-        }
-        log.hint("Evidence and next steps for one gap: senso gaps get <gap_id>");
+
+        emit(ctx, data, {
+          table: { rows: rows.map(listRow), columns: LIST_COLUMNS },
+          ...(rows.length === 0 ? {} : { plain: listBlocks(rows, offset) }),
+          empty: "gaps",
+          emptyHint: defaultView
+            ? `The default view is ${DEFAULT_STATUSES.join(", ")}; a gap seen once is weak and hidden from it.`
+            : "No gap matches these filters. Widen them, or run `senso gaps list --status all`.",
+          next,
+        });
       }),
     );
 
-  gaps
+  describeCommand(list, {
+    returns: [
+      "gaps[] — one row per gap, most severe first, plus total, limit and offset",
+      ...GAP_ROW_RETURNS,
+      ...GAP_VOCABULARY,
+      "next[] — when the default view comes back empty, the commands that widen it",
+    ],
+    exitCodes: {
+      ...apiExits,
+      0: "listed — an empty page is still 0",
+      2: "a filter value is outside its set, --tag is not a UUID, --limit is outside 1-100, or --offset is negative",
+      3: "no API key, the key was rejected, or the organization does not have the product the gap report belongs to",
+    },
+    notes: [
+      "--sort severity (the default) orders conflict, then kb_conflict, then missing, breaking ties by how often the gap was seen and then by recency. --sort recent is newest sighting first; --sort demand is most distinct askers first.",
+      "Under --output json every hint below is silent; the same guidance is in the envelope's `next` array.",
+    ],
+    examples: [
+      { comment: "The working queue: open, reopened and addressed", command: "senso gaps list" },
+      {
+        comment: "The new API-search gaps, which the default view hides",
+        command: "senso gaps list --status weak --origin api_unanswered_question",
+      },
+      {
+        comment: "Just the ids, for a loop",
+        command: "senso gaps list --problem conflict --output json | jq -r '.data.gaps[].gap_id'",
+      },
+    ],
+    seeAlso: ["senso gaps get <gapId>", "senso gaps answer <gapId>", "senso tags list"],
+  });
+
+  const get = gaps
     .command("get <gapId>")
     .description(
       "Get one gap in full: the gap, every sighting behind it, every decision recorded against it, and the evidence — what the search found (retrieval counts and best score), the quote and reasoning behind a judged claim, the documents weighed or cited with their kb_node_id and content_id, and any feedback a person left. Plain output ends with the exact commands to act on this gap, chosen from its problem and status.",
     )
     .action(
       runAction(program, async (ctx: Ctx, rawId: string) => {
-        const gapId = parseUuid("gap id", rawId, GAP_ID_HINT);
+        const gapId = parseId(rawId, GAP_ID);
         const data = await apiRequest<GapDetail>({
           path: `/org/gaps/${gapId}`,
+          resource: gapResource(gapId),
           apiKey: ctx.apiKey,
           baseUrl: ctx.baseUrl,
         });
-        emit(ctx, data, { plain: detailLines(data) });
-        printSteps(ctx, "What you can do:", nextSteps(data));
+        const guidance = nextSteps(data);
+        emit(ctx, data, {
+          plain: detailLines(data),
+          // Explicit rows: `resolutions` is a known list key, so the generic
+          // renderer would treat a gap with a decision ledger as a LIST of
+          // decisions and drop the gap itself — and a gap with none would
+          // render as "No resolutions found."
+          table: { rows: data.gap ? [listRow(data.gap)] : [], columns: LIST_COLUMNS },
+          next: guidance.next,
+          warnings: guidance.notes,
+        });
       }),
     );
 
-  gaps
+  describeCommand(get, {
+    returns: [
+      "gap — the row, as in `gaps list`",
+      "occurrences[] — every sighting: when, what was asked, who asked, and the subject it happened on",
+      "resolutions[] — the decision ledger, newest first; resolution_id is what `senso gaps undo` takes",
+      "lead_evidence.retrieval.raw_result_count / filtered_result_count — candidates before and after the relevance filter. 0 raw means nothing matched at all, so write new content; raw above 0 with 0 filtered means something nearly matched, so improving an existing document may be enough",
+      "lead_evidence.quote / reasoning / suggested_fix / confidence — the judge's own account of itself",
+      "lead_evidence.evidence[] — documents weighed, with their relation to the claim",
+      "lead_evidence.sources[] — documents the answer cited, with kb_node_id (null when that document has been deleted) and content_id",
+      "lead_evidence.feedback[] — what the person who flagged the answer wrote",
+      ...GAP_ROW_RETURNS,
+      ...GAP_VOCABULARY,
+      "next[] — the commands for THIS gap's problem and status, with its id substituted",
+      "warnings[] — what cannot be run: that the gap is already closed, that a weak gap is hidden, that a flagged answer has not been diagnosed",
+    ],
+    exitCodes: {
+      ...idExits,
+      2: "<gapId> is not a UUID",
+      4: "no gap with this id in this organization",
+    },
+    notes: [
+      "<gapId> is a gap_id. The content ids this command prints belong to a different space and are not accepted here; a kb_node_id is not accepted either.",
+      "The sightings shown are capped by the API; occurrence_count on the gap is the true total.",
+    ],
+    examples: [
+      { command: "senso gaps get 7c9e6d2a-1f34-4b8e-9a17-2c5d8e0f1b3a" },
+      {
+        comment: "Just the commands to run next",
+        command:
+          "senso gaps get 7c9e6d2a-1f34-4b8e-9a17-2c5d8e0f1b3a --output json | jq -r '.next[].command'",
+      },
+    ],
+    seeAlso: [
+      "senso gaps answer <gapId>",
+      "senso gaps resolve <gapId>",
+      "senso gaps dismiss <gapId>",
+      "senso kb create-raw",
+    ],
+  });
+
+  const resolve = gaps
     .command("resolve <gapId>")
     .description(
       `Record what was done about a gap, and move it accordingly. Types, with the status each leaves the gap in: ${resolutionTypeTable()} For the two common cases use the shortcuts \`gaps answer\` and \`gaps dismiss\`. Undo any decision with \`gaps undo\`.`,
@@ -850,26 +1114,21 @@ export function registerGapsCommands(program: Command): void {
             notes?: string;
           },
         ) => {
-          const gapId = parseUuid("gap id", rawId, GAP_ID_HINT);
-          const type = requireEnum("--type", cmdOpts.type, RESOLUTION_TYPES);
+          const gapId = parseId(rawId, GAP_ID);
+          const type = requireEnumFlag("--type", cmdOpts.type, RESOLUTION_TYPES);
           await recordResolution(ctx, gapId, {
             type,
             producedContentId:
               cmdOpts.producedContentId === undefined
                 ? undefined
-                : parseUuid(
-                    "--produced-content-id",
-                    cmdOpts.producedContentId,
-                    "Content ids are the `id` from `senso kb create-raw`, or `content_id` from `senso kb get`.",
-                  ),
+                : parseId(cmdOpts.producedContentId, contentIdSpec("--produced-content-id")),
             authorityContentId:
               cmdOpts.authorityContentId === undefined
                 ? undefined
-                : parseUuid(
-                    "--authority-content-id",
-                    cmdOpts.authorityContentId,
-                    `\`senso gaps get ${gapId}\` lists the documents involved, with their content ids.`,
-                  ),
+                : parseId(cmdOpts.authorityContentId, {
+                    ...contentIdSpec("--authority-content-id"),
+                    list: `senso gaps get ${gapId}`,
+                  }),
             rulingSide: parseEnumFlag("--ruling-side", cmdOpts.rulingSide, RULING_SIDES),
             notes: cmdOpts.notes,
           });
@@ -877,7 +1136,39 @@ export function registerGapsCommands(program: Command): void {
       ),
     );
 
-  gaps
+  describeCommand(resolve, {
+    returns: RESOLUTION_RETURNS,
+    exitCodes: {
+      ...idExits,
+      2: "--type is not one of the ten, the type needs a flag that was not given, or an id is not a UUID",
+      4: "no gap with this id in this organization (the API answers this with a 400; the CLI reports it as 4)",
+    },
+    notes: [
+      "The ten types, with the status each leaves the gap in:",
+      ...resolutionTypeLines().map((l) => `  ${l}`),
+      "--ruling-side is informational only: it is recorded on the ledger entry and is never cross-checked against --type.",
+      "Nothing makes this idempotent. Recording the same decision twice appends a second ledger entry.",
+      "With an organization API key the entry has no author, so resolved_by_name comes back empty.",
+    ],
+    examples: [
+      {
+        comment: "Two of your own documents disagree, and this one is right",
+        command:
+          "senso gaps resolve <gapId> --type ruled_document --authority-content-id <content_id>",
+      },
+      {
+        comment: "The organization simply does not do this",
+        command: "senso gaps resolve <gapId> --type we_dont_do_this --notes 'We do not ship to EU'",
+      },
+    ],
+    seeAlso: [
+      "senso gaps answer <gapId>",
+      "senso gaps dismiss <gapId>",
+      "senso gaps undo <gapId> <resolutionId>",
+    ],
+  });
+
+  const answer = gaps
     .command("answer <gapId>")
     .description(
       "Record that content was written to fix a gap — the usual last step after `senso kb create-raw`. Records `answered` (or `content_updated` with --updated, when an existing document was improved instead). The gap becomes addressed and resolves when a later search or evaluation confirms the answer; for an API search gap, that is the next API search for the same question that returns a sourced answer.",
@@ -896,12 +1187,8 @@ export function registerGapsCommands(program: Command): void {
           rawId: string,
           cmdOpts: { contentId: string; updated?: boolean; notes?: string },
         ) => {
-          const gapId = parseUuid("gap id", rawId, GAP_ID_HINT);
-          const contentId = parseUuid(
-            "--content-id",
-            cmdOpts.contentId,
-            "Content ids are the `id` from `senso kb create-raw`, or `content_id` from `senso kb get`.",
-          );
+          const gapId = parseId(rawId, GAP_ID);
+          const contentId = parseId(cmdOpts.contentId, contentIdSpec("--content-id"));
           await recordResolution(ctx, gapId, {
             type: cmdOpts.updated ? "content_updated" : "answered",
             producedContentId: contentId,
@@ -911,7 +1198,36 @@ export function registerGapsCommands(program: Command): void {
       ),
     );
 
-  gaps
+  describeCommand(answer, {
+    returns: RESOLUTION_RETURNS,
+    exitCodes: {
+      ...idExits,
+      2: "<gapId> or --content-id is not a UUID",
+      4: "no gap with this id in this organization",
+    },
+    notes: [
+      "Both forms land the gap in `addressed`: --updated changes only the type that is recorded (content_updated rather than answered), not the resulting status.",
+      "The API does not check the content id. A well-formed id belonging to nothing, or to another organization, is recorded and the gap moves anyway — which is the one way this command can quietly do the wrong thing. The id is echoed in `warnings` so it can be checked.",
+      "`addressed` is not `resolved`: the gap resolves when a later search or evaluation confirms the answer. For an API-search gap that is the next API search for the same question that returns a sourced answer.",
+    ],
+    examples: [
+      {
+        comment: "The usual last step after writing the answer",
+        command: "senso gaps answer <gapId> --content-id <id from kb create-raw>",
+      },
+      {
+        comment: "An existing document was improved instead",
+        command: "senso gaps answer <gapId> --content-id <content_id> --updated",
+      },
+    ],
+    seeAlso: [
+      "senso kb create-raw",
+      "senso gaps get <gapId>",
+      "senso gaps undo <gapId> <resolutionId>",
+    ],
+  });
+
+  const dismiss = gaps
     .command("dismiss <gapId>")
     .description(
       "Close a gap that does not need fixing — integration noise, a test or probe search, a question nobody needs answered. Records `dismissed`. A dismissed gap stays closed even if it is seen again; only `gaps undo` reopens it. To keep future probe searches out of the report, run them with `senso search --no-gap-signals`.",
@@ -919,40 +1235,80 @@ export function registerGapsCommands(program: Command): void {
     .option("--notes <text>", "Why it does not matter, in a sentence")
     .action(
       runAction(program, async (ctx: Ctx, rawId: string, cmdOpts: { notes?: string }) => {
-        const gapId = parseUuid("gap id", rawId, GAP_ID_HINT);
-        await recordResolution(ctx, gapId, { type: "dismissed", notes: cmdOpts.notes });
+        const gapId = parseId(rawId, GAP_ID);
+        await recordResolution(ctx, gapId, {
+          type: "dismissed",
+          notes: cmdOpts.notes,
+          extraNext: [
+            {
+              why: "Stop probe searches from filing gaps at all",
+              command: 'senso search "..." --no-gap-signals',
+            },
+          ],
+        });
       }),
     );
 
-  gaps
+  describeCommand(dismiss, {
+    returns: RESOLUTION_RETURNS,
+    exitCodes: {
+      ...idExits,
+      2: "<gapId> is not a UUID",
+      4: "no gap with this id in this organization",
+    },
+    notes: [
+      "A dismissed gap stays closed even if the same question is asked again — unlike resolved, which reopens on new evidence. Only `gaps undo` reverses it.",
+      "dismissed means 'it does not matter'. `resolve --type not_relevant` means 'nothing was wrong' and `resolve --type we_dont_do_this` means 'the organization does not do this, and recording that IS the fix'. All three close the gap; the ledger keeps which one you meant.",
+      "There is no confirmation prompt: the decision is a ledger entry, and `gaps undo` retracts it.",
+    ],
+    examples: [
+      { command: "senso gaps dismiss <gapId> --notes 'load-test probe'" },
+      {
+        comment: "The upstream fix for probe traffic",
+        command: 'senso search "..." --no-gap-signals',
+      },
+    ],
+    seeAlso: ["senso gaps resolve <gapId>", "senso gaps undo <gapId> <resolutionId>"],
+  });
+
+  const undo = gaps
     .command("undo <gapId> <resolutionId>")
     .description(
       "Retract one recorded decision. The gap's status is recomputed from the decisions that remain — undoing the newer of two returns it to what the older one implied, and undoing the only one makes it open again. Resolution ids are on `gaps get` and in the output of `resolve`, `answer` and `dismiss`.",
     )
     .action(
       runAction(program, async (ctx: Ctx, rawGapId: string, rawResolutionId: string) => {
-        const gapId = parseUuid("gap id", rawGapId, GAP_ID_HINT);
-        const resolutionId = parseUuid(
-          "resolution id",
-          rawResolutionId,
-          `Resolution ids are listed under Decisions in \`senso gaps get ${gapId}\`.`,
-        );
+        const gapId = parseId(rawGapId, GAP_ID);
+        const resolutionId = parseId(rawResolutionId, resolutionIdSpec(gapId));
         try {
           await apiRequest({
             method: "DELETE",
             path: `/org/gaps/${gapId}/resolutions/${resolutionId}`,
+            resource: gapResource(gapId),
             apiKey: ctx.apiKey,
             baseUrl: ctx.baseUrl,
           });
         } catch (err) {
           if (err instanceof ApiError && err.status === 404) {
+            // Two different 404s, and the API already says which: "Gap not
+            // found" means the first id is wrong, anything else means the
+            // resolution is not on this gap. Reporting both as "either id is
+            // wrong" left the caller to guess, and the commonest cause is the
+            // two positional UUIDs typed the other way round.
+            const gapMissing = /gap not found/i.test(err.message);
             throw new CliError(
-              `Gap ${gapId} has no resolution ${resolutionId} in this organization.`,
+              gapMissing
+                ? `Gap ${gapId} not found in this organization.`
+                : `Gap ${gapId} has no resolution ${resolutionId} in this organization.`,
               EXIT.NOT_FOUND,
               {
                 code: "not_found",
                 status: 404,
-                hint: `Either id is wrong, or the resolution belongs to another gap or was already undone. \`senso gaps get ${gapId}\` lists its current decisions.`,
+                field: gapMissing ? "<gapId>" : "<resolutionId>",
+                received: gapMissing ? gapId : resolutionId,
+                hint: gapMissing
+                  ? `Check the order — the gap id comes first, then the resolution id. \`senso gaps list --status all\` lists every gap.`
+                  : `The resolution belongs to another gap or was already undone. \`senso gaps get ${gapId}\` lists its current decisions.`,
                 cause: err,
               },
             );
@@ -963,7 +1319,41 @@ export function registerGapsCommands(program: Command): void {
           ctx,
           `Resolution ${resolutionId} undone. The gap's status was recomputed from the decisions that remain — read it with \`senso gaps get ${gapId}\`.`,
           { action: "undone", resource: "gap_resolution", id: resolutionId, gap_id: gapId },
+          {
+            next: [
+              {
+                why: "The status was recomputed from the decisions that remain — read the new one",
+                command: `senso gaps get ${gapId}`,
+              },
+            ],
+          },
         );
       }),
     );
+
+  describeCommand(undo, {
+    returns: [
+      "action — `undone`",
+      "resource — `gap_resolution`",
+      "id — the resolution_id that was retracted; gap_id — the gap it was on",
+      "The new status is NOT returned: the API answers 204. `next` carries the command that reads it.",
+    ],
+    exitCodes: {
+      ...idExits,
+      2: "<gapId> or <resolutionId> is not a UUID",
+      4: "no such gap, or that resolution is not on this gap (it may belong to another gap, or already be undone)",
+    },
+    notes: [
+      "Two UUIDs in different id spaces, positional and easy to transpose: <gapId> comes from `senso gaps list`, <resolutionId> from `senso gaps get <gapId>` or from the output of resolve, answer or dismiss.",
+      "The gap's status is recomputed from the decisions that remain: undoing the newer of two returns it to what the older one implied, and undoing the only one makes it open again.",
+    ],
+    examples: [
+      { command: "senso gaps undo <gapId> <resolutionId>" },
+      {
+        comment: "The resolution ids currently on a gap",
+        command: "senso gaps get <gapId> --output json | jq -r '.data.resolutions[].resolution_id'",
+      },
+    ],
+    seeAlso: ["senso gaps get <gapId>", "senso gaps resolve <gapId>"],
+  });
 }

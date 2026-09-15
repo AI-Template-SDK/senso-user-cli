@@ -9,9 +9,44 @@
  */
 
 import pc from "picocolors";
+import { CliError, EXIT } from "../../lib/errors.js";
 import { outputPlain } from "../../lib/output.js";
 import type { Ctx } from "../../lib/run-action.js";
 import type { AnalyticsWindow, DataQuality, Deltas, Metrics, RateTrend, Totals } from "./types.js";
+
+// ---------------------------------------------------------------------------
+// Payload guards
+// ---------------------------------------------------------------------------
+
+/**
+ * Refuses to render a payload that is missing the blocks this group indexes.
+ *
+ * `apiRequest<T>` is a cast, not a validator, so `data.totals.mention_rate` is
+ * a fact to the compiler and a guess at runtime. Every hand-written renderer
+ * here reaches two or three levels into the response, and an unexpected body —
+ * a proxy's error page, a shape change, a partial rollup — used to surface as
+ * `Cannot read properties of undefined (reading 'mention_rate')`: exit 1, code
+ * "error", and no way for an agent to tell a broken response from a broken CLI.
+ *
+ * Naming the endpoint and the missing block turns that into something a caller
+ * can report and a maintainer can act on.
+ */
+export function requireBlocks(path: string, blocks: Record<string, unknown>): void {
+  const missing = Object.entries(blocks)
+    .filter(([, value]) => value === undefined || value === null)
+    .map(([key]) => key);
+  if (missing.length === 0) return;
+  throw new CliError(
+    `Unexpected response from GET ${path}: no ${missing.join(", ")} block${missing.length === 1 ? "" : "s"}.`,
+    EXIT.ERROR,
+    {
+      code: "error",
+      hint: "Re-run with SENSO_DEBUG=1 and report the payload with the time and the command.",
+      request: { method: "GET", path },
+      details: { missing },
+    },
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Formatting helpers
