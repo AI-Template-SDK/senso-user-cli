@@ -44,6 +44,7 @@ Generated from the command tree of `@senso-ai/cli`. Every command accepts the [g
 - [`senso industries`](#senso-industries) — Browse the public industry catalog and the competitive intelligence Senso collects for it — brand leaderboards, domain citations and the prompts each industry runs.
 - [`senso partner`](#senso-partner) — Partner-network commands.
 - [`senso update`](#senso-update) — Update CLI to the latest version
+- [`senso uninstall`](#senso-uninstall) — Remove this CLI, the Senso agent skills it installed, and the stored API key.
 
 ## Global options
 
@@ -2761,4 +2762,19 @@ Update CLI to the latest version
 ```
 senso update [options]
 ```
+
+## senso uninstall
+
+Remove this CLI, the Senso agent skills it installed, and the stored API key. Asks first unless --yes is passed.
+
+```
+senso uninstall [options]
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `-y, --yes` | Skip the confirmation prompt (required when there is no terminal) |  |
+| `--dry-run` | Report what would be removed without removing anything |  |
+| `--keep-skills` | Leave the installed agent skills alone |  |
+| `--keep-config` | Leave the stored API key and organization info alone |  |
 

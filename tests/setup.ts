@@ -40,6 +40,20 @@ export const TEST_API_KEY = "tgr_test_key_for_the_suite";
 
 let configDir: string;
 
+/**
+ * Pinned at module load, not only in `beforeEach`, because that is when
+ * lib/config.ts reads it. A test file's imports are evaluated before any hook
+ * runs, so a `beforeEach` alone left the module pointed at the developer's
+ * real config for the whole file — and on a machine that had run `senso
+ * login`, every "no API key" test found one and made a request instead of
+ * exiting 3. Setup files run before the test file is imported, so this is
+ * early enough. Nothing is written here; the per-test directory below is
+ * where a test that stores a key puts it.
+ */
+process.env.SENSO_CONFIG_DIR = join(tmpdir(), `senso-test-never-created-${String(process.pid)}`);
+delete process.env.SENSO_API_KEY;
+delete process.env.SENSO_BASE_URL;
+
 beforeAll(() => {
   server.listen({ onUnhandledRequest: "error" });
 });

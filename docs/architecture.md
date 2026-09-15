@@ -20,7 +20,7 @@ What happens between `argv` and the Senso API, and which file owns each step.
   preAction hook        runs once, after the globals are parsed and the command
     │                   is known:  miniBanner() → stderr, unless --quiet or
     │                   --output json;  void checkForUpdate(...) — fired, never
-    │                   awaited, skipped for login / logout / update.
+    │                   awaited, skipped for login / logout / uninstall / update.
     ▼
   lib/run-action.ts     runAction(program, handler)
     │                     resolveContext(program) → Ctx { apiKey, baseUrl,
@@ -100,9 +100,10 @@ is why the banner and the update check live here and not in the bin entry:
   entirely under `--output json` — even on stderr it is noise an agent has to be
   told to ignore.
 - The update check needs the command's name, because it is skipped for `login`,
-  `logout` and `update`. The first two own the config file for the duration of
-  their run and a concurrent update-check write would be a second writer; the
-  third asks the registry itself.
+  `logout`, `uninstall` and `update`. The first three own the config file for
+  the duration of their run and a concurrent update-check write would be a
+  second writer — for `uninstall` that writer would recreate the file the
+  command just deleted; the fourth asks the registry itself.
 - Commander handles `--version` and `--help` without dispatching an action, so
   the hook never fires for them. `senso --version` therefore makes no request and
   creates no config directory, which is what makes it usable as a healthcheck —

@@ -23,6 +23,11 @@ other API keys.
 `SENSO_CONFIG_DIR` relocates the file. Nothing else is stored: no knowledge base
 content, no cache, no history, no telemetry.
 
+`senso logout` deletes the file. `senso uninstall` deletes it, removes the agent
+skills `senso skills install` put on the machine, and then removes the CLI
+package itself; a key supplied through `SENSO_API_KEY` is outside its reach,
+and it says so.
+
 ## What leaves your machine
 
 Two destinations, both over HTTPS, and nothing else.

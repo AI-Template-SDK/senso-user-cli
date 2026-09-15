@@ -133,6 +133,7 @@ argument and flag, generated from the CLI itself.
 | `run-config`                                                             | Which models run, and on which days                                             |
 | `skills`                                                                 | Install the Senso agent skills                                                  |
 | `update`                                                                 | Update this CLI                                                                 |
+| `uninstall`                                                              | Remove this CLI, the skills it installed, and the stored API key                |
 
 A few worth knowing about:
 

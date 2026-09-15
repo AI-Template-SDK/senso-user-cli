@@ -51,13 +51,16 @@ import { registerHistoryImportsCommands } from "./commands/history-imports.js";
 import { registerIndustriesCommands } from "./commands/industries.js";
 import { registerPartnerCommands } from "./commands/partner.js";
 import { registerUpdateCommand } from "./commands/update.js";
+import { registerUninstallCommand } from "./commands/uninstall.js";
 
 /**
- * `login` and `logout` own the config file for the duration of their run, and
- * `update` asks the registry itself — a second check would be redundant work
- * and a second writer.
+ * `login`, `logout` and `uninstall` own the config file for the duration of
+ * their run, and `update` asks the registry itself — a second check would be
+ * redundant work and a second writer. For `uninstall` the second writer is
+ * worse than redundant: the check finishes after the command has deleted the
+ * config file, and writes it straight back.
  */
-const UPDATE_CHECK_EXEMPT = new Set(["login", "logout", "update"]);
+export const UPDATE_CHECK_EXEMPT = new Set(["login", "logout", "update", "uninstall"]);
 
 /**
  * The exit-code table, shown at the bottom of `senso --help`.
@@ -175,6 +178,7 @@ export function createProgram(): Command {
   registerIndustriesCommands(program);
   registerPartnerCommands(program);
   registerUpdateCommand(program);
+  registerUninstallCommand(program);
 
   return program;
 }

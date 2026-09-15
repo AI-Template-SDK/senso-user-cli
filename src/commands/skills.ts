@@ -12,7 +12,7 @@ const execFileAsync = promisify(execFile);
 // Mirrors the skills published from senso-contextos/skills/. This list drifted
 // once already — senso-onboarding shipped there and was never added here — so
 // tests/policy/skills-list.test.ts now compares it against a fixture.
-const SENSO_SKILLS = [
+export const SENSO_SKILLS = [
   "senso-ai/senso-search",
   "senso-ai/senso-ingest",
   "senso-ai/senso-content-gen",
@@ -34,8 +34,11 @@ const AGENT_FLAGS: Record<string, string> = {
 /** How long a single shipables invocation may take. */
 const SHIPABLES_TIMEOUT_MS = 120_000;
 
-function shortName(pkg: string): string {
-  return pkg.replace("senso-ai/senso-", "");
+/** Every official skill is published under this prefix. */
+export const SENSO_SKILL_PREFIX = "senso-ai/senso-";
+
+export function shortName(pkg: string): string {
+  return pkg.replace(SENSO_SKILL_PREFIX, "");
 }
 
 async function resolveShipables(): Promise<string> {
@@ -49,14 +52,23 @@ async function resolveShipables(): Promise<string> {
   }
 }
 
-async function runShipables(args: string[]): Promise<{ stdout: string; stderr: string }> {
+/**
+ * Run one shipables command and capture what it printed.
+ *
+ * `cwd` matters because shipables keys a project-level install by the
+ * directory it was run from: an uninstall for a skill installed in another
+ * project has to run from that project's directory to find it.
+ */
+export async function runShipables(
+  args: string[],
+  opts: { cwd?: string } = {},
+): Promise<{ stdout: string; stderr: string }> {
   const bin = await resolveShipables();
+  const execOpts = { timeout: SHIPABLES_TIMEOUT_MS, ...opts };
   if (bin === "npx") {
-    return execFileAsync("npx", ["--yes", "@senso-ai/shipables", ...args], {
-      timeout: SHIPABLES_TIMEOUT_MS,
-    });
+    return execFileAsync("npx", ["--yes", "@senso-ai/shipables", ...args], execOpts);
   }
-  return execFileAsync(bin, args, { timeout: SHIPABLES_TIMEOUT_MS });
+  return execFileAsync(bin, args, execOpts);
 }
 
 function buildAgentFlags(agent?: string): string[] {
@@ -238,7 +250,10 @@ export function registerSkillsCommands(program: Command): void {
         const pkg = name.startsWith("@") ? name : `senso-ai/senso-${name}`;
         const globalFlag = cmdOpts.global ? ["--global"] : [];
 
-        const { stdout, stderr } = await runShipables(["uninstall", pkg, ...globalFlag, "--yes"]);
+        // No `--yes`: shipables' uninstall does not take one and rejects it
+        // as an unknown option, so passing it made every `skills remove` exit 1
+        // without removing anything. The install side does take it.
+        const { stdout, stderr } = await runShipables(["uninstall", pkg, ...globalFlag]);
 
         if (!ctx.quiet) {
           if (stdout.trim()) log.raw(stdout.trim());

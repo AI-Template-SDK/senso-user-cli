@@ -91,8 +91,8 @@ Three things about these are worth knowing:
   command, but the `preAction` hook decides whether to check by looking at
   `--quiet` and `--output` only, and never consults the parsed value. What does
   suppress the check: `SENSO_NO_UPDATE_CHECK=1`, `--quiet`, `--output json`, the
-  commands `login`, `logout` and `update`, and `--version` / `--help`, which never
-  dispatch an action.
+  commands `login`, `logout`, `uninstall` and `update`, and `--version` /
+  `--help`, which never dispatch an action.
 
 ## The config file
 
