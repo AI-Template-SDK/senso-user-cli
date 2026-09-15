@@ -404,17 +404,20 @@ describe("skills list, reading what the child printed", () => {
 });
 
 describe("skills remove", () => {
-  it("uninstalls the expanded package name without prompting", async () => {
+  it("uninstalls the expanded package name, without a --yes shipables does not take", async () => {
+    // shipables' uninstall has no --yes flag and rejects it as an unknown
+    // option. Passing it made every `skills remove` exit 1 having removed
+    // nothing, so the argv is asserted literally.
     const res = await runCli(["skills", "remove", "search"]);
 
     expect(res.exitCode).toBe(0);
-    expect(argv()).toEqual(["uninstall", "senso-ai/senso-search", "--yes"]);
+    expect(argv()).toEqual(["uninstall", "senso-ai/senso-search"]);
   });
 
   it("forwards --global", async () => {
     await runCli(["skills", "remove", "search", "--global"]);
 
-    expect(argv()).toEqual(["uninstall", "senso-ai/senso-search", "--global", "--yes"]);
+    expect(argv()).toEqual(["uninstall", "senso-ai/senso-search", "--global"]);
   });
 
   it("puts the confirmation on stderr, leaving stdout empty", async () => {

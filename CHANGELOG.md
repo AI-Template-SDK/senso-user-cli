@@ -11,6 +11,21 @@ mattered, and what you need to do differently.
 
 ### Added
 
+- **`senso uninstall` — remove the CLI and everything it put on the machine.**
+  Three steps, in this order: the Senso agent skills that `senso skills
+install` installed, found from shipables' own record so a skill installed in
+  another project is removed too; the config file holding the API key, and its
+  directory if nothing else is in it; then the npm package itself. A skill that
+  will not uninstall stops the command before the CLI goes, so there is still a
+  `senso` to retry with. It asks first in a terminal and exits 2 without one
+  unless `--yes` is passed, so an agent has to mean it. `--dry-run` reports the
+  plan and removes nothing, `--keep-skills` and `--keep-config` narrow it, and
+  `--output json` gets the outcome as a payload. A key set through
+  `SENSO_API_KEY` cannot be removed by a process and is called out instead. If
+  npm exits 0 but the file the CLI is running from is still there, the copy
+  was not the global npm install, and the command says so and exits 1 rather
+  than reporting a removal that did not happen.
+
 - **`senso gaps` — the gap report, for agents as much as people.** Six
   commands over `/org/gaps`: `list` finds work, `get` reads one gap in full,
   `resolve` records a decision, `answer` and `dismiss` are shortcuts for the
@@ -108,6 +123,13 @@ mattered, and what you need to do differently.
   Markdown with citations rather than storing content. It takes 10–30 seconds
   and consumes credits, so `--audience`, `--style-tone`, `--extra-instructions`
   and `--product-line-ids` are length-checked before the request goes out.
+
+### Fixed
+
+- **`senso skills remove` exited 1 without removing anything.** It passed
+  `--yes` to `shipables uninstall`, which has no such flag and rejects it as an
+  unknown option. The flag is no longer passed; `skills install` still passes
+  it, because the install side does take one.
 
 ### Changed
 

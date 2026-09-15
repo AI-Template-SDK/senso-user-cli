@@ -124,8 +124,8 @@ freely; changing a code is a breaking change.
 - **The banner is on stderr and suppressed entirely under `--output json`.**
   Even on stderr it is noise an agent has to be told to ignore.
 
-- **The update check does not run for `--version`, `--help`, `login`, `logout`
-  or `update`,** and its timeout is 3 seconds rather than 10. It is fired without
+- **The update check does not run for `--version`, `--help`, `login`, `logout`,
+  `uninstall` or `update`,** and its timeout is 3 seconds rather than 10. It is fired without
   being awaited, so an outstanding fetch keeps the event loop alive after the
   command has printed — that timeout is the worst-case delay before the process
   exits.
