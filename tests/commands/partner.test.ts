@@ -168,7 +168,7 @@ describe("partner, when the request fails for some other reason", () => {
 
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("not your fault");
+    expect(res.stderr).toContain("server-side failure");
     expect(res.stderr).not.toContain("partner authentication");
   });
 
@@ -505,7 +505,7 @@ describe("partner industries list, on success", () => {
     const res = await runCli(["partner", "industries", "list", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual(INDUSTRIES);
+    expect(res.data()).toEqual(INDUSTRIES);
     expect(res.stderr).toBe("");
   });
 
@@ -558,7 +558,7 @@ describe("partner industries summary, on success", () => {
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual(SUMMARY);
+    expect(res.data()).toEqual(SUMMARY);
     expect(res.stderr).toBe("");
   });
 

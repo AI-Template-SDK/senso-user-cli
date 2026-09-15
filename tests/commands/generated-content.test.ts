@@ -1,55 +1,89 @@
 /**
  * Command layer: `senso generated-content`.
  *
- * Read-only, two subcommands, and almost all of the risk is in one line: `list`
- * turns `--status` into a path segment rather than a query parameter, so the
- * flag decides which endpoint is called. What is worth protecting:
+ * The browse half of the content engine, and the place a blank column shipped
+ * green. What is worth protecting:
  *
- *   - `published` and `drafts` reach the URL as path segments, with `published`
- *     the default when the flag is absent;
- *   - the paging defaults ("10" and "0") are actually sent, because a caller
- *     paging by hand needs the CLI's idea of page one to match the server's;
- *   - `--search` is omitted entirely when unset, rather than sent empty.
+ *   - the table's columns are the ones the DTO actually carries —
+ *     content_id, title, editorial_status, generated_at. The command used to
+ *     declare `id` and `status`, which the API has never returned, so every row
+ *     printed two blank cells and one of them was the id every following
+ *     command needs. The fixtures below are built from
+ *     GeneratedContentListItem / GeneratedContentDetailResponse in senso-api's
+ *     internal/api/dto/generated_content_dto.go for exactly that reason;
+ *   - `--status` picks a PATH segment, so an unrecognized value used to fall
+ *     through to `published` and return a plausible-looking wrong list;
+ *   - `--limit` outside 1-100 is not clamped by the API, it silently returns
+ *     ten rows, so it is rejected here instead;
+ *   - `get` shares its route with `senso content get`, which refuses knowledge
+ *     base content with a 400. That is a wrong-command error (exit 2) naming
+ *     `senso kb get`, not an API failure.
  *
- * One assertion covers the guard on `--status`: anything but published/drafts
- * (with `draft` accepted as a spelling of `drafts`) is a usage error, rather
- * than silently falling through to `published` and returning a wrong list.
- *
- * Failure branches come first, as in tests/commands/roles.test.ts.
+ * Failure branches first.
  */
 
 import { describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import { server, TEST_API_KEY } from "../setup.js";
-import { apiUrl, runCli } from "../helpers.js";
+import { apiUrl, envelope, errorEnvelope, runCli } from "../helpers.js";
 
-const LISTING = {
+const CONTENT_ID = "9d7e1c40-5b3a-4c22-8f16-0a3b7e5d2c81";
+const DRAFT_CONTENT_ID = "3a5c7e91-2b48-4d06-8f13-6c9a0e4b7d52";
+const VERSION_ID = "4a1b8c67-2d39-4e05-9f7a-6b2c8d0e1f34";
+const KB_CONTENT_ID = "1e8b4f62-9c07-4a35-b2d8-5f70c3a9e614";
+
+/** GeneratedContentListResponse: items plus the page window. */
+const LIST = {
   items: [
     {
-      id: "gc-1",
-      title: "How does pricing work?",
-      status: "published",
-      created_at: "2026-01-02T03:04:05Z",
+      content_id: CONTENT_ID,
+      version_id: VERSION_ID,
+      question_text: "How do refunds work at Acme?",
+      title: "How refunds work",
+      summary: "Refunds are issued within 14 days of the request.",
+      editorial_status: "published",
+      version_num: 3,
+      generated_at: "2026-06-11T10:04:00Z",
+      created_at: "2026-06-09T08:00:00Z",
+      updated_at: "2026-06-11T10:04:00Z",
     },
     {
-      id: "gc-2",
-      title: "What is a citeable?",
-      status: "published",
-      created_at: "2026-01-03T03:04:05Z",
+      content_id: DRAFT_CONTENT_ID,
+      version_id: "8d0f2a47-5e31-4c99-a7b6-2f4c8e1d6053",
+      // Empty for content written without an originating prompt — a blank
+      // Builder document, or a recorded URL.
+      question_text: "",
+      title: "Shipping windows",
+      editorial_status: "draft",
+      version_num: 1,
+      generated_at: "2026-06-12T09:30:00Z",
+      created_at: "2026-06-12T09:30:00Z",
+      updated_at: "2026-06-12T09:30:00Z",
     },
   ],
-  total: 2,
+  total: 42,
+  limit: 10,
+  offset: 0,
 };
 
-const ONE_ITEM = {
-  id: "gc-1",
-  title: "How does pricing work?",
-  status: "published",
-  question: "How does pricing work?",
-  body: "# Pricing\n\nIt works like this.",
+const EMPTY_LIST = { items: [], total: 0, limit: 10, offset: 0 };
+
+/** GeneratedContentDetailResponse: the same item plus the rendered body. */
+const DETAIL = {
+  content_id: CONTENT_ID,
+  content_type: "article",
+  editorial_status: "published",
+  title: "How refunds work",
+  summary: "Refunds are issued within 14 days of the request.",
+  question_text: "How do refunds work at Acme?",
+  version_num: 3,
+  generated_at: "2026-06-11T10:04:00Z",
+  created_at: "2026-06-09T08:00:00Z",
+  updated_at: "2026-06-11T10:04:00Z",
+  text: "# How refunds work\n\nRefunds are issued within 14 days.",
 };
 
-describe("generated-content, when the request fails", () => {
+describe("generated-content list, when the request fails", () => {
   it("exits 3 and explains how to authenticate when there is no API key", async () => {
     const res = await runCli(["generated-content", "list"], { withKey: false });
 
@@ -73,34 +107,20 @@ describe("generated-content, when the request fails", () => {
     expect(res.stderr).toContain("Authentication failed");
   });
 
-  it("exits 3 when the org does not have the GEO product or the read scope", async () => {
+  it("exits 3 when the key may not read content", async () => {
     server.use(
       http.get(apiUrl("/org/generated-content/published"), () =>
-        HttpResponse.json({ error: "read:content required" }, { status: 403 }),
+        HttpResponse.json({ error: "missing permission read:content" }, { status: 403 }),
       ),
     );
 
     const res = await runCli(["generated-content", "list"]);
 
     expect(res.exitCode).toBe(3);
-    expect(res.stdout).toBe("");
     expect(res.stderr).toContain("Permission denied");
-    expect(res.stderr).toContain("read:content required");
   });
 
-  it("exits 4 when the item does not exist", async () => {
-    server.use(
-      http.get(apiUrl("/org/generated-content/:id"), () => new HttpResponse(null, { status: 404 })),
-    );
-
-    const res = await runCli(["generated-content", "get", "gc-missing"]);
-
-    expect(res.exitCode).toBe(4);
-    expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("Not found");
-  });
-
-  it("exits 1 on a 500 and says it is not the caller's fault", async () => {
+  it("exits 1 on a 500 and offers a retry", async () => {
     server.use(
       http.get(
         apiUrl("/org/generated-content/published"),
@@ -112,78 +132,144 @@ describe("generated-content, when the request fails", () => {
 
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("not your fault");
+    expect(res.stderr).toContain("Retry shortly");
   });
 
-  it("exits 5 when the API rate limits the caller", async () => {
+  it("exits 1 on a 501 and says retrying is NOT the answer", async () => {
     server.use(
-      http.get(
-        apiUrl("/org/generated-content/published"),
-        () => new HttpResponse(null, { status: 429 }),
+      http.get(apiUrl("/org/generated-content/published"), () =>
+        HttpResponse.json({ error: "generated content is not enabled here" }, { status: 501 }),
       ),
     );
 
     const res = await runCli(["generated-content", "list"]);
 
-    expect(res.exitCode).toBe(5);
-    expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("Rate limited");
+    expect(res.exitCode).toBe(1);
+    expect(res.stderr).toContain("not a transient failure");
+    expect(res.stderr).not.toContain("Retry shortly");
   });
 
-  it("writes the failure to stderr as JSON, leaving stdout empty, under --output json", async () => {
+  it("reports a malformed body rather than throwing a parse error at the user", async () => {
     server.use(
-      http.get(apiUrl("/org/generated-content/:id"), () =>
-        HttpResponse.json({ error: "nope" }, { status: 404 }),
+      http.get(apiUrl("/org/generated-content/published"), () =>
+        HttpResponse.text("<html>nope</html>"),
       ),
     );
 
-    const res = await runCli(["generated-content", "get", "gc-1", "--output", "json"]);
+    const res = await runCli(["generated-content", "list"]);
 
-    expect(res.exitCode).toBe(4);
-    // A caller redirecting stdout to a file gets an empty file, not a file
-    // containing an error object it would later read as data.
+    expect(res.exitCode).toBe(1);
+    expect(res.stderr).toContain("Invalid JSON response");
+  });
+
+  it("writes the failure to stderr as an error envelope, leaving stdout empty", async () => {
+    server.use(
+      http.get(apiUrl("/org/generated-content/published"), () =>
+        HttpResponse.json({ error: "nope" }, { status: 403 }),
+      ),
+    );
+
+    const res = await runCli(["generated-content", "list", "--output", "json"]);
+
+    expect(res.exitCode).toBe(3);
     expect(res.stdout).toBe("");
-
-    const reported: unknown = JSON.parse(res.stderr);
-    expect(reported).toMatchObject({ error: { code: "not_found", status: 404 } });
+    const err = errorEnvelope(res);
+    expect(err.command).toBe("generated-content list");
+    expect(err.error).toMatchObject({
+      code: "forbidden",
+      status: 403,
+      request: { method: "GET", path: "/org/generated-content/published" },
+    });
   });
 });
 
-describe("generated-content, on usage errors", () => {
-  it("exits 2 when get is called without an id", async () => {
-    // No handler is registered: setup.ts fails any request that reaches the
-    // network, so this also proves nothing was sent.
-    const res = await runCli(["generated-content", "get"]);
+describe("generated-content list, when a flag is wrong", () => {
+  // No handler registered here: a request would fail the test, which is how
+  // "validated before the round trip" is proven.
+
+  it("exits 2 on a --status the API has no path for, rather than listing published", async () => {
+    const res = await runCli([
+      "generated-content",
+      "list",
+      "--status",
+      "pending",
+      "--output",
+      "json",
+    ]);
 
     expect(res.exitCode).toBe(2);
     expect(res.stdout).toBe("");
+    const err = errorEnvelope(res);
+    expect(err.error.field).toBe("--status");
+    expect(err.error.received).toBe("pending");
+    expect(err.error.allowed).toEqual(["published", "drafts"]);
   });
 
-  it("exits 2 and names the valid formats when --output is not one of them", async () => {
-    const res = await runCli(["generated-content", "list", "--output", "csv"]);
+  it("exits 2 when --limit is above 100, which the API answers with ten rows", async () => {
+    const res = await runCli(["generated-content", "list", "--limit", "500", "--output", "json"]);
 
     expect(res.exitCode).toBe(2);
-    expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("json, table, plain");
+    const err = errorEnvelope(res);
+    expect(err.error.field).toBe("--limit");
+    expect(err.error.message).toContain("out of range");
   });
 
-  it("exits 2 and names the two statuses when --status is neither", async () => {
-    // No handler is registered, so this also proves nothing was requested: the
-    // old behavior fell through to "published" and returned a wrong list.
-    const res = await runCli(["generated-content", "list", "--status", "archived"]);
+  it("exits 2 when --limit is not a whole number", async () => {
+    const res = await runCli(["generated-content", "list", "--limit", "ten"]);
 
     expect(res.exitCode).toBe(2);
-    expect(res.stdout).toBe("");
-    expect(res.stderr).toContain('Invalid --status: "archived"');
-    expect(res.stderr).toContain("published, drafts");
+    expect(res.stderr).toContain("is not a whole number");
   });
 
-  it("still accepts the singular --status draft", async () => {
+  it("exits 2 on a negative --offset", async () => {
+    const res = await runCli(["generated-content", "list", "--offset", "-1"]);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stderr).toContain("--offset");
+  });
+});
+
+describe("generated-content list, on the wire", () => {
+  it("reads the published listing by default, with the page window as parameters", async () => {
+    let seen: Request | undefined;
+    server.use(
+      http.get(apiUrl("/org/generated-content/published"), ({ request }) => {
+        seen = request;
+        return HttpResponse.json(LIST);
+      }),
+    );
+
+    await runCli(["generated-content", "list"]);
+
+    const url = new URL(seen?.url ?? "");
+    expect(url.pathname).toBe("/api/v1/org/generated-content/published");
+    expect(url.searchParams.get("limit")).toBe("10");
+    expect(url.searchParams.get("offset")).toBe("0");
+    // Absent, not empty: an empty search would be a filter matching nothing.
+    expect(url.searchParams.has("search")).toBe(false);
+    expect(seen?.headers.get("x-api-key")).toBe(TEST_API_KEY);
+  });
+
+  it("switches the PATH, not a parameter, for --status drafts", async () => {
     let seen: Request | undefined;
     server.use(
       http.get(apiUrl("/org/generated-content/drafts"), ({ request }) => {
         seen = request;
-        return HttpResponse.json(LISTING);
+        return HttpResponse.json(LIST);
+      }),
+    );
+
+    await runCli(["generated-content", "list", "--status", "drafts"]);
+
+    expect(new URL(seen?.url ?? "").pathname).toBe("/api/v1/org/generated-content/drafts");
+  });
+
+  it("accepts `draft` as a spelling of `drafts`", async () => {
+    let seen: Request | undefined;
+    server.use(
+      http.get(apiUrl("/org/generated-content/drafts"), ({ request }) => {
+        seen = request;
+        return HttpResponse.json(LIST);
       }),
     );
 
@@ -192,189 +278,240 @@ describe("generated-content, on usage errors", () => {
     expect(res.exitCode).toBe(0);
     expect(new URL(seen?.url ?? "").pathname).toBe("/api/v1/org/generated-content/drafts");
   });
-});
 
-describe("generated-content list, on the wire", () => {
-  it("GETs the published path with the documented paging defaults", async () => {
+  it("passes --search and the page window through", async () => {
     let seen: Request | undefined;
     server.use(
       http.get(apiUrl("/org/generated-content/published"), ({ request }) => {
         seen = request;
-        return HttpResponse.json(LISTING);
-      }),
-    );
-
-    await runCli(["generated-content", "list"]);
-
-    expect(seen?.method).toBe("GET");
-    expect(new URL(seen?.url ?? "").pathname).toBe("/api/v1/org/generated-content/published");
-    const params = new URL(seen?.url ?? "").searchParams;
-    // Sent explicitly rather than left to the server, so the CLI's page one and
-    // the API's page one cannot drift apart.
-    expect(params.get("limit")).toBe("10");
-    expect(params.get("offset")).toBe("0");
-    // Unset, so absent — not an empty `search=`, which would filter on "".
-    expect(params.has("search")).toBe(false);
-    expect(seen?.headers.get("x-api-key")).toBe(TEST_API_KEY);
-  });
-
-  it("switches to the drafts path for --status drafts", async () => {
-    let seen: Request | undefined;
-    server.use(
-      http.get(apiUrl("/org/generated-content/drafts"), ({ request }) => {
-        seen = request;
-        return HttpResponse.json({ items: [], total: 0 });
-      }),
-    );
-
-    await runCli(["generated-content", "list", "--status", "drafts"]);
-
-    // The flag picks the endpoint, not a filter on one endpoint.
-    expect(new URL(seen?.url ?? "").pathname).toBe("/api/v1/org/generated-content/drafts");
-  });
-
-  it("accepts the singular --status draft as well", async () => {
-    let seen: Request | undefined;
-    server.use(
-      http.get(apiUrl("/org/generated-content/drafts"), ({ request }) => {
-        seen = request;
-        return HttpResponse.json({ items: [], total: 0 });
-      }),
-    );
-
-    await runCli(["generated-content", "list", "--status", "draft"]);
-
-    expect(new URL(seen?.url ?? "").pathname).toBe("/api/v1/org/generated-content/drafts");
-  });
-
-  it("sends --limit, --offset and --search as query parameters", async () => {
-    let seen: Request | undefined;
-    server.use(
-      http.get(apiUrl("/org/generated-content/published"), ({ request }) => {
-        seen = request;
-        return HttpResponse.json(LISTING);
+        return HttpResponse.json(LIST);
       }),
     );
 
     await runCli([
       "generated-content",
       "list",
-      "--limit",
-      "50",
-      "--offset",
-      "100",
       "--search",
-      "pricing & plans",
+      "refund",
+      "--limit",
+      "25",
+      "--offset",
+      "50",
     ]);
 
-    const params = new URL(seen?.url ?? "").searchParams;
-    expect(params.get("limit")).toBe("50");
-    expect(params.get("offset")).toBe("100");
-    // Encoded by URLSearchParams, so an ampersand in a title cannot inject a
-    // second parameter.
-    expect(params.get("search")).toBe("pricing & plans");
+    const url = new URL(seen?.url ?? "");
+    expect(url.searchParams.get("search")).toBe("refund");
+    expect(url.searchParams.get("limit")).toBe("25");
+    expect(url.searchParams.get("offset")).toBe("50");
   });
 });
 
-describe("generated-content get, on the wire", () => {
-  it("GETs the item's own path with no query string", async () => {
-    let seen: Request | undefined;
-    server.use(
-      http.get(apiUrl("/org/generated-content/:id"), ({ request }) => {
-        seen = request;
-        return HttpResponse.json(ONE_ITEM);
-      }),
-    );
-
-    await runCli(["generated-content", "get", "gc-1"]);
-
-    expect(seen?.method).toBe("GET");
-    expect(new URL(seen?.url ?? "").pathname).toBe("/api/v1/org/generated-content/gc-1");
-    expect(new URL(seen?.url ?? "").search).toBe("");
-  });
-});
-
-describe("generated-content, on success", () => {
-  it("prints the list payload unmodified under --output json", async () => {
-    server.use(
-      http.get(apiUrl("/org/generated-content/published"), () => HttpResponse.json(LISTING)),
-    );
+describe("generated-content list, on success", () => {
+  it("prints the payload under data, with the page window derived from it", async () => {
+    server.use(http.get(apiUrl("/org/generated-content/published"), () => HttpResponse.json(LIST)));
 
     const res = await runCli(["generated-content", "list", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual(LISTING);
-    // json implies quiet: no banner, no commentary alongside the payload.
+    expect(res.data()).toEqual(LIST);
+    expect(envelope(res).page).toMatchObject({
+      offset: 0,
+      limit: 10,
+      returned: 2,
+      total: 42,
+      has_more: true,
+    });
     expect(res.stderr).toBe("");
   });
 
-  it("renders one row per item under --output table", async () => {
-    server.use(
-      http.get(apiUrl("/org/generated-content/published"), () => HttpResponse.json(LISTING)),
-    );
+  it("gives the next page as a command that can be run as written", async () => {
+    server.use(http.get(apiUrl("/org/generated-content/published"), () => HttpResponse.json(LIST)));
+
+    const res = await runCli([
+      "generated-content",
+      "list",
+      "--search",
+      "refund",
+      "--output",
+      "json",
+    ]);
+
+    const next = envelope(res).page?.next ?? "";
+    expect(next).toContain("--offset 2");
+    expect(next).toContain("--search refund");
+  });
+
+  it("renders content_id, title, editorial_status and generated_at under --output table", async () => {
+    // The regression this file exists for: `id` and `status` are not fields of
+    // this DTO, and declaring them printed two blank columns.
+    server.use(http.get(apiUrl("/org/generated-content/published"), () => HttpResponse.json(LIST)));
 
     const res = await runCli(["generated-content", "list", "--output", "table"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.stdout).toContain("title");
-    expect(res.stdout).toContain("gc-1");
-    expect(res.stdout).toContain("What is a citeable?");
+    for (const column of ["content_id", "title", "editorial_status", "generated_at"]) {
+      expect(res.stdout).toContain(column);
+    }
+    expect(res.stdout).toContain(CONTENT_ID);
+    expect(res.stdout).toContain("How refunds work");
+    expect(res.stdout).toContain("published");
+    expect(res.stdout).toContain("2026-06-11T10:04:00Z");
+  });
+
+  it("does not warn about an absent column, because every declared one is real", async () => {
+    // The table renderer warns when a declared column exists on no row. If this
+    // fires, the columns and the DTO have drifted apart again.
+    server.use(http.get(apiUrl("/org/generated-content/published"), () => HttpResponse.json(LIST)));
+
+    const res = await runCli(["generated-content", "list", "--output", "table"]);
+
+    expect(res.stderr).not.toContain("which the API did not return");
   });
 
   it("renders a readable block per item by default", async () => {
-    server.use(
-      http.get(apiUrl("/org/generated-content/published"), () => HttpResponse.json(LISTING)),
-    );
+    server.use(http.get(apiUrl("/org/generated-content/published"), () => HttpResponse.json(LIST)));
 
     const res = await runCli(["generated-content", "list"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.stdout).toContain("How does pricing work?");
-    expect(res.stdout).toContain("gc-2");
+    expect(res.stdout).toContain("How refunds work");
+    expect(res.stdout).toContain("How do refunds work at Acme?");
+    expect(res.stderr).toContain("Showing 1–2 of 42.");
   });
 
-  it("says so plainly when there are no drafts", async () => {
+  it("says an empty page is empty, and why it might be", async () => {
     server.use(
-      http.get(apiUrl("/org/generated-content/drafts"), () =>
-        HttpResponse.json({ items: [], total: 0 }),
-      ),
+      http.get(apiUrl("/org/generated-content/drafts"), () => HttpResponse.json(EMPTY_LIST)),
     );
 
     const res = await runCli(["generated-content", "list", "--status", "drafts"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.stdout).toContain("total");
+    expect(res.stdout).toContain("No generated content found.");
+    expect(res.stderr).toContain("senso engine draft");
   });
 
-  it("prints one item, body and all, unmodified under --output json", async () => {
-    server.use(http.get(apiUrl("/org/generated-content/:id"), () => HttpResponse.json(ONE_ITEM)));
+  it("points at the first item's id as the next thing to read", async () => {
+    server.use(http.get(apiUrl("/org/generated-content/published"), () => HttpResponse.json(LIST)));
 
-    const res = await runCli(["generated-content", "get", "gc-1", "--output", "json"]);
+    const res = await runCli(["generated-content", "list", "--output", "json"]);
+
+    const next = (envelope(res).next ?? []).map((s) => s.command).join(" ");
+    expect(next).toContain(`senso generated-content get ${CONTENT_ID}`);
+    expect(next).toContain(`senso content citation-details ${CONTENT_ID}`);
+  });
+});
+
+describe("generated-content get, when the id is wrong", () => {
+  it("exits 2 without a request when <id> is not a UUID", async () => {
+    const res = await runCli(["generated-content", "get", "c-1", "--output", "json"]);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stdout).toBe("");
+    const err = errorEnvelope(res);
+    expect(err.error.field).toBe("<id>");
+    expect(err.error.received).toBe("c-1");
+    expect(err.error.hint).toContain("senso generated-content list --status drafts");
+  });
+
+  it("names the resource and the id on a 404", async () => {
+    server.use(
+      http.get(apiUrl(`/org/generated-content/${CONTENT_ID}`), () =>
+        HttpResponse.json({ error: "not found" }, { status: 404 }),
+      ),
+    );
+
+    const res = await runCli(["generated-content", "get", CONTENT_ID, "--output", "json"]);
+
+    expect(res.exitCode).toBe(4);
+    const err = errorEnvelope(res);
+    expect(err.error.code).toBe("not_found");
+    expect(err.error.message).toContain(`Generated content ${CONTENT_ID} not found`);
+    expect(err.error.field).toBe("content_id");
+  });
+
+  it("re-reports a knowledge base document as a usage error naming `senso kb get`", async () => {
+    // The id is a perfectly good content_id from the other half of the system.
+    // Passing the API's 400 through reads as a bug in this command; the real
+    // fix is a different command, so it exits 2 rather than 1.
+    server.use(
+      http.get(apiUrl(`/org/generated-content/${KB_CONTENT_ID}`), () =>
+        HttpResponse.json(
+          { error: "Knowledge base content must be accessed through KB node endpoints" },
+          { status: 400 },
+        ),
+      ),
+    );
+
+    const res = await runCli(["generated-content", "get", KB_CONTENT_ID, "--output", "json"]);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stdout).toBe("");
+    const err = errorEnvelope(res);
+    expect(err.error.code).toBe("usage");
+    expect(err.error.status).toBe(400);
+    expect(err.error.received).toBe(KB_CONTENT_ID);
+    expect(err.error.message).toContain("knowledge base document");
+    expect(err.error.hint).toContain("senso kb get <kb_node_id>");
+    expect(err.error.hint).toContain("senso kb find");
+  });
+
+  it("leaves any other 400 as an API rejection, which is exit 1", async () => {
+    server.use(
+      http.get(apiUrl(`/org/generated-content/${CONTENT_ID}`), () =>
+        HttpResponse.json({ error: "invalid content id" }, { status: 400 }),
+      ),
+    );
+
+    const res = await runCli(["generated-content", "get", CONTENT_ID, "--output", "json"]);
+
+    expect(res.exitCode).toBe(1);
+    expect(errorEnvelope(res).error.code).toBe("validation");
+  });
+});
+
+describe("generated-content get, on success", () => {
+  it("returns the item with its body under data", async () => {
+    server.use(
+      http.get(apiUrl(`/org/generated-content/${CONTENT_ID}`), () => HttpResponse.json(DETAIL)),
+    );
+
+    const res = await runCli(["generated-content", "get", CONTENT_ID, "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    // The rendered body is the reason to call this command; it must survive
-    // whole, newlines included.
-    expect(res.json()).toEqual(ONE_ITEM);
+    expect(res.data()).toEqual(DETAIL);
     expect(res.stderr).toBe("");
   });
 
-  it("renders one item as field/value rows under --output table", async () => {
-    server.use(http.get(apiUrl("/org/generated-content/:id"), () => HttpResponse.json(ONE_ITEM)));
+  it("prints the markdown body, not a stringified blob, in plain output", async () => {
+    server.use(
+      http.get(apiUrl(`/org/generated-content/${CONTENT_ID}`), () => HttpResponse.json(DETAIL)),
+    );
 
-    const res = await runCli(["generated-content", "get", "gc-1", "--output", "table"]);
+    const res = await runCli(["generated-content", "get", CONTENT_ID]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.stdout).toContain("field");
-    expect(res.stdout).toContain("question");
+    expect(res.stdout).toContain("text");
+    expect(res.stdout).toContain("How refunds work");
+    expect(res.stdout).toContain("How do refunds work at Acme?");
   });
 
-  it("renders one item as key/value lines by default", async () => {
-    server.use(http.get(apiUrl("/org/generated-content/:id"), () => HttpResponse.json(ONE_ITEM)));
+  it("offers the citation view for a published item and publishing for a draft", async () => {
+    server.use(
+      http.get(apiUrl(`/org/generated-content/${CONTENT_ID}`), () => HttpResponse.json(DETAIL)),
+      http.get(apiUrl(`/org/generated-content/${DRAFT_CONTENT_ID}`), () =>
+        HttpResponse.json({ ...DETAIL, content_id: DRAFT_CONTENT_ID, editorial_status: "draft" }),
+      ),
+    );
 
-    const res = await runCli(["generated-content", "get", "gc-1"]);
+    const published = await runCli(["generated-content", "get", CONTENT_ID, "--output", "json"]);
+    const draft = await runCli(["generated-content", "get", DRAFT_CONTENT_ID, "--output", "json"]);
 
-    expect(res.exitCode).toBe(0);
-    expect(res.stdout).toContain("title");
-    expect(res.stdout).toContain("How does pricing work?");
+    expect((envelope(published).next ?? []).map((s) => s.command).join(" ")).toContain(
+      `senso content citation-details ${CONTENT_ID}`,
+    );
+    expect((envelope(draft).next ?? []).map((s) => s.command).join(" ")).toContain(
+      `senso engine publish --data '{"content_id":"${DRAFT_CONTENT_ID}"`,
+    );
   });
 });

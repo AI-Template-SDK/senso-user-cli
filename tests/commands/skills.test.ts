@@ -130,7 +130,7 @@ describe("skills list-available, which answers for itself", () => {
   it("lists every official skill by short name and package under --output json", async () => {
     const res = await runCli(["skills", "list-available", "--output", "json"]);
 
-    const listed = res.json<{ package: string; shortName: string }[]>();
+    const listed = res.data<{ package: string; shortName: string }[]>();
     expect(listed).toHaveLength(SKILL_COUNT);
     expect(listed).toContainEqual({ package: "senso-ai/senso-search", shortName: "search" });
     expect(res.stderr).toBe("");
@@ -352,7 +352,7 @@ describe("skills list, reading what the child printed", () => {
     const res = await runCli(["skills", "list", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual(installed);
+    expect(res.data()).toEqual(installed);
   });
 
   it("says so plainly when nothing is installed", async () => {
@@ -433,7 +433,7 @@ describe("skills remove", () => {
     const res = await runCli(["skills", "remove", "search", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual({ removed: "search", package: "senso-ai/senso-search" });
+    expect(res.data()).toEqual({ removed: "search", package: "senso-ai/senso-search" });
     expect(res.stderr).toBe("");
   });
 });

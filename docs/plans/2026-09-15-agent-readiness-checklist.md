@@ -109,22 +109,22 @@ has to change for the CLI to be able to say the right thing. Check items off in 
 
 ## Part B — Cross-cutting changes in `senso-api`
 
-- [ ] Error body: `{ status, message, code?, field?, details? }`. Binding failures name the field and constraint instead of "Invalid request body" / "Invalid request payload" (`internal/api/middleware/response.go`, every `ShouldBindJSON` site).
-- [ ] Never discard a bind error. `UnpublishContent` does `_ = c.ShouldBindJSON(&body)`; a malformed id empties `publish_record_ids` and the request falls through to unpublishing from every destination. Reject with 400 naming the field.
-- [ ] 404, not 400, for a missing resource: `POST /org/gaps/{id}/resolutions` ("gap not found"), and any handler that flattens service errors into 400 with a raw Go string.
-- [ ] `rejectKBContent` (400 "Knowledge base content must be accessed through KB node endpoints"): keep the status but add a stable `code` (e.g. `kb_content_use_kb_endpoints`) and include the `kb_node_id` so a client can redirect the call.
+- [x] Error body: `{ status, message, code?, field?, details? }`. Binding failures name the field and constraint instead of "Invalid request body" / "Invalid request payload" (`internal/api/middleware/response.go`, every `ShouldBindJSON` site).
+- [x] Never discard a bind error. `UnpublishContent` does `_ = c.ShouldBindJSON(&body)`; a malformed id empties `publish_record_ids` and the request falls through to unpublishing from every destination. Reject with 400 naming the field.
+- [x] 404, not 400, for a missing resource: `POST /org/gaps/{id}/resolutions` ("gap not found"), and any handler that flattens service errors into 400 with a raw Go string.
+- [x] `rejectKBContent` (400 "Knowledge base content must be accessed through KB node endpoints"): keep the status but add a stable `code` (e.g. `kb_content_use_kb_endpoints`) and include the `kb_node_id` so a client can redirect the call.
 - [ ] List envelope: `{ items, total, limit, offset }` on every list endpoint; scalar extras (`sort_by`, `scope`, `mode`, `window`) under `meta`. `total` is the org-wide count, not the page size (`product-lines`). Expose `limit`/`offset` where the API pages internally but the route hides it (`/partner/industries` defaults to 10).
 - [ ] Every status/enum field is enumerated in `docs/specs/sdk-api.yaml` (senso-contextos), including values only visible in Go today (run statuses, `markdown_requires_raw_ingestion`, `already_tracked`, `gated`).
-- [ ] Return what was actually done: `unpublished_count`, ctas `clear-default` switched count, competitors `batch-add` created vs already-present, tracked-sources `update` on a published rule (409, not a silent 200).
-- [ ] Publish outcome: a 200 whose `publish_status` is "failed" should be a distinct status (207 or 422) or at least carry a stable `code`; document it either way.
-- [ ] Turn user-caused 500s into 4xx with a message: competitor org cap ("Failed to perform competitor operation"), `kb update-file` unsupported type ("Failed to ingest content." vs the readable `invalid` on upload), `validateFile` errors need sentinels.
-- [ ] Validate every filter on `GET /org/gaps` (statuses, kinds, surfaces, origins — only `problems` is checked) → 400 naming the field, instead of an empty list.
-- [ ] Discovery endpoints: publish the `--models` allow-list (`all_model_ids` on `/org/analytics/filters`), route `ListSupportedModels` for scheduler models, expose `include_uncurated` on tags, add missing glossary entries and take the glossary out of the GEO gate.
-- [ ] Partner routes: an org key gets 401 "Authentication required"; return 403 "Partner API key required" so the client can say the right thing.
-- [ ] Resolutions: check `produced_content_id` / `authority_content_id` exist and belong to the org.
-- [ ] `questions patch`: accept `tag_ids: []` and document it as the only way to clear; reject `null` with a message that says so.
-- [ ] Document non-terminal states: history-import `failed` can return to `running`; a `completed` import can have copied nothing (`prompts_count`, `historic_runs_imported`).
-- [ ] `GET /org/kb/upload` accepted content types vs what the CLI derives (`application/json`, `application/xml`, `application/octet-stream` are sent and always rejected): either accept them or publish the list so the CLI can pre-check.
+- [x] Return what was actually done: `unpublished_count`, ctas `clear-default` switched count, competitors `batch-add` created vs already-present, tracked-sources `update` on a published rule (409, not a silent 200).
+- [x] Publish outcome: a 200 whose `publish_status` is "failed" should be a distinct status (207 or 422) or at least carry a stable `code`; document it either way.
+- [x] Turn user-caused 500s into 4xx with a message: competitor org cap ("Failed to perform competitor operation"), `kb update-file` unsupported type ("Failed to ingest content." vs the readable `invalid` on upload), `validateFile` errors need sentinels.
+- [x] Validate every filter on `GET /org/gaps` (statuses, kinds, surfaces, origins — only `problems` is checked) → 400 naming the field, instead of an empty list.
+- [x] Discovery endpoints: publish the `--models` allow-list (`all_model_ids` on `/org/analytics/filters`), route `ListSupportedModels` for scheduler models, expose `include_uncurated` on tags, add missing glossary entries and take the glossary out of the GEO gate.
+- [x] Partner routes: an org key gets 401 "Authentication required"; return 403 "Partner API key required" so the client can say the right thing.
+- [x] Resolutions: check `produced_content_id` / `authority_content_id` exist and belong to the org.
+- [x] `questions patch`: accept `tag_ids: []` and document it as the only way to clear; reject `null` with a message that says so.
+- [x] Document non-terminal states: history-import `failed` can return to `running`; a `completed` import can have copied nothing (`prompts_count`, `historic_runs_imported`).
+- [x] `GET /org/kb/upload` accepted content types vs what the CLI derives (`application/json`, `application/xml`, `application/octet-stream` are sent and always rejected): either accept them or publish the list so the CLI can pre-check.
 
 ---
 
@@ -967,20 +967,20 @@ has to change for the CLI to be able to say the right thing. Check items off in 
 
 **`senso publish-records`** · group
 
-- [ ] Either drop "Inspect and" from the description, or add a `publish-records list` that reads the destinations off `GET /org/content/verification` - the data is already there, and two other help texts already assume the command exists.
-- [ ] Name the sources of a publish_record_id in the group help.
-- [ ] List the states the CLI can observe and which ones are actionable (only `failed` is retryable).
-- [ ] Cross-reference `senso content unpublish --publish-record-ids`, which is the other command that consumes this id.
+- [x] Either drop "Inspect and" from the description, or add a `publish-records list` that reads the destinations off `GET /org/content/verification` - the data is already there, and two other help texts already assume the command exists.
+- [x] Name the sources of a publish_record_id in the group help.
+- [x] List the states the CLI can observe and which ones are actionable (only `failed` is retryable).
+- [x] Cross-reference `senso content unpublish --publish-record-ids`, which is the other command that consumes this id.
 
 **`senso publish-records retry`** · 🔴 high
 
-- [ ] Validate <publishRecordId> as a UUID -> exit 2.
-- [ ] Confirmation: `Publish record <id> is now live.` for the 204.
-- [ ] Special-case the 502: "The destination refused the retry; the record is back in `failed`." with a hint to read last_error from `senso content verification --status published`.
-- [ ] Document the 409 with its exact message and the fact that only `failed` is retryable, plus how to read `state` before retrying.
-- [ ] Distinguish the three 404 messages: "Publish record <id> not found", "The publisher for publish record <id> no longer exists", "The content behind publish record <id> no longer exists".
-- [ ] Emit {"action":"retried","resource":"publish_record","id":"...","state":"live"} so a JSON caller has an outcome.
-- [ ] Name the sources of the id in the Arguments section.
+- [x] Validate <publishRecordId> as a UUID -> exit 2.
+- [x] Confirmation: `Publish record <id> is now live.` for the 204.
+- [x] Special-case the 502: "The destination refused the retry; the record is back in `failed`." with a hint to read last_error from `senso content verification --status published`.
+- [x] Document the 409 with its exact message and the fact that only `failed` is retryable, plus how to read `state` before retrying.
+- [x] Distinguish the three 404 messages: "Publish record <id> not found", "The publisher for publish record <id> no longer exists", "The content behind publish record <id> no longer exists".
+- [x] Emit {"action":"retried","resource":"publish_record","id":"...","state":"live"} so a JSON caller has an outcome.
+- [x] Name the sources of the id in the Arguments section.
 
 ### `senso brand-kit` <sub>14 items</sub>
 
@@ -1067,77 +1067,77 @@ has to change for the CLI to be able to say the right thing. Check items off in 
 
 **`senso prompts`** · group
 
-- [ ] Say in one line that prompts and questions are two views of the same geo_questions rows, that prompt_id === geo_question_id, and when to use which group.
-- [ ] Add the id space and the typical workflow as an ordered list: prompts create -> prompts list -> (scheduled run) -> prompts get / analytics prompts.
-- [ ] State that creation does not trigger a run and point at 'senso run-config schedule'.
+- [x] Say in one line that prompts and questions are two views of the same geo_questions rows, that prompt_id === geo_question_id, and when to use which group.
+- [x] Add the id space and the typical workflow as an ordered list: prompts create -> prompts list -> (scheduled run) -> prompts get / analytics prompts.
+- [x] State that creation does not trigger a run and point at 'senso run-config schedule'.
 
 **`senso prompts create`** · 🔴 high
 
-- [ ] Validate --data before the request: require question_text (non-empty, <= 500 chars) and type; check type against the four stages plus the accepted aliases with parseEnumFlag-style handling -> exit 2 naming the field, the value received and the allowed values.
-- [ ] Name the unknown keys in --data rather than silently posting them (the API ignores geo_pool_id / tag_ids here even though 'questions create' accepts both).
-- [ ] Help: document the 500-character limit, the alias normalization, and that tags come back empty because auto-tagging is asynchronous.
-- [ ] Add next steps on stderr: 'senso prompts tags set <id> --names ...' and 'senso run-config schedule' (runs are scheduled, not immediate).
+- [x] Validate --data before the request: require question_text (non-empty, <= 500 chars) and type; check type against the four stages plus the accepted aliases with parseEnumFlag-style handling -> exit 2 naming the field, the value received and the allowed values.
+- [x] Name the unknown keys in --data rather than silently posting them (the API ignores geo_pool_id / tag_ids here even though 'questions create' accepts both).
+- [x] Help: document the 500-character limit, the alias normalization, and that tags come back empty because auto-tagging is asynchronous.
+- [x] Add next steps on stderr: 'senso prompts tags set <id> --names ...' and 'senso run-config schedule' (runs are scheduled, not immediate).
 
 **`senso prompts delete`** · 🟠 medium
 
-- [ ] Validate <promptId> as a UUID -> exit 2.
-- [ ] 404: 'Prompt <id> not found in this organization.' with hint 'senso prompts list'. Map the other-org 403 to exit 4.
-- [ ] Reword: the run history is removed from the API's view (soft delete); there is no undelete.
-- [ ] Emit the documented mutation envelope: data {action: 'deleted', resource: 'prompt', id}.
-- [ ] Mention that 'senso questions delete <id>' is the same operation.
+- [x] Validate <promptId> as a UUID -> exit 2.
+- [x] 404: 'Prompt <id> not found in this organization.' with hint 'senso prompts list'. Map the other-org 403 to exit 4.
+- [x] Reword: the run history is removed from the API's view (soft delete); there is no undelete.
+- [x] Emit the documented mutation envelope: data {action: 'deleted', resource: 'prompt', id}.
+- [x] Mention that 'senso questions delete <id>' is the same operation.
 
 **`senso prompts get`** · 🔴 high
 
-- [ ] Validate <promptId> as a UUID before the request -> exit 2 naming the id space.
-- [ ] 404: 'Prompt <id> not found in this organization.' with hint 'senso prompts list --search ...'.
-- [ ] Map the endpoint-specific 403 'Prompt does not belong to this organization' to exit 4 with the same not-found wording — from the caller's side it is a wrong id, not a permissions problem. Keep the product 403 as exit 3.
-- [ ] Hand-write the plain rendering: prompt header, then one numbered block per run with model / created_at / is_latest / target_mentioned / target_rank / target_sov, then claims and citations as indented sub-blocks.
-- [ ] Say in Returns what each score means and that 'competitors' is the non-target subset of 'evals'.
-- [ ] When runs is empty, say so on stderr with 'senso run-config schedule' as the next step.
+- [x] Validate <promptId> as a UUID before the request -> exit 2 naming the id space.
+- [x] 404: 'Prompt <id> not found in this organization.' with hint 'senso prompts list --search ...'.
+- [x] Map the endpoint-specific 403 'Prompt does not belong to this organization' to exit 4 with the same not-found wording — from the caller's side it is a wrong id, not a permissions problem. Keep the product 403 as exit 3.
+- [x] Hand-write the plain rendering: prompt header, then one numbered block per run with model / created_at / is_latest / target_mentioned / target_rank / target_sov, then claims and citations as indented sub-blocks.
+- [x] Say in Returns what each score means and that 'competitors' is the non-target subset of 'evals'.
+- [x] When runs is empty, say so on stderr with 'senso run-config schedule' as the next step.
 
 **`senso prompts list`** · 🟠 medium
 
-- [ ] Help: name prompt_id, give the type values and their meaning, say search is a case-insensitive substring of the question text only, say --limit is capped at 100 by the API.
-- [ ] Validate --limit with parseIntFlag('--limit', v, {min: 1, max: 100}) and --offset with {min: 0} — exit 2 before the request rather than silently getting a different page.
-- [ ] Emit the page footer on stderr: 'Showing 1-50 of 312. Next page: senso prompts list --offset 50', and put a page object in the JSON envelope.
-- [ ] Empty list: 'No prompts found.' on stdout plus, on stderr, 'senso prompts create --data ... adds one' and a note that --search narrows the list.
+- [x] Help: name prompt_id, give the type values and their meaning, say search is a case-insensitive substring of the question text only, say --limit is capped at 100 by the API.
+- [x] Validate --limit with parseIntFlag('--limit', v, {min: 1, max: 100}) and --offset with {min: 0} — exit 2 before the request rather than silently getting a different page.
+- [x] Emit the page footer on stderr: 'Showing 1-50 of 312. Next page: senso prompts list --offset 50', and put a page object in the JSON envelope.
+- [x] Empty list: 'No prompts found.' on stdout plus, on stderr, 'senso prompts create --data ... adds one' and a note that --search narrows the list.
 
 ### `senso prompts tags` <sub>20 items</sub>
 
 **`senso prompts tags`** · group
 
-- [ ] Name the id space (<promptId> from 'senso prompts list') and point at 'senso tags list' for tag ids.
-- [ ] Explain 'curated': false means the tag was machine-minted from a search query and is awaiting adoption; attaching it here adopts it org-wide.
-- [ ] Warn that 'set' is a replace, and that 'set' with no flags clears the prompt's tags.
+- [x] Name the id space (<promptId> from 'senso prompts list') and point at 'senso tags list' for tag ids.
+- [x] Explain 'curated': false means the tag was machine-minted from a search query and is awaiting adoption; attaching it here adopts it org-wide.
+- [x] Warn that 'set' is a replace, and that 'set' with no flags clears the prompt's tags.
 
 **`senso prompts tags add`** · 🟠 medium
 
-- [ ] Reject --name together with --id -> exit 2, rather than silently dropping --name.
-- [ ] Validate --id and <promptId> as UUIDs, and --name as 1-255 characters -> exit 2.
-- [ ] Say in Returns that nothing is returned and point at 'senso prompts tags list <id>' to read back the id of a tag created by name; add it as a next step.
-- [ ] State whether re-attaching an already attached tag is a no-op.
+- [x] Reject --name together with --id -> exit 2, rather than silently dropping --name.
+- [x] Validate --id and <promptId> as UUIDs, and --name as 1-255 characters -> exit 2.
+- [x] Say in Returns that nothing is returned and point at 'senso prompts tags list <id>' to read back the id of a tag created by name; add it as a next step.
+- [x] State whether re-attaching an already attached tag is a no-op.
 
 **`senso prompts tags list`** · 🟠 medium
 
-- [ ] Validate <promptId> as a UUID -> exit 2.
-- [ ] Empty result: 'No tags attached to prompt <id>.' on stdout, with 'senso prompts tags add <id> --name <tag>' on stderr.
-- [ ] Help: explain curated, and say the 'id' field is what 'prompts tags remove --id' and 'prompts tags set --ids' take.
-- [ ] 404 wording as for 'prompts get'.
+- [x] Validate <promptId> as a UUID -> exit 2.
+- [x] Empty result: 'No tags attached to prompt <id>.' on stdout, with 'senso prompts tags add <id> --name <tag>' on stderr.
+- [x] Help: explain curated, and say the 'id' field is what 'prompts tags remove --id' and 'prompts tags set --ids' take.
+- [x] 404 wording as for 'prompts get'.
 
 **`senso prompts tags remove`** · 🟠 medium
 
-- [ ] Reject --name together with --id -> exit 2.
-- [ ] Validate <promptId> and --id as UUIDs, and --name as non-blank -> exit 2.
-- [ ] Say plainly in the help that a name or id that was not attached still exits 0, and suggest 'senso prompts tags list <promptId>' to confirm the result.
-- [ ] Optionally read the tag list back and report 'Detached X' vs 'X was not attached; nothing changed' as a stderr warning and a warnings[] entry.
+- [x] Reject --name together with --id -> exit 2.
+- [x] Validate <promptId> and --id as UUIDs, and --name as non-blank -> exit 2.
+- [x] Say plainly in the help that a name or id that was not attached still exits 0, and suggest 'senso prompts tags list <promptId>' to confirm the result.
+- [x] Optionally read the tag list back and report 'Detached X' vs 'X was not attached; nothing changed' as a stderr warning and a warnings[] entry.
 
 **`senso prompts tags set`** · 🔴 high
 
-- [ ] Require at least one of --names / --ids, and add an explicit --clear flag for the 'remove all tags' intent -> exit 2 otherwise.
-- [ ] Validate every --ids entry as a UUID before the request, naming the offending value -> exit 2.
-- [ ] Validate every --names entry as non-empty and <= 255 characters -> exit 2 naming the offending name.
-- [ ] Report the diff on stderr: 'Added: x, y. Removed: z. Created new tag: y.' and put it in warnings[] in the JSON envelope.
-- [ ] Validate <promptId> as a UUID -> exit 2.
+- [x] Require at least one of --names / --ids, and add an explicit --clear flag for the 'remove all tags' intent -> exit 2 otherwise.
+- [x] Validate every --ids entry as a UUID before the request, naming the offending value -> exit 2.
+- [x] Validate every --names entry as non-empty and <= 255 characters -> exit 2 naming the offending name.
+- [x] Report the diff on stderr: 'Added: x, y. Removed: z. Created new tag: y.' and put it in warnings[] in the JSON envelope.
+- [x] Validate <promptId> as a UUID -> exit 2.
 
 ### `senso run-config` <sub>30 items</sub>
 
@@ -1568,96 +1568,96 @@ has to change for the CLI to be able to say the right thing. Check items off in 
 
 **`senso tags`** · group
 
-- [ ] Rewrite the group description in the §2.1 group shape: purpose, id spaces (tag `id` vs the resource ids kb_node_id/content_id/prompt_id), and an ordered workflow.
-- [ ] Add a 'See also' line naming `senso kb tags`, `senso content tags`, `senso prompts tags` and `senso auto-tag` (the setting that governs whether tags are minted automatically).
-- [ ] Say that `tags list` shows only curated tags by default and point at the new `--include-uncurated` flag.
-- [ ] Add the cross-reference the other way round: a 'See also: senso tags list' line in the kb/content/prompts tags group descriptions.
+- [x] Rewrite the group description in the §2.1 group shape: purpose, id spaces (tag `id` vs the resource ids kb_node_id/content_id/prompt_id), and an ordered workflow.
+- [x] Add a 'See also' line naming `senso kb tags`, `senso content tags`, `senso prompts tags` and `senso auto-tag` (the setting that governs whether tags are minted automatically).
+- [x] Say that `tags list` shows only curated tags by default and point at the new `--include-uncurated` flag.
+- [x] Add the cross-reference the other way round: a 'See also: senso tags list' line in the kb/content/prompts tags group descriptions.
 
 **`senso tags create`** · 🟠 medium
 
-- [ ] Validate --name before the request: non-empty after trim, ≤255 characters → exit 2 naming the flag and the length.
-- [ ] Help: say the response's `id` is the tag id, that counts are not included, and that `senso kb tags attach <id> --name <name>` creates the tag implicitly.
-- [ ] 409: prefix with what was attempted and add a runnable hint — `senso tags list | grep -i <name>`.
-- [ ] Add Returns / Exit codes / Examples.
+- [x] Validate --name before the request: non-empty after trim, ≤255 characters → exit 2 naming the flag and the length.
+- [x] Help: say the response's `id` is the tag id, that counts are not included, and that `senso kb tags attach <id> --name <name>` creates the tag implicitly.
+- [x] 409: prefix with what was attempted and add a runnable hint — `senso tags list | grep -i <name>`.
+- [x] Add Returns / Exit codes / Examples.
 
 **`senso tags delete`** · 🟠 medium
 
-- [ ] Validate <id> as a UUID → exit 2.
-- [ ] Help: tell the agent to check the counts first (`senso tags get <id>`), and state plainly that the resources survive, only the label goes.
-- [ ] JSON: emit `data: { action: "deleted", resource: "tag", id: "…" }`.
-- [ ] 404: 'Tag <id> not found in this organization (it may already be deleted).' with hint `senso tags list`.
+- [x] Validate <id> as a UUID → exit 2.
+- [x] Help: tell the agent to check the counts first (`senso tags get <id>`), and state plainly that the resources survive, only the label goes.
+- [x] JSON: emit `data: { action: "deleted", resource: "tag", id: "…" }`.
+- [x] 404: 'Tag <id> not found in this organization (it may already be deleted).' with hint `senso tags list`.
 
 **`senso tags get`** · 🔴 high
 
-- [ ] Validate <id> as a UUID → exit 2 with the received value and a pointer to `senso tags list`.
-- [ ] Help: name the id space explicitly and say what it is NOT (kb_node_id / content_id / prompt_id).
-- [ ] 404 message: 'Tag <id> not found in this organization.' with hint `senso tags list`.
-- [ ] Help: enumerate the seven counts and what each one counts.
+- [x] Validate <id> as a UUID → exit 2 with the received value and a pointer to `senso tags list`.
+- [x] Help: name the id space explicitly and say what it is NOT (kb_node_id / content_id / prompt_id).
+- [x] 404 message: 'Tag <id> not found in this organization.' with hint `senso tags list`.
+- [x] Help: enumerate the seven counts and what each one counts.
 
 **`senso tags list`** · 🔴 high
 
-- [ ] Fix the column list: `id, name, curated, prompt_count, content_count, created_at`. Do the same in kb.ts, content.ts and prompts.ts, and fix the MSW fixtures to use `id` so the policy test protects the real shape.
-- [ ] Add `--include-uncurated` mapping to the API's include_uncurated=true.
-- [ ] Help: list all seven count fields, explain `curated`, and state that the endpoint is unpaginated and returns every tag.
-- [ ] Empty list: print 'No tags found.' on stdout and, on stderr, 'Auto-minted tags are hidden by default — retry with --include-uncurated.'
-- [ ] Add Returns / Exit codes / Examples per §2.1.
+- [x] Fix the column list: `id, name, curated, prompt_count, content_count, created_at`. Do the same in kb.ts, content.ts and prompts.ts, and fix the MSW fixtures to use `id` so the policy test protects the real shape.
+- [x] Add `--include-uncurated` mapping to the API's include_uncurated=true.
+- [x] Help: list all seven count fields, explain `curated`, and state that the endpoint is unpaginated and returns every tag.
+- [x] Empty list: print 'No tags found.' on stdout and, on stderr, 'Auto-minted tags are hidden by default — retry with --include-uncurated.'
+- [x] Add Returns / Exit codes / Examples per §2.1.
 
 **`senso tags update`** · 🟠 medium
 
-- [ ] Validate <id> as a UUID and --name as 1–255 chars → exit 2.
-- [ ] Help: name the id space; state that the rename is visible everywhere the tag is attached, immediately.
-- [ ] 409 hint: name the collision and the manual merge path (`senso tags get <other-id>` then re-tag and `senso tags delete`).
-- [ ] Help Returns: say counts are not in this response and point at `tags get`.
+- [x] Validate <id> as a UUID and --name as 1–255 chars → exit 2.
+- [x] Help: name the id space; state that the rename is visible everywhere the tag is attached, immediately.
+- [x] 409 hint: name the collision and the manual merge path (`senso tags get <other-id>` then re-tag and `senso tags delete`).
+- [x] Help Returns: say counts are not in this response and point at `tags get`.
 
 ### `senso product-lines` <sub>27 items</sub>
 
 **`senso product-lines`** · group
 
-- [ ] Rewrite the group description in the §2.1 shape: purpose, the `product_line_id` id space, the GEO + read/update:product_line requirement, and an ordered workflow (list → create → generate with --product-line-ids).
-- [ ] State what `details` actually becomes: flattened, per-leaf, into the evidence inventory as approved evidence for generated claims, keyed 'details.<path>'. Warn that anything untrue or stale in there is something the generator may assert.
-- [ ] Add 'See also: senso generate --product-line-ids, senso brand-kit, senso content-types'.
+- [x] Rewrite the group description in the §2.1 shape: purpose, the `product_line_id` id space, the GEO + read/update:product_line requirement, and an ordered workflow (list → create → generate with --product-line-ids).
+- [x] State what `details` actually becomes: flattened, per-leaf, into the evidence inventory as approved evidence for generated claims, keyed 'details.<path>'. Warn that anything untrue or stale in there is something the generator may assert.
+- [x] Add 'See also: senso generate --product-line-ids, senso brand-kit, senso content-types'.
 
 **`senso product-lines create`** · 🔴 high
 
-- [ ] Validate the --data shape before the request: require `name` (non-empty string ≤255 chars); require `details`, when present, to be a JSON object; name any unknown top-level keys in a warning. All exit 2.
-- [ ] Help: document that `details` leaves become approved evidence for generation, and that key order is not preserved.
-- [ ] Confirmation: '✓ Created product line <product_line_id>.' and a Next line pointing at `senso generate --product-line-ids <id>`.
-- [ ] Help: state the GEO requirement, update:product_line, and the 409 on duplicate name.
+- [x] Validate the --data shape before the request: require `name` (non-empty string ≤255 chars); require `details`, when present, to be a JSON object; name any unknown top-level keys in a warning. All exit 2.
+- [x] Help: document that `details` leaves become approved evidence for generation, and that key order is not preserved.
+- [x] Confirmation: '✓ Created product line <product_line_id>.' and a Next line pointing at `senso generate --product-line-ids <id>`.
+- [x] Help: state the GEO requirement, update:product_line, and the 409 on duplicate name.
 
 **`senso product-lines delete`** · 🟠 medium
 
-- [ ] Validate <id> as a UUID → exit 2.
-- [ ] Help: say what else references a product_line_id (generate --product-line-ids, Builder workspace selections) so the agent knows what breaks.
-- [ ] JSON: `data: { action: "deleted", resource: "product_line", id: "…" }`.
-- [ ] 404: 'Product line <id> not found in this organization (it may already be deleted).' hint `senso product-lines list`.
+- [x] Validate <id> as a UUID → exit 2.
+- [x] Help: say what else references a product_line_id (generate --product-line-ids, Builder workspace selections) so the agent knows what breaks.
+- [x] JSON: `data: { action: "deleted", resource: "product_line", id: "…" }`.
+- [x] 404: 'Product line <id> not found in this organization (it may already be deleted).' hint `senso product-lines list`.
 
 **`senso product-lines get`** · 🟠 medium
 
-- [ ] Validate <id> as a UUID → exit 2.
-- [ ] Render `details` as an indented sub-block in plain, and in table fall back to a 'see --output json' note rather than a truncated blob.
-- [ ] Help: name the id space, list the returned fields, state the GEO + read:product_line requirement.
-- [ ] 404: 'Product line <id> not found in this organization.' hint `senso product-lines list`.
+- [x] Validate <id> as a UUID → exit 2.
+- [x] Render `details` as an indented sub-block in plain, and in table fall back to a 'see --output json' note rather than a truncated blob.
+- [x] Help: name the id space, list the returned fields, state the GEO + read:product_line requirement.
+- [x] 404: 'Product line <id> not found in this organization.' hint `senso product-lines list`.
 
 **`senso product-lines list`** · 🔴 high
 
-- [ ] Validate --limit (integer ≥ 1) and --offset (integer ≥ 0) with parseIntFlag → exit 2 naming the flag and the value.
-- [ ] Print the pagination line on stderr: 'Showing 1–50 of 50 on this page. Next page: senso product-lines list --offset 50' and say plainly that `total` is the page size, not the org total.
-- [ ] Render `details` as an indented sub-block in plain output.
-- [ ] Help: name the GEO requirement and the read:product_line permission, and say that `details` is truncated out of the table on purpose.
+- [x] Validate --limit (integer ≥ 1) and --offset (integer ≥ 0) with parseIntFlag → exit 2 naming the flag and the value.
+- [x] Print the pagination line on stderr: 'Showing 1–50 of 50 on this page. Next page: senso product-lines list --offset 50' and say plainly that `total` is the page size, not the org total.
+- [x] Render `details` as an indented sub-block in plain output.
+- [x] Help: name the GEO requirement and the read:product_line permission, and say that `details` is truncated out of the table on purpose.
 
 **`senso product-lines patch`** · 🔴 high
 
-- [ ] Fix the help: state that `details` is REPLACED, not merged, and change the example to show the full blob. Add the merge recipe: `senso product-lines get <id> --output json | jq '.data.details + {price_usd:129}'`.
-- [ ] Validate --data client-side: at least one of name/details; `details` must be an object; `name` non-empty ≤255. All exit 2.
-- [ ] Validate <id> as a UUID → exit 2.
-- [ ] Change the confirmation to '✓ Patched product line <id> (fields: details).' so it differs from `update`.
+- [x] Fix the help: state that `details` is REPLACED, not merged, and change the example to show the full blob. Add the merge recipe: `senso product-lines get <id> --output json | jq '.data.details + {price_usd:129}'`.
+- [x] Validate --data client-side: at least one of name/details; `details` must be an object; `name` non-empty ≤255. All exit 2.
+- [x] Validate <id> as a UUID → exit 2.
+- [x] Change the confirmation to '✓ Patched product line <id> (fields: details).' so it differs from `update`.
 
 **`senso product-lines update`** · 🔴 high
 
-- [ ] Refuse a --data without `details` (exit 2) with the message that PUT resets it to {}, and point at `product-lines patch` — or require an explicit `--data '{"name":"…","details":{}}'` to clear it.
-- [ ] Validate <id> as a UUID and `name` as a non-empty ≤255-char string → exit 2.
-- [ ] Emit a warning when the new `details` is {} and the previous value was not, e.g. warnings: ['details was replaced with {} — 4 evidence fields removed'] (requires a GET first, or at minimum a static warning when details is absent).
-- [ ] Help: add the 409, the GEO requirement, and the sorted-keys note.
+- [x] Refuse a --data without `details` (exit 2) with the message that PUT resets it to {}, and point at `product-lines patch` — or require an explicit `--data '{"name":"…","details":{}}'` to clear it.
+- [x] Validate <id> as a UUID and `name` as a non-empty ≤255-char string → exit 2.
+- [x] Emit a warning when the new `details` is {} and the previous value was not, e.g. warnings: ['details was replaced with {} — 4 evidence fields removed'] (requires a GET first, or at minimum a static warning when details is absent).
+- [x] Help: add the 409, the GEO requirement, and the sorted-keys note.
 
 ### `senso roles` <sub>4 items</sub>
 
@@ -1771,24 +1771,24 @@ has to change for the CLI to be able to say the right thing. Check items off in 
 
 **`senso generated-content`** · group
 
-- [ ] Group help: state that content_id here is the same id space as `senso content` and `senso engine`, and say when to prefer `content verification` (owners, tags, destinations, publish_record_id, citation metrics) over `generated-content list` (title, question_text, editorial_status only).
-- [ ] Add the workflow: engine draft -> generated-content list --status drafts -> engine publish -> generated-content list --status published.
+- [x] Group help: state that content_id here is the same id space as `senso content` and `senso engine`, and say when to prefer `content verification` (owners, tags, destinations, publish_record_id, citation metrics) over `generated-content list` (title, question_text, editorial_status only).
+- [x] Add the workflow: engine draft -> generated-content list --status drafts -> engine publish -> generated-content list --status published.
 
 **`senso generated-content get`** · 🟠 medium
 
-- [ ] Validate <id> as a UUID -> exit 2.
-- [ ] Help: say knowledge-base content is rejected and point at `senso kb content <kb_node_id>`; name `senso content get` for tags and provenance.
-- [ ] Document the response keys, especially `text` as the markdown body and `question_text` as possibly empty.
-- [ ] 404: "Generated content <id> not found in organization <slug>." hint `senso generated-content list --status drafts`.
-- [ ] Add next-step hints: `senso engine publish --data '{"content_id": ...}'` for a draft, `senso content citation-details <id>` for a published item.
+- [x] Validate <id> as a UUID -> exit 2.
+- [x] Help: say knowledge-base content is rejected and point at `senso kb content <kb_node_id>`; name `senso content get` for tags and provenance.
+- [x] Document the response keys, especially `text` as the markdown body and `question_text` as possibly empty.
+- [x] 404: "Generated content <id> not found in organization <slug>." hint `senso generated-content list --status drafts`.
+- [x] Add next-step hints: `senso engine publish --data '{"content_id": ...}'` for a draft, `senso content citation-details <id>` for a published item.
 
 **`senso generated-content list`** · 🔴 high
 
-- [ ] Fix the columns: ["content_id", "title", "editorial_status", "generated_at"].
-- [ ] Validate --limit (1..100) and --offset (>= 0) with parseIntFlag -> exit 2, since the API silently falls back to 10 rather than clamping.
-- [ ] Show `Showing 1-10 of 42. Next page: senso generated-content list --offset 10` on stderr.
-- [ ] Empty result: `No generated content found.` plus a stderr hint to try the other --status value and `senso engine draft`.
-- [ ] Help: document the returned fields, especially content_id (feeds engine publish / content get) and version_id (feeds content reject / restore).
+- [x] Fix the columns: ["content_id", "title", "editorial_status", "generated_at"].
+- [x] Validate --limit (1..100) and --offset (>= 0) with parseIntFlag -> exit 2, since the API silently falls back to 10 rather than clamping.
+- [x] Show `Showing 1-10 of 42. Next page: senso generated-content list --offset 10` on stderr.
+- [x] Empty result: `No generated content found.` plus a stderr hint to try the other --status value and `senso engine draft`.
+- [x] Help: document the returned fields, especially content_id (feeds engine publish / content get) and version_id (feeds content reject / restore).
 
 ### `senso analytics` <sub>45 items</sub>
 
@@ -1874,100 +1874,100 @@ has to change for the CLI to be able to say the right thing. Check items off in 
 
 **`senso history-imports`** · group
 
-- [ ] Move the `completed` caveat into BOTH leaf commands' help and into the output of `get` (a stderr line whenever status is completed and historic_runs_imported is 0 or null).
-- [ ] List the four statuses and say `failed` is not terminal (a failed job is retried and may return to running); the terminal-for-your-purposes test is completed with historic_runs_imported > 0.
-- [ ] Say the group is read-only, that jobs are started only by `senso industries import-prompts`, and that both commands need the GEO product.
-- [ ] Add the workflow to the group description.
+- [x] Move the `completed` caveat into BOTH leaf commands' help and into the output of `get` (a stderr line whenever status is completed and historic_runs_imported is 0 or null).
+- [x] List the four statuses and say `failed` is not terminal (a failed job is retried and may return to running); the terminal-for-your-purposes test is completed with historic_runs_imported > 0.
+- [x] Say the group is read-only, that jobs are started only by `senso industries import-prompts`, and that both commands need the GEO product.
+- [x] Add the workflow to the group description.
 
 **`senso history-imports get`** · 🔴 high
 
-- [ ] Repeat the caveat in this command's help AND act on it in the output: when status is completed and historic_runs_imported is 0 or null, print on stderr 'Completed, but no historic runs were imported — the job matched no prompts. Check `senso prompts list`.'
-- [ ] Print the state on stderr: for pending/running, 'Still importing. Poll again: senso history-imports get <id>'; for completed with runs > 0, '✓ Imported N historic runs across M prompts.'; for failed, 'This attempt failed; failed imports are retried automatically — poll again before giving up.'
-- [ ] Validate <importId> as a UUID before the request; exit 2 with a hint naming both sources of the id.
-- [ ] Render null prompts_count / historic_runs_imported as '(not yet known)' rather than blank.
-- [ ] 404: 'History import <id> not found in this organization.' with hint `senso history-imports list`.
-- [ ] Special-case 501 and 502 as in `list`.
-- [ ] Add Returns / Exit codes / Examples, including the jq one-liner that polls correctly (status completed AND historic_runs_imported > 0).
+- [x] Repeat the caveat in this command's help AND act on it in the output: when status is completed and historic_runs_imported is 0 or null, print on stderr 'Completed, but no historic runs were imported — the job matched no prompts. Check `senso prompts list`.'
+- [x] Print the state on stderr: for pending/running, 'Still importing. Poll again: senso history-imports get <id>'; for completed with runs > 0, '✓ Imported N historic runs across M prompts.'; for failed, 'This attempt failed; failed imports are retried automatically — poll again before giving up.'
+- [x] Validate <importId> as a UUID before the request; exit 2 with a hint naming both sources of the id.
+- [x] Render null prompts_count / historic_runs_imported as '(not yet known)' rather than blank.
+- [x] 404: 'History import <id> not found in this organization.' with hint `senso history-imports list`.
+- [x] Special-case 501 and 502 as in `list`.
+- [x] Add Returns / Exit codes / Examples, including the jq one-liner that polls correctly (status completed AND historic_runs_imported > 0).
 
 **`senso history-imports list`** · 🟠 medium
 
-- [ ] Empty result: print 'No history imports found.' on stdout and, on stderr, 'Imports are started by `senso industries import-prompts`.'
-- [ ] Explain in the help why prompts_count and historic_runs_imported are in the default columns, and that they are null until the job completes.
-- [ ] Special-case 501: 'History imports are not available on this Senso deployment.' with no retry hint and exit 1.
-- [ ] Special-case 502: 'Senso could not reach the history-import ledger.' with hint 'Retry in a minute; the prompts themselves are unaffected.'
-- [ ] Add Returns / Exit codes / Examples, and say that `error` is always a fixed sentence.
+- [x] Empty result: print 'No history imports found.' on stdout and, on stderr, 'Imports are started by `senso industries import-prompts`.'
+- [x] Explain in the help why prompts_count and historic_runs_imported are in the default columns, and that they are null until the job completes.
+- [x] Special-case 501: 'History imports are not available on this Senso deployment.' with no retry hint and exit 1.
+- [x] Special-case 502: 'Senso could not reach the history-import ledger.' with hint 'Retry in a minute; the prompts themselves are unaffected.'
+- [x] Add Returns / Exit codes / Examples, and say that `error` is always a fixed sentence.
 
 ### `senso industries` <sub>46 items</sub>
 
 **`senso industries`** · group
 
-- [ ] Add an ordered workflow to the group description: 1) senso industries list, 2) senso org set-industry <industry_id> (once, if not already set), 3) senso industries prompts <industry>, 4) senso industries import-prompts <industry> --prompt-ids ..., 5) senso history-imports get <import_id>.
-- [ ] Name the id spaces: industry_id (industries list) vs industry prompt id (industries prompts `id`) vs geo_question_id (the org prompt that import-prompts creates).
-- [ ] State that every command except `list` requires the GEO product, and that reads also require read:prompt for `prompts`.
-- [ ] State that a name <industry> resolves to the first search match, and tell the caller to pass a UUID when the name is ambiguous.
-- [ ] State the shared window contract once: --from/--to are YYYY-MM-DD, default last 30 days, maximum span 90 days; --models is one of the documented model keys; --location is a 2-letter country code.
+- [x] Add an ordered workflow to the group description: 1) senso industries list, 2) senso org set-industry <industry_id> (once, if not already set), 3) senso industries prompts <industry>, 4) senso industries import-prompts <industry> --prompt-ids ..., 5) senso history-imports get <import_id>.
+- [x] Name the id spaces: industry_id (industries list) vs industry prompt id (industries prompts `id`) vs geo_question_id (the org prompt that import-prompts creates).
+- [x] State that every command except `list` requires the GEO product, and that reads also require read:prompt for `prompts`.
+- [x] State that a name <industry> resolves to the first search match, and tell the caller to pass a UUID when the name is ambiguous.
+- [x] State the shared window contract once: --from/--to are YYYY-MM-DD, default last 30 days, maximum span 90 days; --models is one of the documented model keys; --location is a 2-letter country code.
 
 **`senso industries brand`** · 🔴 high
 
-- [ ] Hand-written `plain` renderer: resolved identity block, then mentioned, then metrics as indented sub-lines, then by_model as numbered blocks, then notes — never inline JSON.
-- [ ] When `mentioned` is false, print on stderr: 'Air Kanada was not named in this industry over 2026-08-01..2026-08-31. This is an answer, not an error. Check the spelling against `senso industries brands <industry>`.'
-- [ ] Add to the help: a name the registry has not seen is created on first lookup (a write on a GET); prefer `brand-by-id` for repeat calls.
-- [ ] Add Returns naming resolved.brand_id as the value to store and pass to brand-by-id, and explain matched_on / match_confidence / surface_forms.
-- [ ] Validate --from/--to/--models before the request (exit 2), as in `industries brands`.
-- [ ] Reject an empty/whitespace <brandName> with exit 2 rather than a 400.
+- [x] Hand-written `plain` renderer: resolved identity block, then mentioned, then metrics as indented sub-lines, then by_model as numbered blocks, then notes — never inline JSON.
+- [x] When `mentioned` is false, print on stderr: 'Air Kanada was not named in this industry over 2026-08-01..2026-08-31. This is an answer, not an error. Check the spelling against `senso industries brands <industry>`.'
+- [x] Add to the help: a name the registry has not seen is created on first lookup (a write on a GET); prefer `brand-by-id` for repeat calls.
+- [x] Add Returns naming resolved.brand_id as the value to store and pass to brand-by-id, and explain matched_on / match_confidence / surface_forms.
+- [x] Validate --from/--to/--models before the request (exit 2), as in `industries brands`.
+- [x] Reject an empty/whitespace <brandName> with exit 2 rather than a 400.
 
 **`senso industries brand-by-id`** · 🟠 medium
 
-- [ ] Validate <brandId> as a UUID before the request; exit 2 with the hint `senso industries brands <industry>` and an explicit 'brand_key is not a brand_id'.
-- [ ] Share the hand-written plain renderer with `industries brand`.
-- [ ] Help: document the merge/self-heal behavior — always write back resolved.brand_id.
-- [ ] Distinguish the two 404s by the request path so the message can name either the industry or the brand.
-- [ ] Validate --from/--to/--models before the request.
+- [x] Validate <brandId> as a UUID before the request; exit 2 with the hint `senso industries brands <industry>` and an explicit 'brand_key is not a brand_id'.
+- [x] Share the hand-written plain renderer with `industries brand`.
+- [x] Help: document the merge/self-heal behavior — always write back resolved.brand_id.
+- [x] Distinguish the two 404s by the request path so the message can name either the industry or the brand.
+- [x] Validate --from/--to/--models before the request.
 
 **`senso industries brands`** · 🔴 high
 
-- [ ] Give the command a hand-written `plain` renderer (EmitOptions.plain) and a `table` override (EmitOptions.table) that pass `brands` as the rows and print window/totals as a header block — the generic findRows cannot classify this payload and never will.
-- [ ] Validate --from/--to as YYYY-MM-DD, enforce from <= to and the 90-day span, and exit 2 before the request, mirroring evals' parseInstantFlag.
-- [ ] Validate --models against the documented model keys and exit 2 listing them; document the keys in the flag help.
-- [ ] Warn on stderr when --rollup parent is combined with --no-canonicalize, and add it to `warnings` in the JSON envelope.
-- [ ] Add Returns / Exit codes / Examples, including the share-of-voice formula with the field names.
+- [x] Give the command a hand-written `plain` renderer (EmitOptions.plain) and a `table` override (EmitOptions.table) that pass `brands` as the rows and print window/totals as a header block — the generic findRows cannot classify this payload and never will.
+- [x] Validate --from/--to as YYYY-MM-DD, enforce from <= to and the 90-day span, and exit 2 before the request, mirroring evals' parseInstantFlag.
+- [x] Validate --models against the documented model keys and exit 2 listing them; document the keys in the flag help.
+- [x] Warn on stderr when --rollup parent is combined with --no-canonicalize, and add it to `warnings` in the JSON envelope.
+- [x] Add Returns / Exit codes / Examples, including the share-of-voice formula with the field names.
 
 **`senso industries domain`** · 🟠 medium
 
-- [ ] Help: state plainly that --url overrides <domain>; better, warn on stderr and add a `warnings` entry when both are given and they disagree.
-- [ ] Hand-written plain renderer: resolved block, cited, citation_references, rank_in_industry, share_of_citations, then co_mentioned_brands as numbered rows.
-- [ ] On cited=false, stderr: 'aircanada.com was not cited in this industry over 2026-08-01..2026-08-31. Check the window, or list the domains that were cited.'
-- [ ] Add Returns naming the ownership values and warning that citation_references counts occurrences.
-- [ ] Validate --from/--to/--models before the request.
+- [x] Help: state plainly that --url overrides <domain>; better, warn on stderr and add a `warnings` entry when both are given and they disagree.
+- [x] Hand-written plain renderer: resolved block, cited, citation_references, rank_in_industry, share_of_citations, then co_mentioned_brands as numbered rows.
+- [x] On cited=false, stderr: 'aircanada.com was not cited in this industry over 2026-08-01..2026-08-31. Check the window, or list the domains that were cited.'
+- [x] Add Returns naming the ownership values and warning that citation_references counts occurrences.
+- [x] Validate --from/--to/--models before the request.
 
 **`senso industries import-prompts`** · 🔴 high
 
-- [ ] Hand-written plain output: a summary line (created N, skipped M), then outcomes as numbered blocks, then defaults_seeded as a named list of what activation wrote, then history_import with the poll command spelled out.
-- [ ] Always print the poll command on stderr when import_id is present: 'Next: senso history-imports get <import_id>' — and when history_import.status is `skipped`, print the reason plus 'Re-run this command to retry the history import; the prompts are already copied.'
-- [ ] Add `next` to the JSON envelope carrying the same poll command, and `warnings` for every skipped outcome and for `skipped` history imports.
-- [ ] 403 'Industry does not match the organization's industry': message 'Industry <id> is not your organization's industry, so its prompts cannot be imported.' hint '`senso org get` shows your industry_id; `senso org set-industry` sets it (once).'
-- [ ] 403 'Organization has no industry set': hint 'Run `senso org set-industry <industry_id>` first — pick one from `senso industries list`.'
-- [ ] 403 from RequireProduct: name GEO, as elsewhere in the group.
-- [ ] Prefix the 400 rejections: 'Could not import industry prompts: <API message>' with hint '`senso industries prompts <industry>` lists the active ids this accepts.'
-- [ ] Restructure the help per §2.1 and put the ACTIVATES warning on its own line near the top.
+- [x] Hand-written plain output: a summary line (created N, skipped M), then outcomes as numbered blocks, then defaults_seeded as a named list of what activation wrote, then history_import with the poll command spelled out.
+- [x] Always print the poll command on stderr when import_id is present: 'Next: senso history-imports get <import_id>' — and when history_import.status is `skipped`, print the reason plus 'Re-run this command to retry the history import; the prompts are already copied.'
+- [x] Add `next` to the JSON envelope carrying the same poll command, and `warnings` for every skipped outcome and for `skipped` history imports.
+- [x] 403 'Industry does not match the organization's industry': message 'Industry <id> is not your organization's industry, so its prompts cannot be imported.' hint '`senso org get` shows your industry_id; `senso org set-industry` sets it (once).'
+- [x] 403 'Organization has no industry set': hint 'Run `senso org set-industry <industry_id>` first — pick one from `senso industries list`.'
+- [x] 403 from RequireProduct: name GEO, as elsewhere in the group.
+- [x] Prefix the 400 rejections: 'Could not import industry prompts: <API message>' with hint '`senso industries prompts <industry>` lists the active ids this accepts.'
+- [x] Restructure the help per §2.1 and put the ACTIVATES warning on its own line near the top.
 
 **`senso industries list`** · 🟠 medium
 
-- [ ] Add Returns / Exit codes / Examples to the help; say industry_id is the <industry> argument everywhere else and the argument to `senso org set-industry`.
-- [ ] Say model_count 0 = never run = no history to import, active_prompt_count 0 = nothing to import.
-- [ ] Say the catalog is public industries only.
-- [ ] Print a pagination footer on stderr: 'Showing 1-50 of 212. Next page: senso industries list --offset 50'.
-- [ ] Print 'No industries found.' on stdout plus, on stderr, 'Your --search matched nothing; drop it to see the whole catalog.' when the list is empty.
-- [ ] Add `page` to the JSON envelope (offset/limit/returned/total/has_more/next).
+- [x] Add Returns / Exit codes / Examples to the help; say industry_id is the <industry> argument everywhere else and the argument to `senso org set-industry`.
+- [x] Say model_count 0 = never run = no history to import, active_prompt_count 0 = nothing to import.
+- [x] Say the catalog is public industries only.
+- [x] Print a pagination footer on stderr: 'Showing 1-50 of 212. Next page: senso industries list --offset 50'.
+- [x] Print 'No industries found.' on stdout plus, on stderr, 'Your --search matched nothing; drop it to see the whole catalog.' when the list is empty.
+- [x] Add `page` to the JSON envelope (offset/limit/returned/total/has_more/next).
 
 **`senso industries prompts`** · 🟠 medium
 
-- [ ] Add Returns / Exit codes / Examples; name the id space explicitly ('id' is an industry prompt id, not a geo_question_id) and list the funnel_stage values the API emits.
-- [ ] Validate a UUID-shaped <industry> before the request and exit 2 with the catalog command as the hint.
-- [ ] 403 on GEO: 'Your organization does not have the GEO product, which `senso industries prompts` requires.' hint 'Contact your Senso account owner to add GEO; `senso org get` shows what your org has.'
-- [ ] 404: 'Industry <id> not found, or it is a private industry your organization cannot read.' hint 'senso industries list'.
-- [ ] Pagination footer on stderr plus `page` in the JSON envelope.
-- [ ] Next-step line on stderr: 'Next: senso industries import-prompts <industry> --prompt-ids <id>,<id>'.
+- [x] Add Returns / Exit codes / Examples; name the id space explicitly ('id' is an industry prompt id, not a geo_question_id) and list the funnel_stage values the API emits.
+- [x] Validate a UUID-shaped <industry> before the request and exit 2 with the catalog command as the hint.
+- [x] 403 on GEO: 'Your organization does not have the GEO product, which `senso industries prompts` requires.' hint 'Contact your Senso account owner to add GEO; `senso org get` shows what your org has.'
+- [x] 404: 'Industry <id> not found, or it is a private industry your organization cannot read.' hint 'senso industries list'.
+- [x] Pagination footer on stderr plus `page` in the JSON envelope.
+- [x] Next-step line on stderr: 'Next: senso industries import-prompts <industry> --prompt-ids <id>,<id>'.
 
 ### `senso partner` <sub>41 items</sub>
 

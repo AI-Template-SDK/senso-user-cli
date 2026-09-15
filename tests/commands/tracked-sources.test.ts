@@ -111,7 +111,7 @@ describe("tracked-sources, when the request fails", () => {
 
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("not your fault");
+    expect(res.stderr).toContain("server-side failure");
   });
 
   it("exits 1 on a 409 when the API refuses to edit a published rule", async () => {
@@ -413,7 +413,7 @@ describe("tracked-sources, on success", () => {
     const res = await runCli(["tracked-sources", "list", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual(SOURCES);
+    expect(res.data()).toEqual(SOURCES);
     expect(res.stderr).toBe("");
   });
 
@@ -490,7 +490,7 @@ describe("tracked-sources delete, on confirmation", () => {
     const res = await runCli(["tracked-sources", "delete", "ts-1", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toMatchObject({ ok: true });
+    expect(res.data()).toMatchObject({ ok: true });
     expect(res.stderr).toBe("");
   });
 });

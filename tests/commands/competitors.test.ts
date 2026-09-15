@@ -103,7 +103,7 @@ describe("competitors, when the request fails", () => {
 
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("not your fault");
+    expect(res.stderr).toContain("server-side failure");
   });
 
   it("exits 5 when the API rate limits the caller", async () => {
@@ -347,7 +347,7 @@ describe("competitors, on success", () => {
     const res = await runCli(["competitors", "list", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual(COMPETITORS);
+    expect(res.data()).toEqual(COMPETITORS);
     // json implies quiet: no banner, no success tick alongside it.
     expect(res.stderr).toBe("");
   });
@@ -401,7 +401,7 @@ describe("competitors, on success", () => {
     const res = await runCli(["competitors", "add", "--name", "Acme", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual(ONE_COMPETITOR);
+    expect(res.data()).toEqual(ONE_COMPETITOR);
     expect(res.stderr).toBe("");
   });
 });
@@ -429,7 +429,7 @@ describe("competitors delete, on confirmation", () => {
     const res = await runCli(["competitors", "delete", "c-1", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toMatchObject({ ok: true });
+    expect(res.data()).toMatchObject({ ok: true });
     expect(res.stderr).toBe("");
   });
 });

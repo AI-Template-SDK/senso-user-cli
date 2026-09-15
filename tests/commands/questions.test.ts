@@ -102,7 +102,7 @@ describe("questions list, when the request fails", () => {
 
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("not your fault");
+    expect(res.stderr).toContain("server-side failure");
   });
 
   it("reports a malformed body rather than throwing a parse error at the user", async () => {
@@ -347,7 +347,7 @@ describe("questions list, on success", () => {
     const res = await runCli(["questions", "list", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual(QUESTIONS);
+    expect(res.data()).toEqual(QUESTIONS);
     expect(res.stderr).toBe("");
   });
 
@@ -410,7 +410,7 @@ describe("questions create and patch, on success", () => {
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual(QUESTION);
+    expect(res.data()).toEqual(QUESTION);
     expect(res.stderr).toBe("");
   });
 
@@ -447,7 +447,7 @@ describe("questions delete, on success", () => {
     const res = await runCli(["questions", "delete", QUESTION_ID, "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual({ ok: true, message: `Question ${QUESTION_ID} deleted.` });
+    expect(res.data()).toEqual({ ok: true, message: `Question ${QUESTION_ID} deleted.` });
     expect(res.stderr).toBe("");
   });
 

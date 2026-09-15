@@ -88,7 +88,7 @@ describe("run-config, when the request fails", () => {
 
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("not your fault");
+    expect(res.stderr).toContain("server-side failure");
   });
 
   it("reports a malformed body rather than throwing a parse error at the user", async () => {
@@ -283,7 +283,7 @@ describe("run-config models, on success", () => {
     const res = await runCli(["run-config", "models", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual(MODELS);
+    expect(res.data()).toEqual(MODELS);
     expect(res.stderr).toBe("");
   });
 
@@ -325,7 +325,7 @@ describe("run-config schedule, on success", () => {
     const res = await runCli(["run-config", "schedule", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual(SCHEDULE);
+    expect(res.data()).toEqual(SCHEDULE);
     expect(res.stderr).toBe("");
   });
 
@@ -375,7 +375,7 @@ describe("run-config writes, on success", () => {
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual(SCHEDULE);
+    expect(res.data()).toEqual(SCHEDULE);
     expect(res.stderr).toBe("");
   });
 
@@ -516,7 +516,7 @@ describe("run-config model-options and scheduler-models, on success", () => {
     const res = await runCli(["run-config", "model-options", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual(MODEL_OPTIONS);
+    expect(res.data()).toEqual(MODEL_OPTIONS);
     expect(res.stderr).toBe("");
   });
 
