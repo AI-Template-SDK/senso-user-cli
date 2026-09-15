@@ -1,7 +1,8 @@
 name: Publish to npm
 
-# Triggered by pushing a version tag:
+# Triggered by pushing a version tag, from an up-to-date main:
 #
+#   git checkout main && git pull
 #   npm version minor
 #   git push --follow-tags
 #
@@ -13,7 +14,8 @@ name: Publish to npm
 # because publishing is the single irreversible action in this repository — npm
 # permits unpublishing for 72 hours and never reuses a version number.
 #
-#   1. The tag must match the version in package.json.
+#   1. The tag must match the version in package.json, point at a commit on
+#      main, and be newer than the version already on npm.
 #   2. CHANGELOG.md must have a section for that version. A release nobody can
 #      read the notes for is a release nobody can safely upgrade to.
 #   3. The full test suite must pass on the tagged commit. Previously a tag
@@ -42,6 +44,8 @@ jobs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the main-branch check needs origin/main
 
       - name: Check the tag matches package.json
         id: version
@@ -52,6 +56,37 @@ jobs:
             exit 1
           fi
           echo "version=$PKG" >> "$GITHUB_OUTPUT"
+
+      # 0.16.0 was tagged on a feature branch just after its pull request had
+      # been squash-merged. It published, main never got the bump, and main's
+      # next release came out as 0.15.1: lower than latest, so npm refused it at
+      # the final step, after the full test run. These two checks fail both
+      # mistakes in seconds.
+      - name: Check the tagged commit is on main
+        run: |
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::$GITHUB_REF_NAME points at a commit that is not on main."
+            echo "::error::Delete the tag, then run npm version on an up-to-date main."
+            exit 1
+          fi
+
+      - name: Check the version is newer than the one on npm
+        run: |
+          PKG="$(node -p "require('./package.json').version")"
+          LATEST="$(npm view @senso-ai/cli version 2>/dev/null || true)"
+          if [ -z "$LATEST" ]; then
+            echo "::warning::Could not read the published version from npm, so this check was skipped."
+            exit 0
+          fi
+          if ! node -e '
+            const [a, b] = process.argv.slice(1).map((v) => v.split(".").map(Number));
+            const d = a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+            process.exit(d > 0 ? 0 : 1);
+          ' "$PKG" "$LATEST"; then
+            echo "::error::package.json says $PKG, but npm already has $LATEST."
+            echo "::error::Delete the tag, pull main, and bump past $LATEST."
+            exit 1
+          fi
 
       - name: Check the changelog has an entry for this version
         run: |
