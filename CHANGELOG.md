@@ -9,7 +9,7 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
-## [0.15.1] — 2026-09-15
+## [0.17.0] — 2026-09-15
 
 ### Added
 
@@ -27,6 +27,17 @@ install` installed, found from shipables' own record so a skill installed in
   npm exits 0 but the file the CLI is running from is still there, the copy
   was not the global npm install, and the command says so and exits 1 rather
   than reporting a removal that did not happen.
+
+### Fixed
+
+- **`senso skills remove` exited 1 without removing anything.** It passed
+  `--yes` to `shipables uninstall`, which has no such flag and rejects it as an
+  unknown option. The flag is no longer passed; `skills install` still passes
+  it, because the install side does take one.
+
+## [0.16.0] — 2026-09-14
+
+### Added
 
 - **`senso gaps` — the gap report, for agents as much as people.** Six
   commands over `/org/gaps`: `list` finds work, `get` reads one gap in full,
@@ -125,13 +136,6 @@ install` installed, found from shipables' own record so a skill installed in
   Markdown with citations rather than storing content. It takes 10–30 seconds
   and consumes credits, so `--audience`, `--style-tone`, `--extra-instructions`
   and `--product-line-ids` are length-checked before the request goes out.
-
-### Fixed
-
-- **`senso skills remove` exited 1 without removing anything.** It passed
-  `--yes` to `shipables uninstall`, which has no such flag and rejects it as an
-  unknown option. The flag is no longer passed; `skills install` still passes
-  it, because the install side does take one.
 
 ### Changed
 
@@ -514,8 +518,9 @@ get` showed the organization's locations and silently dropped its name, slug
 - First published release: authentication, search, content, ingestion,
   organization administration, and self-update.
 
-[Unreleased]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.15.1...HEAD
-[0.15.1]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.15.0...v0.15.1
+[Unreleased]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.16.0...v0.17.0
+[0.16.0]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.12.0...v0.13.0
