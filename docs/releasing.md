@@ -40,10 +40,16 @@ breaking change.
 ### 2. Bump, tag and push
 
 ```bash
+git checkout main && git pull           # never from a feature branch
 make all                                # what the tag will re-run anyway
 npm version patch                       # or minor / major
 git push --follow-tags
 ```
+
+Run it from an up-to-date `main`. Merging a pull request on GitHub leaves your
+local checkout on its branch, and `npm version` there tags a commit `main` never
+sees. That is how 0.16.0 was published from `feat/gaps-commands` while `main`
+stayed at 0.15.0 and later tried to release 0.15.1. The workflow now refuses both.
 
 `npm version` rewrites `package.json`, commits, and creates the annotated tag
 `v0.13.0`. `--follow-tags` pushes the commit and the tag together.
@@ -62,12 +68,12 @@ configured on npmjs.com under the package's Trusted Publisher settings
 
 Four jobs, chained with `needs:`, cheapest first.
 
-| Job                | Gate                                                                                                            |
-| ------------------ | --------------------------------------------------------------------------------------------------------------- |
-| `verify`           | The tag equals `v` + `package.json`'s version, and `CHANGELOG.md` has a `## [x.y.z]` section for it             |
-| `test`             | `make install lint typecheck security unit e2e smoke` on the tagged commit, on Node 22                          |
-| `publish`          | `npm publish --access public --provenance`, then a GitHub release cut from the changelog section with `gh`      |
-| `verify-published` | Installs the published version from the registry on Ubuntu, macOS and Windows and runs `--version` and `--help` |
+| Job                | Gate                                                                                                                                                            |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verify`           | The tag equals `v` + `package.json`'s version, points at a commit on `main`, is newer than npm's `latest`, and `CHANGELOG.md` has a `## [x.y.z]` section for it |
+| `test`             | `make install lint typecheck security unit e2e smoke` on the tagged commit, on Node 22                                                                          |
+| `publish`          | `npm publish --access public --provenance`, then a GitHub release cut from the changelog section with `gh`                                                      |
+| `verify-published` | Installs the published version from the registry on Ubuntu, macOS and Windows and runs `--version` and `--help`                                                 |
 
 Three details are decisions rather than boilerplate:
 
