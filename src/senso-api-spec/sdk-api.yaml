@@ -10909,7 +10909,6 @@ components:
     ContentEngineDraftRequest:
       type: object
       required:
-        - geo_question_id
         - raw_markdown
         - seo_title
       properties:
@@ -17073,12 +17072,11 @@ components:
     ContentEnginePublishRequest:
       type: object
       description: >-
-        Publishes generated markdown as a content item. `geo_question_id`, `raw_markdown`,
-        and `seo_title` are required. `builder_workspace_id` and
+        Publishes generated markdown as a content item. `raw_markdown` and `seo_title`
+        are required; `geo_question_id` is optional. `builder_workspace_id` and
         `expected_workspace_version_id` must be supplied together.
       additionalProperties: false
       required:
-        - geo_question_id
         - raw_markdown
         - seo_title
       properties:

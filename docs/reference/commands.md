@@ -1144,7 +1144,7 @@ senso engine [options] [command]
 
 ### senso engine publish
 
-Publish content to external destinations via the content engine. Requires geo_question_id, raw_markdown, and seo_title. By default publishes to every destination currently selected for generation (citeables is the default for most orgs — see 'senso destinations list'). Pass --publisher-ids to restrict publishing to a specific subset, or include 'publisher_ids' inside --data. To record content as already published externally rather than pushing it to destinations, set mark_as_published (and optionally manual_published_at) in --data.
+Publish content to external destinations via the content engine. Requires raw_markdown and seo_title; geo_question_id is optional. Pass content_id to publish a new version of an existing content item rather than creating another one — without it, the item is found by geo_question_id or created fresh. By default publishes to every destination currently selected for generation (citeables is the default for most orgs — see 'senso destinations list'). Pass --publisher-ids to restrict publishing to a specific subset, or include 'publisher_ids' inside --data. To record content as already published externally rather than pushing it to destinations, set mark_as_published (and optionally manual_published_at) in --data. A destination can fail while the call still succeeds: read publish_destinations, which this command reports on stderr. Exits 1 if every destination failed.
 
 ```
 senso engine publish [options]
@@ -1152,12 +1152,12 @@ senso engine publish [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "geo_question_id": "uuid", "raw_markdown": "...", "seo_title": "...", "summary": "...", "publisher_ids": ["<uuid>", ...], "mark_as_published": false, "manual_published_at": "2026-06-11T00:00:00Z" } |  |
+| `--data <json>` | JSON: { "raw_markdown": "...", "seo_title": "...", "content_id": "uuid", "geo_question_id": "uuid", "summary": "...", "publisher_ids": ["<uuid>", ...], "mark_as_published": false, "manual_published_at": "2026-06-11T00:00:00Z", "manual_published_url": "https://...", "generation_run_id": "uuid", "generation_receipt_id": "uuid" }. Only raw_markdown and seo_title are required. content_id targets an existing content item. |  |
 | `--publisher-ids <ids...>` | Restrict publishing to specific publisher IDs. Overrides any publisher_ids present in --data. Omit to publish to all configured destinations (citeables by default). |  |
 
 ### senso engine draft
 
-Save content as a draft for review before publishing. Requires geo_question_id, raw_markdown, and seo_title. Drafts do not hit any destination until you run 'senso engine publish' on them.
+Save content as a draft for review before publishing. Requires raw_markdown and seo_title; geo_question_id is optional. Pass content_id to save a new version of an existing content item — that is how an edit loop revises one item instead of leaving a trail of new ones. Without it, the item is found by geo_question_id or created fresh. Drafts do not hit any destination until you run 'senso engine publish' on them.
 
 ```
 senso engine draft [options]
@@ -1165,7 +1165,7 @@ senso engine draft [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "geo_question_id": "uuid", "raw_markdown": "...", "seo_title": "...", "summary": "..." } |  |
+| `--data <json>` | JSON: { "raw_markdown": "...", "seo_title": "...", "content_id": "uuid", "geo_question_id": "uuid", "summary": "...", "generation_run_id": "uuid", "generation_receipt_id": "uuid" }. Only raw_markdown and seo_title are required. content_id targets an existing content item, so repeated drafts version it rather than creating a new one. |  |
 
 ## senso destinations
 

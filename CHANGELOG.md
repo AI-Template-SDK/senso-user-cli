@@ -9,6 +9,38 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`senso engine publish` no longer claims success over a publish that reached
+  nothing.** The endpoint answers 200 even when a destination failed — the real
+  outcome is per-destination, under `publish_destinations[].status` — and the
+  command printed "Content published." without reading it. A destination now
+  counts as a problem when it is `failed` or carries an `error_msg`, which
+  follows the server in testing positively for `success` rather than treating
+  "not failed" as landed: a `pending` destination means "publish record saved
+  but enqueue failed" and nothing published. Each problem is named on stderr
+  with its reason, a partial failure says how many of how many did not publish,
+  and every destination failing exits 1 with an empty stdout, carrying the
+  reasons and the content id in the error — the error is all a `--output json`
+  caller sees, since that format implies `--quiet`. A retry can then target the
+  item that was already saved rather than creating another. A publish where
+  every destination is `queued` reports that it is queued rather than
+  published, because nothing is live yet. Content recorded with
+  `mark_as_published`, which reaches no destination by design, still reports
+  success.
+
+- **`senso engine draft` and `publish` document the fields they actually
+  accept.** Both take `content_id`, and passing it saves a new version of an
+  existing content item — that is how an edit loop revises one item instead of
+  leaving a trail of new ones. It worked all along and was missing from
+  `--data`, so an agent working from `--help` could not discover it. Also added:
+  `generation_run_id`, `generation_receipt_id`, and `manual_published_url` on
+  `publish`. Both descriptions also claimed `geo_question_id` was required; it is
+  optional, and only `raw_markdown` and `seo_title` are not.
+  `builder_workspace_id` and `expected_workspace_version_id` are deliberately
+  NOT documented: both require an acting user, which an organization API key
+  never carries, so every attempt from this CLI is a 400.
+
 ## [0.17.0] — 2026-09-15
 
 ### Added
