@@ -486,11 +486,11 @@ export function emit(ctx: OutputContext, data: unknown, opts: EmitOptions = {}):
   if (opts.plain !== undefined) {
     outputPlain(opts.plain);
   } else if (rows) {
+    const header =
+      list && Object.keys(list.extras).length > 0 ? [...objectLines(list.extras), ""] : [];
     if (rows.length === 0) {
-      outputPlain(`  ${emptyLine(opts, list)}`);
+      outputPlain([...header, `  ${emptyLine(opts, list)}`]);
     } else {
-      const header =
-        list && Object.keys(list.extras).length > 0 ? [...objectLines(list.extras), ""] : [];
       outputPlain([...header, ...itemBlocks(rows, page?.offset ?? 0)]);
     }
   } else if (isPlainObject(data)) {

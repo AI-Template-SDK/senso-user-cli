@@ -1143,57 +1143,57 @@ has to change for the CLI to be able to say the right thing. Check items off in 
 
 **`senso run-config`** · group
 
-- [ ] Describe the two model spaces in the group help, with the vocabulary each takes, and say plainly that 'set-models' also rewrites the scheduler opt-in while 'set-scheduler-models' does not rewrite the legacy list.
-- [ ] Recommend one path for agents: model-options -> set-models -> models, and mark the scheduler-models pair as advanced.
-- [ ] Note that the reads need the GEO product and the writes need the update:org permission (JWT callers) — different failures for the same group.
+- [x] Describe the two model spaces in the group help, with the vocabulary each takes, and say plainly that 'set-models' also rewrites the scheduler opt-in while 'set-scheduler-models' does not rewrite the legacy list.
+- [x] Recommend one path for agents: model-options -> set-models -> models, and mark the scheduler-models pair as advanced.
+- [x] Note that the reads need the GEO product and the writes need the update:org permission (JWT callers) — different failures for the same group.
 
 **`senso run-config model-options`** · 🔴 high
 
-- [ ] Pass explicit rows: emit(ctx, data, {table: {rows: data.valid_models, columns: ['name','display_name']}, plain: <one line per option>}) so the list renders in every format.
-- [ ] Say in the help that a few names are accepted but not listed (the OpenAI direct-API model 'gpt', and the aliases aioverview / claude-sonnet-4-6 / gpt-4.1), so an agent seeing one of them in 'run-config models' does not think it is invalid.
-- [ ] Add the follow-up command to stderr: 'senso run-config set-models --data '{"models":["chatgpt","claude"]}''.
-- [ ] Explain 'scope'.
+- [x] Pass explicit rows: emit(ctx, data, {table: {rows: data.valid_models, columns: ['name','display_name']}, plain: <one line per option>}) so the list renders in every format.
+- [x] Say in the help that a few names are accepted but not listed (the OpenAI direct-API model 'gpt', and the aliases aioverview / claude-sonnet-4-6 / gpt-4.1), so an agent seeing one of them in 'run-config models' does not think it is invalid.
+- [x] Add the follow-up command to stderr: 'senso run-config set-models --data '{"models":["chatgpt","claude"]}''.
+- [x] Explain 'scope'.
 
 **`senso run-config models`** · 🟠 medium
 
-- [ ] Empty result: 'No run models configured. No runs will be produced.' on stdout, with 'senso run-config set-models --data ...' on stderr.
-- [ ] Help: say the 'name' field is what set-models takes and that geo_model_id is not used by any command.
-- [ ] Point at 'run-config model-options' and note the scheduler-models relationship.
+- [x] Empty result: 'No run models configured. No runs will be produced.' on stdout, with 'senso run-config set-models --data ...' on stderr.
+- [x] Help: say the 'name' field is what set-models takes and that geo_model_id is not used by any command.
+- [x] Point at 'run-config model-options' and note the scheduler-models relationship.
 
 **`senso run-config schedule`** · 🟢 low
 
-- [ ] Render day names alongside the numbers: 'schedule 1 (Monday), 3 (Wednesday), 5 (Friday)'.
-- [ ] Empty schedule: 'No run days configured — scheduled runs will not fire.' on stdout, with 'senso run-config set-schedule --data ...' on stderr.
-- [ ] Say in the help that the schedule has day granularity only, and add set-schedule as a next step.
+- [x] Render day names alongside the numbers: 'schedule 1 (Monday), 3 (Wednesday), 5 (Friday)'.
+- [x] Empty schedule: 'No run days configured — scheduled runs will not fire.' on stdout, with 'senso run-config set-schedule --data ...' on stderr.
+- [x] Say in the help that the schedule has day granularity only, and add set-schedule as a next step.
 
 **`senso run-config scheduler-models`** · 🟠 medium
 
-- [ ] Show the joined 'provider/model' id as a first-class field in the output, since that is the value the write command takes.
-- [ ] Explain execution_mode and drop or explain adapter_key.
-- [ ] Empty result: 'No scheduler models opted in.' plus the set-models / set-scheduler-models next step.
-- [ ] Point at 'senso run-config models' and say which of the two the scheduler actually uses.
+- [x] Show the joined 'provider/model' id as a first-class field in the output, since that is the value the write command takes.
+- [x] Explain execution_mode and drop or explain adapter_key.
+- [x] Empty result: 'No scheduler models opted in.' plus the set-models / set-scheduler-models next step.
+- [x] Point at 'senso run-config models' and say which of the two the scheduler actually uses.
 
 **`senso run-config set-models`** · 🔴 high
 
-- [ ] Fix the error path so the endpoint's own message survives: prefer body.message when body.error is also present for model-validation 400s, or special-case the unsupported_models/valid_models/suggestions body and render 'Unsupported: gpt5. Did you mean gpt? Accepted: aioverview, chatgpt, claude, gemini, google_ai_overviews, gpt, grok, perplexity.' Put unsupported_models, valid_models and suggestions into the JSON error object.
-- [ ] Validate --data before the request with the same assertModels() the scheduler command uses: models present, an array, non-empty, every entry a non-blank string <= 255 characters -> exit 2.
-- [ ] List the accepted names in the help and point at 'senso run-config model-options'.
-- [ ] Warn that this REPLACES the set and report the diff (added / removed) on stderr and in warnings[].
-- [ ] Say that it also rewrites the scheduler opt-in.
+- [x] Fix the error path so the endpoint's own message survives: prefer body.message when body.error is also present for model-validation 400s, or special-case the unsupported_models/valid_models/suggestions body and render 'Unsupported: gpt5. Did you mean gpt? Accepted: aioverview, chatgpt, claude, gemini, google_ai_overviews, gpt, grok, perplexity.' Put unsupported_models, valid_models and suggestions into the JSON error object.
+- [x] Validate --data before the request with the same assertModels() the scheduler command uses: models present, an array, non-empty, every entry a non-blank string <= 255 characters -> exit 2.
+- [x] List the accepted names in the help and point at 'senso run-config model-options'.
+- [x] Warn that this REPLACES the set and report the diff (added / removed) on stderr and in warnings[].
+- [x] Say that it also rewrites the scheduler opt-in.
 
 **`senso run-config set-schedule`** · 🟠 medium
 
-- [ ] Reject an empty schedule with exit 2 and an explicit message: the API cannot store 'no days' through this endpoint.
-- [ ] Say REPLACES in the description, and print the diff: 'Added Friday, removed Monday.'
-- [ ] De-duplicate (or reject duplicates) client-side and render day names in the result.
-- [ ] Say there is no time-of-day or timezone control.
+- [x] Reject an empty schedule with exit 2 and an explicit message: the API cannot store 'no days' through this endpoint.
+- [x] Say REPLACES in the description, and print the diff: 'Added Friday, removed Monday.'
+- [x] De-duplicate (or reject duplicates) client-side and render day names in the result.
+- [x] Say there is no time-of-day or timezone control.
 
 **`senso run-config set-scheduler-models`** · 🔴 high
 
-- [ ] Make the error path keep the API's message: render 'Unsupported: anthropic/sonnet. Did you mean anthropic/claude? Accepted: ...' and carry unsupported_models / valid_models / suggestions in the JSON error object. Until then, remove the promise from the help.
-- [ ] Extend assertModels to require a '/' in each entry, with a hint that bare names belong to 'senso run-config set-models' -> exit 2.
-- [ ] List the seeded catalog in the help (brightdata/chatgpt, brightdata/grok, brightdata/perplexity, brightdata/gemini, brightdata_serp/google_ai_overviews, anthropic/claude, openai/gpt) while saying it is configurable.
-- [ ] Say this does NOT update the run-model list, and recommend 'set-models' for the common case.
+- [x] Make the error path keep the API's message: render 'Unsupported: anthropic/sonnet. Did you mean anthropic/claude? Accepted: ...' and carry unsupported_models / valid_models / suggestions in the JSON error object. Until then, remove the promise from the help.
+- [x] Extend assertModels to require a '/' in each entry, with a hint that bare names belong to 'senso run-config set-models' -> exit 2.
+- [x] List the seeded catalog in the help (brightdata/chatgpt, brightdata/grok, brightdata/perplexity, brightdata/gemini, brightdata_serp/google_ai_overviews, anthropic/claude, openai/gpt) while saying it is configurable.
+- [x] Say this does NOT update the run-model list, and recommend 'set-models' for the common case.
 
 ### `senso skills` <sub>18 items</sub>
 
@@ -1263,39 +1263,39 @@ has to change for the CLI to be able to say the right thing. Check items off in 
 
 **`senso questions`** · group
 
-- [ ] Rewrite the group description: same records as 'senso prompts', different verbs. State that geo_question_id === prompt_id.
-- [ ] Give the split explicitly: use 'questions' for funnel-stage changes, tags at creation and network-scoped questions; use 'prompts' for search/sort/paging, run history and tag management.
-- [ ] Rename or at least re-document 'questions list --type' as a scope filter — ideally add --scope as the name and keep --type as a deprecated alias — because it collides with the funnel-stage 'type' in the same group.
-- [ ] Warn on 'questions delete' that it removes run history too.
+- [x] Rewrite the group description: same records as 'senso prompts', different verbs. State that geo_question_id === prompt_id.
+- [x] Give the split explicitly: use 'questions' for funnel-stage changes, tags at creation and network-scoped questions; use 'prompts' for search/sort/paging, run history and tag management.
+- [x] Rename or at least re-document 'questions list --type' as a scope filter — ideally add --scope as the name and keep --type as a deprecated alias — because it collides with the funnel-stage 'type' in the same group.
+- [x] Warn on 'questions delete' that it removes run history too.
 
 **`senso questions create`** · 🔴 high
 
-- [ ] Validate --data before the request: question_text present and <= 255 characters; type one of the four stages, case-sensitive; every tag_ids entry a UUID; reject unknown keys naming them -> exit 2.
-- [ ] Help: say the limit is 255 here and 500 through 'senso prompts create', and that this endpoint does NOT accept the legacy stage spellings.
-- [ ] Warn when the response has no 'tags' although tag_ids were sent — that means the API swallowed a tag failure.
-- [ ] Point at 'senso tags list' for tag ids, and add next steps (prompts get / run-config schedule).
+- [x] Validate --data before the request: question_text present and <= 255 characters; type one of the four stages, case-sensitive; every tag_ids entry a UUID; reject unknown keys naming them -> exit 2.
+- [x] Help: say the limit is 255 here and 500 through 'senso prompts create', and that this endpoint does NOT accept the legacy stage spellings.
+- [x] Warn when the response has no 'tags' although tag_ids were sent — that means the API swallowed a tag failure.
+- [x] Point at 'senso tags list' for tag ids, and add next steps (prompts get / run-config schedule).
 
 **`senso questions delete`** · 🟠 medium
 
-- [ ] Say it removes the question AND its run history, exactly as 'senso prompts delete' does, and that there is no undelete.
-- [ ] Validate <questionId> as a UUID -> exit 2; 404 message naming the resource and id; map the other-org 403 to exit 4.
-- [ ] Emit the documented mutation envelope: data {action: 'deleted', resource: 'question', id}.
+- [x] Say it removes the question AND its run history, exactly as 'senso prompts delete' does, and that there is no undelete.
+- [x] Validate <questionId> as a UUID -> exit 2; 404 message naming the resource and id; map the other-org 403 to exit 4.
+- [x] Emit the documented mutation envelope: data {action: 'deleted', resource: 'question', id}.
 
 **`senso questions list`** · 🔴 high
 
-- [ ] Pass explicit rows to emit(): emit(ctx, data, {table: {rows: data.questions, columns: [...]}, plain: <blocks>}) so plain and table render the list regardless of the envelope's extra keys. (The general fix is to let findRows ignore keys whose value is an empty string or zero, but the per-command override is the safe one.)
-- [ ] Rename the flag to --scope with --type kept as a hidden alias, and say in the help that the output's 'type' column is the funnel stage.
-- [ ] Say the result is not paginated and that 'senso prompts list' is the paged/searchable view of the same rows.
-- [ ] When --type network returns [], say on stderr whether the org has a network at all (or at least point at 'senso org get').
-- [ ] Empty result: 'No questions found.' plus the create command on stderr.
+- [x] Pass explicit rows to emit(): emit(ctx, data, {table: {rows: data.questions, columns: [...]}, plain: <blocks>}) so plain and table render the list regardless of the envelope's extra keys. (The general fix is to let findRows ignore keys whose value is an empty string or zero, but the per-command override is the safe one.)
+- [x] Rename the flag to --scope with --type kept as a hidden alias, and say in the help that the output's 'type' column is the funnel stage.
+- [x] Say the result is not paginated and that 'senso prompts list' is the paged/searchable view of the same rows.
+- [x] When --type network returns [], say on stderr whether the org has a network at all (or at least point at 'senso org get').
+- [x] Empty result: 'No questions found.' plus the create command on stderr.
 
 **`senso questions patch`** · 🔴 high
 
-- [ ] FIX THE HELP: '{"tag_ids": []} clears every tag; null is rejected as no field provided.' Better, reject tag_ids: null client-side with exit 2 and a hint pointing at [].
-- [ ] Validate --data before the request: at least one of tag_ids/type; type against the four stages; every tag_ids entry a UUID; name unknown keys -> exit 2.
-- [ ] Validate <questionId> as a UUID -> exit 2; map the other-org 403 to exit 4 with a not-found message.
-- [ ] Say tag_ids REPLACES the set, and report the diff in warnings[].
-- [ ] Add an --add-tags / --remove-tags convenience or point at 'senso prompts tags add/remove' for incremental changes.
+- [x] FIX THE HELP: '{"tag_ids": []} clears every tag; null is rejected as no field provided.' Better, reject tag_ids: null client-side with exit 2 and a hint pointing at [].
+- [x] Validate --data before the request: at least one of tag_ids/type; type against the four stages; every tag_ids entry a UUID; name unknown keys -> exit 2.
+- [x] Validate <questionId> as a UUID -> exit 2; map the other-org 403 to exit 4 with a not-found message.
+- [x] Say tag_ids REPLACES the set, and report the diff in warnings[].
+- [x] Add an --add-tags / --remove-tags convenience or point at 'senso prompts tags add/remove' for incremental changes.
 
 ### `senso kb` <sub>161 items</sub>
 

@@ -429,7 +429,16 @@ describe("prompts, when the command line is wrong", () => {
   it("exits 2 when tags add is given both, rather than picking one silently", async () => {
     // --id used to win, so a caller who meant the name watched a different tag
     // move and nothing said so.
-    const res = await runCli(["prompts", "tags", "add", PROMPT_ID, "--name", "crm", "--id", TAG_ID]);
+    const res = await runCli([
+      "prompts",
+      "tags",
+      "add",
+      PROMPT_ID,
+      "--name",
+      "crm",
+      "--id",
+      TAG_ID,
+    ]);
 
     expect(res.exitCode).toBe(2);
     expect(res.stderr).toContain("Pass --name or --id, not both.");

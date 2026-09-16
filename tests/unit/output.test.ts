@@ -378,6 +378,20 @@ describe("emit, in plain, on shapes that used to render as JSON strings", () => 
     expect(out).toContain("acme");
   });
 
+  it("keeps the record's own fields when its list is empty", () => {
+    // `prompts get` returns the prompt WITH its runs. An empty `runs` used to
+    // print "No runs found." and nothing else, so the prompt_id, text and type
+    // — the whole reason to run the command — disappeared exactly when there
+    // was least other information on screen.
+    const { out } = capture(() => {
+      emit(ctx("plain"), { prompt_id: "p-1", text: "best crm", runs: [] }, { empty: "runs" });
+    });
+
+    expect(out).toContain("prompt_id");
+    expect(out).toContain("best crm");
+    expect(out).toContain("No runs found.");
+  });
+
   it("says a list is empty rather than printing a blank envelope field", () => {
     const { out, err } = capture(() => {
       emit(ctx("plain"), { gaps: [], total: 0 }, {
