@@ -2067,7 +2067,6 @@ deferred with a reason. Roughly 214 were implemented or already true; roughly
 [Part F](#part-f--deferred-needs-a-decision) with the reason. Nothing was
 ticked without being looked at, and nothing deferred was ticked silently.
 
-
 323 items across 170 commands. These are the things the CLI cannot fix alone.
 
 ### `senso global` <sub>2 items</sub>
@@ -2992,7 +2991,7 @@ The sensov2 web app consumes these endpoints, so none of this was made.
       and some lists are bare arrays. This is the single largest remaining
       inconsistency and the one an agent trips over most.
 - [ ] **Every `204` that should carry what it did.** `gaps undo`, `prompts
-      delete`, `tags add`/`delete`, `publish-records retry`, `kb bulk-delete`,
+    delete`, `tags add`/`delete`, `publish-records retry`, `kb bulk-delete`,
       `remove-owner`, and the legacy unpublish path — which is why
       `content unpublish` still cannot report `unpublished_count` on the
       unpublish-everywhere case.
