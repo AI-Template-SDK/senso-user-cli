@@ -112,7 +112,7 @@ export function registerCtaCommands(program: Command): void {
       "Typical workflow:",
       "  1. senso ctas upload-url --filename hero.png --content-type image/png --size 48213   (optional) sign an image URL",
       "  2. curl -X PUT … the bytes to upload_url   the CLI does not upload the file itself",
-      "  3. senso ctas create --data '{\"title\":…,\"button_label\":…,\"target_url\":…,\"is_default\":true}'",
+      '  3. senso ctas create --data \'{"title":…,"button_label":…,"target_url":…,"is_default":true}\'',
       "  4. senso ctas set-for-content <content_id> --selection template --cta-id <cta_id>   pin one item, or leave items on default",
       "",
       "Reads need read:content; every write needs update:content.",
@@ -349,9 +349,7 @@ export function registerCtaCommands(program: Command): void {
         }),
       ),
     {
-      returns: [
-        "action: deleted, resource: cta_template, id — the template that was removed",
-      ],
+      returns: ["action: deleted, resource: cta_template, id — the template that was removed"],
       exitCodes: {
         ...idExits,
         0: "deleted",
@@ -364,7 +362,8 @@ export function registerCtaCommands(program: Command): void {
         { command: "senso ctas delete b7e2c1d0-3f4a-4b5c-9d6e-7f8a9b0c1d2e" },
         {
           comment: "Clear the default first when the template is it",
-          command: "senso ctas clear-default && senso ctas delete b7e2c1d0-3f4a-4b5c-9d6e-7f8a9b0c1d2e",
+          command:
+            "senso ctas clear-default && senso ctas delete b7e2c1d0-3f4a-4b5c-9d6e-7f8a9b0c1d2e",
         },
       ],
       seeAlso: ["senso ctas list", "senso ctas clear-default", "senso ctas set-default"],
@@ -548,7 +547,11 @@ export function registerCtaCommands(program: Command): void {
           program,
           async (ctx, contentId: string, cmdOpts: { selection: string; ctaId?: string }) => {
             const id = parseId(contentId, CONTENT_ID);
-            const selectionType = requireEnumFlag("--selection", cmdOpts.selection, SELECTION_TYPES);
+            const selectionType = requireEnumFlag(
+              "--selection",
+              cmdOpts.selection,
+              SELECTION_TYPES,
+            );
             // The API rejects both mismatches, but it costs a round trip to be
             // told so — and "cta_id must be omitted" is not obviously about a flag
             // the caller did pass.
@@ -720,7 +723,7 @@ export function registerCtaCommands(program: Command): void {
         {
           comment: "Sign, then upload",
           command:
-            "U=$(senso ctas upload-url --filename hero.png --content-type image/png --size 48213 --output json); curl -X PUT -H \"Content-Type: image/png\" --data-binary @hero.png \"$(echo \"$U\" | jq -r .data.upload_url)\"",
+            'U=$(senso ctas upload-url --filename hero.png --content-type image/png --size 48213 --output json); curl -X PUT -H "Content-Type: image/png" --data-binary @hero.png "$(echo "$U" | jq -r .data.upload_url)"',
         },
       ],
       seeAlso: ["senso ctas create", "senso ctas update"],
@@ -924,4 +927,3 @@ function explainSelectionFailure(err: unknown, contentId: string, ctaId?: string
     },
   );
 }
-

@@ -228,7 +228,7 @@ describe("`--output json` on a successful command", () => {
     });
 
     expect(res.code).toBe(0);
-    expect(res.json()).toEqual(ROLES);
+    expect(res.data()).toEqual(ROLES);
     expect(res.stderr).toBe("");
   });
 
@@ -241,7 +241,7 @@ describe("`--output json` on a successful command", () => {
     });
 
     expect(res.code).toBe(0);
-    expect(res.json()).toEqual(BALANCE);
+    expect(res.data()).toEqual(BALANCE);
     expect(res.stderr).toBe("");
   });
 
@@ -254,7 +254,7 @@ describe("`--output json` on a successful command", () => {
     });
 
     expect(res.code).toBe(0);
-    expect(res.json()).toEqual(TAGS);
+    expect(res.data()).toEqual(TAGS);
     expect(res.stderr).toBe("");
   });
 
@@ -270,7 +270,7 @@ describe("`--output json` on a successful command", () => {
     // argv scan, so `--output=json` printed a decorated table and a pipeline
     // that had worked in one shell broke in another.
     expect(res.code).toBe(0);
-    expect(res.json()).toEqual(ROLES);
+    expect(res.data()).toEqual(ROLES);
     expect(res.stderr).toBe("");
   });
 });

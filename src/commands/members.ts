@@ -40,10 +40,7 @@ export function registerMemberCommands(program: Command): void {
       .option("--limit <n>", "Rows per page, integer 1-1000 (default 50)")
       .option("--offset <n>", "Rows to skip, integer >= 0 (default 0)")
       .option("--search <query>", "Case-insensitive substring match on name or email")
-      .option(
-        "--sort <order>",
-        `One of: ${SORTS.join(", ")} (default name_asc)`,
-      )
+      .option("--sort <order>", `One of: ${SORTS.join(", ")} (default name_asc)`)
       .action(
         runAction(program, async (ctx, cmdOpts: Record<string, string>) => {
           const limit = parseIntFlag("--limit", cmdOpts.limit, { min: 1, max: 1000 });
@@ -101,7 +98,7 @@ export function registerMemberCommands(program: Command): void {
         { command: "senso members list --sort created_desc --limit 5" },
         {
           command:
-            'senso members list --output json | jq -r \'.data.members[] | "\\(.user_id)  \\(.email)  \\(.role_display_name)"\'',
+            "senso members list --output json | jq -r '.data.members[] | \"\\(.user_id)  \\(.email)  \\(.role_display_name)\"'",
         },
       ],
       seeAlso: ["senso users list", "senso users update", "senso roles list"],

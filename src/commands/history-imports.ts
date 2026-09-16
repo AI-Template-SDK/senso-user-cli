@@ -188,7 +188,12 @@ export function registerHistoryImportsCommands(program: Command): void {
             next:
               first?.id === undefined
                 ? []
-                : [{ why: "Read one job in full", command: `senso history-imports get ${first.id}` }],
+                : [
+                    {
+                      why: "Read one job in full",
+                      command: `senso history-imports get ${first.id}`,
+                    },
+                  ],
           });
         }),
       ),
@@ -213,10 +218,14 @@ export function registerHistoryImportsCommands(program: Command): void {
         {
           comment: "The completed jobs that actually copied nothing",
           command:
-            'senso history-imports list --output json | jq -r \'.data.imports[] | select(.status=="completed" and (.historic_runs_imported // 0) == 0) | .id\'',
+            "senso history-imports list --output json | jq -r '.data.imports[] | select(.status==\"completed\" and (.historic_runs_imported // 0) == 0) | .id'",
         },
       ],
-      seeAlso: ["senso history-imports get", "senso industries import-prompts", "senso prompts list"],
+      seeAlso: [
+        "senso history-imports get",
+        "senso industries import-prompts",
+        "senso prompts list",
+      ],
     },
   );
 
@@ -292,7 +301,7 @@ export function registerHistoryImportsCommands(program: Command): void {
         {
           comment: "Poll correctly: terminal AND it actually got data",
           command:
-            'until senso history-imports get 5e4d3c2b-1a09-4f8e-9d7c-6b5a4f3e2d10 --output json | jq -e \'.data.status=="completed" and (.data.historic_runs_imported // 0) > 0\' >/dev/null; do sleep 10; done',
+            "until senso history-imports get 5e4d3c2b-1a09-4f8e-9d7c-6b5a4f3e2d10 --output json | jq -e '.data.status==\"completed\" and (.data.historic_runs_imported // 0) > 0' >/dev/null; do sleep 10; done",
         },
       ],
       seeAlso: [

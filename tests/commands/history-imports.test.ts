@@ -224,9 +224,7 @@ describe("history-imports get, when the job completed but copied nothing", () =>
   it("warns that it is not success, in the envelope where a JSON caller can read it", async () => {
     // The regression this whole group exists to prevent. Under --output json
     // stderr is silent, so a warning written only to stderr reaches nobody.
-    server.use(
-      http.get(apiUrl("/org/history-imports/:importId"), () => HttpResponse.json(HOLLOW)),
-    );
+    server.use(http.get(apiUrl("/org/history-imports/:importId"), () => HttpResponse.json(HOLLOW)));
 
     const res = await runCli(["history-imports", "get", IMPORT_ID, "--output", "json"]);
 
@@ -238,9 +236,7 @@ describe("history-imports get, when the job completed but copied nothing", () =>
   });
 
   it("sends the same warning to stderr in plain output, with the payload on stdout", async () => {
-    server.use(
-      http.get(apiUrl("/org/history-imports/:importId"), () => HttpResponse.json(HOLLOW)),
-    );
+    server.use(http.get(apiUrl("/org/history-imports/:importId"), () => HttpResponse.json(HOLLOW)));
 
     const res = await runCli(["history-imports", "get", IMPORT_ID]);
 
@@ -250,9 +246,7 @@ describe("history-imports get, when the job completed but copied nothing", () =>
   });
 
   it("points at the org's own prompts rather than at analytics", async () => {
-    server.use(
-      http.get(apiUrl("/org/history-imports/:importId"), () => HttpResponse.json(HOLLOW)),
-    );
+    server.use(http.get(apiUrl("/org/history-imports/:importId"), () => HttpResponse.json(HOLLOW)));
 
     const res = await runCli(["history-imports", "get", IMPORT_ID, "--output", "json"]);
 
@@ -265,9 +259,7 @@ describe("history-imports get, when the job completed but copied nothing", () =>
 
 describe("history-imports get, when the job failed", () => {
   it("exits 0 and says failed is not terminal, because the job is retried", async () => {
-    server.use(
-      http.get(apiUrl("/org/history-imports/:importId"), () => HttpResponse.json(FAILED)),
-    );
+    server.use(http.get(apiUrl("/org/history-imports/:importId"), () => HttpResponse.json(FAILED)));
 
     const res = await runCli(["history-imports", "get", IMPORT_ID, "--output", "json"]);
 
@@ -280,9 +272,7 @@ describe("history-imports get, when the job failed", () => {
   });
 
   it("tells the caller to poll again rather than to give up", async () => {
-    server.use(
-      http.get(apiUrl("/org/history-imports/:importId"), () => HttpResponse.json(FAILED)),
-    );
+    server.use(http.get(apiUrl("/org/history-imports/:importId"), () => HttpResponse.json(FAILED)));
 
     const res = await runCli(["history-imports", "get", IMPORT_ID, "--output", "json"]);
 

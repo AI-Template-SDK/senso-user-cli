@@ -531,7 +531,15 @@ describe("tags get, update and delete, on success", () => {
       ),
     );
 
-    const res = await runCli(["tags", "update", TAG_1, "--name", "pricing-2026", "--output", "json"]);
+    const res = await runCli([
+      "tags",
+      "update",
+      TAG_1,
+      "--name",
+      "pricing-2026",
+      "--output",
+      "json",
+    ]);
 
     expect(res.exitCode).toBe(0);
     const env = envelope(res);

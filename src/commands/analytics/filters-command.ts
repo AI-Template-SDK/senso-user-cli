@@ -26,7 +26,7 @@ export function addFiltersCommand(analytics: Command, program: Command): void {
       ),
     {
       returns: [
-        "models[] — {id, display_name}. The `id` is what --models accepts; the display_name (\"Google AI Overviews\") is not a value any flag takes",
+        'models[] — {id, display_name}. The `id` is what --models accepts; the display_name ("Google AI Overviews") is not a value any flag takes',
         `The full allow-list, whether or not it has data yet: ${MODEL_VALUES.join(", ")}`,
         "locations[] — case-sensitive strings, exactly as --location wants them",
         "prompt_types[] — the funnel stages that have data, out of awareness | consideration | evaluation | decision",
@@ -48,75 +48,75 @@ export function addFiltersCommand(analytics: Command, program: Command): void {
       seeAlso: ["senso analytics summary", "senso competitors list"],
     },
   ).action(
-      runAction(program, async (ctx) => {
-        const data = await apiRequest<{
-          models: FilterOption[];
-          locations: string[];
-          prompt_types: string[];
-          tags: string[];
-          tracked_competitors: FilterOption[];
-          date_range: { earliest_day: string | null; latest_day: string | null };
-          notes: string[];
-        }>({
-          path: "/org/analytics/filters",
-          apiKey: ctx.apiKey,
-          baseUrl: ctx.baseUrl,
-        });
+    runAction(program, async (ctx) => {
+      const data = await apiRequest<{
+        models: FilterOption[];
+        locations: string[];
+        prompt_types: string[];
+        tags: string[];
+        tracked_competitors: FilterOption[];
+        date_range: { earliest_day: string | null; latest_day: string | null };
+        notes: string[];
+      }>({
+        path: "/org/analytics/filters",
+        apiKey: ctx.apiKey,
+        baseUrl: ctx.baseUrl,
+      });
 
-        // The id leads and the display name is parenthetical: this line is
-        // labelled `--models`, and "Google AI Overviews" is a value that flag
-        // REJECTS. Printing the display name alone made the one command whose
-        // job is to stop a guess into the reason for one.
-        const models = (data.models ?? []).map((m) =>
-          m.display_name && m.display_name !== m.id ? `${m.id} (${m.display_name})` : m.id,
-        );
-        const competitors = (data.tracked_competitors ?? []).map((c) =>
-          c.display_name && c.display_name !== c.id ? `${c.display_name} [${c.id}]` : c.id,
-        );
-        const range = data.date_range;
-        const rangeText =
-          range?.earliest_day && range?.latest_day
-            ? `${range.earliest_day} → ${range.latest_day}`
-            : "no rollup days yet";
+      // The id leads and the display name is parenthetical: this line is
+      // labelled `--models`, and "Google AI Overviews" is a value that flag
+      // REJECTS. Printing the display name alone made the one command whose
+      // job is to stop a guess into the reason for one.
+      const models = (data.models ?? []).map((m) =>
+        m.display_name && m.display_name !== m.id ? `${m.id} (${m.display_name})` : m.id,
+      );
+      const competitors = (data.tracked_competitors ?? []).map((c) =>
+        c.display_name && c.display_name !== c.id ? `${c.display_name} [${c.id}]` : c.id,
+      );
+      const range = data.date_range;
+      const rangeText =
+        range?.earliest_day && range?.latest_day
+          ? `${range.earliest_day} → ${range.latest_day}`
+          : "no rollup days yet";
 
-        const list = (values: string[]): string => (values.length ? values.join(", ") : NO_VALUE);
+      const list = (values: string[]): string => (values.length ? values.join(", ") : NO_VALUE);
 
-        emitContext(ctx, ["", `  ${pc.bold("Available filters")}`]);
-        emit(ctx, data, {
-          table: {
-            rows: [
-              { filter: "--models", values: list(models) },
-              { filter: "--location", values: list(data.locations ?? []) },
-              { filter: "--prompt-type", values: list(data.prompt_types ?? []) },
-              { filter: "--tag", values: list(data.tags ?? []) },
-              { filter: "tracked competitors", values: list(competitors) },
-              { filter: "date range", values: rangeText },
-              { filter: "--models (all ids)", values: MODEL_VALUES.join(", ") },
-            ],
-            columns: ["filter", "values"],
+      emitContext(ctx, ["", `  ${pc.bold("Available filters")}`]);
+      emit(ctx, data, {
+        table: {
+          rows: [
+            { filter: "--models", values: list(models) },
+            { filter: "--location", values: list(data.locations ?? []) },
+            { filter: "--prompt-type", values: list(data.prompt_types ?? []) },
+            { filter: "--tag", values: list(data.tags ?? []) },
+            { filter: "tracked competitors", values: list(competitors) },
+            { filter: "date range", values: rangeText },
+            { filter: "--models (all ids)", values: MODEL_VALUES.join(", ") },
+          ],
+          columns: ["filter", "values"],
+        },
+        next: [
+          {
+            why: "Use one of these models and a window that has data",
+            command: "senso analytics summary --models <id>",
           },
-          next: [
-            {
-              why: "Use one of these models and a window that has data",
-              command: "senso analytics summary --models <id>",
-            },
-          ],
-          plain: [
-            "",
-            `  ${pc.bold("Available filters")}`,
-            "",
-            `  ${pc.bold("--models")}        ${list(models)}`,
-            `  ${pc.bold("--location")}      ${list(data.locations ?? [])}`,
-            `  ${pc.bold("--prompt-type")}   ${list(data.prompt_types ?? [])}`,
-            `  ${pc.bold("--tag")}           ${list(data.tags ?? [])}`,
-            "",
-            `  ${pc.bold("Tracked competitors")}  ${list(competitors)}`,
-            `  ${pc.bold("Date range")}           ${rangeText}`,
-            "",
-            `  ${pc.dim(`Every model id --models accepts, with data or without: ${MODEL_VALUES.join(", ")}`)}`,
-          ],
-        });
-        emitNotes(ctx, data.notes);
-      }),
-    );
+        ],
+        plain: [
+          "",
+          `  ${pc.bold("Available filters")}`,
+          "",
+          `  ${pc.bold("--models")}        ${list(models)}`,
+          `  ${pc.bold("--location")}      ${list(data.locations ?? [])}`,
+          `  ${pc.bold("--prompt-type")}   ${list(data.prompt_types ?? [])}`,
+          `  ${pc.bold("--tag")}           ${list(data.tags ?? [])}`,
+          "",
+          `  ${pc.bold("Tracked competitors")}  ${list(competitors)}`,
+          `  ${pc.bold("Date range")}           ${rangeText}`,
+          "",
+          `  ${pc.dim(`Every model id --models accepts, with data or without: ${MODEL_VALUES.join(", ")}`)}`,
+        ],
+      });
+      emitNotes(ctx, data.notes);
+    }),
+  );
 }

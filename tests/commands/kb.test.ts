@@ -364,7 +364,14 @@ describe("kb, when the command line is wrong", () => {
   });
 
   it("exits 2 when --tag-ids carries something that is not a UUID", async () => {
-    const res = await runCli(["kb", "my-files", "--tag-ids", `${TAG_ID},handbook`, "--output", "json"]);
+    const res = await runCli([
+      "kb",
+      "my-files",
+      "--tag-ids",
+      `${TAG_ID},handbook`,
+      "--output",
+      "json",
+    ]);
 
     expect(res.exitCode).toBe(2);
     expect(errorEnvelope(res).error).toMatchObject({ field: "--tag-ids", received: "handbook" });
@@ -658,7 +665,10 @@ describe("kb, when the request fails", () => {
     // retry here sends it into a loop that can never succeed.
     server.use(
       http.get(apiUrl("/org/kb/my-files"), () =>
-        HttpResponse.json({ error: "The knowledge base is not enabled in this environment" }, { status: 503 }),
+        HttpResponse.json(
+          { error: "The knowledge base is not enabled in this environment" },
+          { status: 503 },
+        ),
       ),
     );
 
@@ -1116,7 +1126,9 @@ describe("kb browsing, what it renders", () => {
   });
 
   it("says a name search matched nothing, and points at the full-text search", async () => {
-    server.use(http.get(apiUrl("/org/kb/find"), () => HttpResponse.json({ ...EMPTY_LIST, limit: 20 })));
+    server.use(
+      http.get(apiUrl("/org/kb/find"), () => HttpResponse.json({ ...EMPTY_LIST, limit: 20 })),
+    );
 
     const res = await runCli(["kb", "find", "--query", "refund"]);
 
@@ -1346,7 +1358,9 @@ describe("kb tree edits, on the wire", () => {
 
   it("puts the created folder on stdout and the tick on stderr", async () => {
     server.use(
-      http.post(apiUrl("/org/kb/folders"), () => HttpResponse.json({ ...FOLDER_NODE, name: "Legal" })),
+      http.post(apiUrl("/org/kb/folders"), () =>
+        HttpResponse.json({ ...FOLDER_NODE, name: "Legal" }),
+      ),
     );
 
     const res = await runCli(["kb", "create-folder", "--name", "Legal"]);
@@ -1371,15 +1385,7 @@ describe("kb tree edits, on the wire", () => {
   it("suppresses the tick entirely under --output json", async () => {
     server.use(http.patch(apiUrl("/org/kb/nodes/:nodeId/move"), () => HttpResponse.json(DOC_NODE)));
 
-    const res = await runCli([
-      "kb",
-      "move",
-      DOC_ID,
-      "--parent-id",
-      FOLDER_ID,
-      "--output",
-      "json",
-    ]);
+    const res = await runCli(["kb", "move", DOC_ID, "--parent-id", FOLDER_ID, "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
     expect(res.data()).toEqual(DOC_NODE);
@@ -1453,7 +1459,14 @@ describe("kb raw content, on the wire", () => {
       http.post(apiUrl("/org/kb/raw"), () => HttpResponse.json(RAW_CONTENT, { status: 202 })),
     );
 
-    const res = await runCli(["kb", "create-raw", "--data", '{"text":"# Hello"}', "--output", "json"]);
+    const res = await runCli([
+      "kb",
+      "create-raw",
+      "--data",
+      '{"text":"# Hello"}',
+      "--output",
+      "json",
+    ]);
 
     expect(envelope(res).next).toEqual([
       {
@@ -1586,16 +1599,7 @@ describe("kb tags, on the wire", () => {
       }),
     );
 
-    await runCli([
-      "kb",
-      "tags",
-      "set",
-      DOC_ID,
-      "--names",
-      "handbook, hr ,",
-      "--ids",
-      OTHER_TAG_ID,
-    ]);
+    await runCli(["kb", "tags", "set", DOC_ID, "--names", "handbook, hr ,", "--ids", OTHER_TAG_ID]);
 
     expect(seen?.method).toBe("PUT");
     // Whitespace trimmed and empty segments dropped, so a trailing comma in a
@@ -1631,7 +1635,16 @@ describe("kb tags, on the wire", () => {
       }),
     );
 
-    const res = await runCli(["kb", "tags", "add", DOC_ID, "--name", "handbook", "--output", "json"]);
+    const res = await runCli([
+      "kb",
+      "tags",
+      "add",
+      DOC_ID,
+      "--name",
+      "handbook",
+      "--output",
+      "json",
+    ]);
 
     expect(seen?.method).toBe("POST");
     expect(body).toEqual({ tag_name: "handbook" });
@@ -1707,7 +1720,16 @@ describe("kb tags, on the wire", () => {
       ),
     );
 
-    const res = await runCli(["kb", "tags", "remove", DOC_ID, "--name", "legal", "--output", "json"]);
+    const res = await runCli([
+      "kb",
+      "tags",
+      "remove",
+      DOC_ID,
+      "--name",
+      "legal",
+      "--output",
+      "json",
+    ]);
 
     expect(res.exitCode).toBe(0);
     expect(res.data()).toMatchObject({ action: "tag_detached", changed: false, tag_name: "legal" });
@@ -1951,7 +1973,12 @@ describe("kb upload, when S3 refuses the bytes", () => {
   it("reports the failing file instead of counting it as uploaded", async () => {
     const { puts } = serveUpload([accepted("a.txt"), accepted("b.txt")], { s3Status: 403 });
 
-    const res = await runCli(["kb", "upload", tempFile("a.txt", "alpha"), tempFile("b.txt", "bravo")]);
+    const res = await runCli([
+      "kb",
+      "upload",
+      tempFile("a.txt", "alpha"),
+      tempFile("b.txt", "bravo"),
+    ]);
 
     expect(puts).toHaveLength(2);
     // The regression this guards: the PUT was once fire-and-forget, so a
@@ -1966,9 +1993,7 @@ describe("kb upload, when S3 refuses the bytes", () => {
     const puts: string[] = [];
     server.use(
       http.post(apiUrl("/org/kb/upload"), () =>
-        HttpResponse.json(
-          uploadResponse([accepted("a.txt", { url: failing }), accepted("b.txt")]),
-        ),
+        HttpResponse.json(uploadResponse([accepted("a.txt", { url: failing }), accepted("b.txt")])),
       ),
       http.put(failing, () => new HttpResponse(null, { status: 500 })),
       http.put(S3_PATH, async ({ request }) => {

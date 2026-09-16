@@ -63,7 +63,7 @@ function parseTagIds(value: unknown): string[] {
   if (!Array.isArray(value)) {
     throw usageError(`"tag_ids" in --data must be an array of tag ids.`, {
       field: "tag_ids",
-      hint: 'Tag ids come from `senso tags list`. Pass [] to attach none, e.g. --data \'{"tag_ids":[]}\'.',
+      hint: "Tag ids come from `senso tags list`. Pass [] to attach none, e.g. --data '{\"tag_ids\":[]}'.",
     });
   }
   const entries = value.map((v, i) => {
@@ -109,7 +109,7 @@ export function registerQuestionsCommands(program: Command): void {
         "questions[].tags — attached tags",
         "questions[].persona_name — the persona this question came from, or null",
         "total — the number of questions returned",
-        "limit, offset, sort_by — always 0 / 0 / \"\": this endpoint neither pages nor sorts. Ignore them.",
+        'limit, offset, sort_by — always 0 / 0 / "": this endpoint neither pages nor sorts. Ignore them.',
       ],
       exitCodes: {
         ...apiExits,
@@ -118,7 +118,10 @@ export function registerQuestionsCommands(program: Command): void {
       },
       examples: [
         { command: "senso questions list" },
-        { comment: "The questions your network shares", command: "senso questions list --type network" },
+        {
+          comment: "The questions your network shares",
+          command: "senso questions list --type network",
+        },
         {
           command:
             "senso questions list --output json | jq -r '.data.questions[] | [.geo_question_id, .type] | @tsv'",
@@ -127,7 +130,11 @@ export function registerQuestionsCommands(program: Command): void {
       notes: [
         "`--type network` on an organization that belongs to no network returns an empty list rather than an error.",
       ],
-      seeAlso: ["senso prompts list", "senso questions create", "senso questions patch <questionId>"],
+      seeAlso: [
+        "senso prompts list",
+        "senso questions create",
+        "senso questions patch <questionId>",
+      ],
     },
   ).action(
     runAction(program, async (ctx, cmdOpts: Record<string, string>) => {
@@ -148,7 +155,7 @@ export function registerQuestionsCommands(program: Command): void {
         emptyHint:
           scope === "network"
             ? "An organization with no network gets an empty list here. Check with `senso org get`."
-            : "Add one with `senso questions create --data '{\"question_text\":\"...\",\"type\":\"decision\"}'`.",
+            : 'Add one with `senso questions create --data \'{"question_text":"...","type":"decision"}\'`.',
       });
     }),
   );
@@ -257,9 +264,17 @@ export function registerQuestionsCommands(program: Command): void {
           : [],
         next: [
           ...(tagsDropped
-            ? [{ why: "Check which tags actually landed", command: `senso prompts tags list ${id}` }]
+            ? [
+                {
+                  why: "Check which tags actually landed",
+                  command: `senso prompts tags list ${id}`,
+                },
+              ]
             : []),
-          { why: "Questions run on the org schedule, not on creation", command: "senso run-config schedule" },
+          {
+            why: "Questions run on the org schedule, not on creation",
+            command: "senso run-config schedule",
+          },
         ],
       });
     }),
@@ -280,12 +295,10 @@ export function registerQuestionsCommands(program: Command): void {
         'JSON with at least one of: { "type": "awareness|consideration|evaluation|decision" } and { "tag_ids": ["<uuid>"] }. tag_ids REPLACES the question\'s tags; pass [] to remove them all. tag_ids: null does NOT clear them — the API reads null as "field not supplied" and rejects the request.',
       ),
     {
-      returns: [
-        "The question after the update: geo_question_id, question_text, type, tags",
-      ],
+      returns: ["The question after the update: geo_question_id, question_text, type, tags"],
       exitCodes: {
         ...idExits,
-        2: '--data is not JSON, names neither type nor tag_ids, uses tag_ids: null, has a stage outside the four, or a tag id that is not a UUID; or <questionId> is not a UUID',
+        2: "--data is not JSON, names neither type nor tag_ids, uses tag_ids: null, has a stage outside the four, or a tag id that is not a UUID; or <questionId> is not a UUID",
         3: "no API key, or the organization does not have the GEO product",
         4: "no question with this id in your organization",
       },
@@ -297,7 +310,8 @@ export function registerQuestionsCommands(program: Command): void {
         },
         {
           comment: "Remove every tag",
-          command: 'senso questions patch 11111111-1111-4111-8111-111111111111 --data \'{"tag_ids":[]}\'',
+          command:
+            "senso questions patch 11111111-1111-4111-8111-111111111111 --data '{\"tag_ids\":[]}'",
         },
         {
           command:
@@ -307,7 +321,11 @@ export function registerQuestionsCommands(program: Command): void {
       notes: [
         "tag_ids is a full replacement, not an append. For an incremental change use `senso prompts tags add` / `senso prompts tags remove`.",
       ],
-      seeAlso: ["senso prompts tags add <promptId>", "senso prompts tags remove <promptId>", "senso tags list"],
+      seeAlso: [
+        "senso prompts tags add <promptId>",
+        "senso prompts tags remove <promptId>",
+        "senso tags list",
+      ],
     },
   ).action(
     runAction(program, async (ctx, questionId: string, cmdOpts: { data: string }) => {
@@ -354,7 +372,9 @@ export function registerQuestionsCommands(program: Command): void {
         warnings:
           patch.tag_ids === undefined
             ? []
-            : [`tag_ids replaced the question's whole tag set; tags that were not listed are now detached.`],
+            : [
+                `tag_ids replaced the question's whole tag set; tags that were not listed are now detached.`,
+              ],
         next: [{ why: "See the question's run history", command: `senso prompts get ${id}` }],
       });
     }),

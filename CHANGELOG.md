@@ -13,9 +13,9 @@ mattered, and what you need to do differently.
 
 - **`--output json` now writes one envelope instead of a bare payload.** Every
   command emits `{ "ok": true, "command": "…", "data": <the API payload>,
-  "page"?, "next"?, "warnings"? }`. `data` is the API's own shape, unmodified,
+"page"?, "next"?, "warnings"? }`. `data` is the API's own shape, unmodified,
   so every existing `jq` path moves under `.data` — `senso search … | jq -r
-  .answer` becomes `jq -r .data.answer`. The seven official agent skills have
+.answer` becomes `jq -r .data.answer`. The seven official agent skills have
   been updated in the same release.
 
   The reason is `next`. `--output json` implies `--quiet`, so everything this
@@ -28,7 +28,7 @@ mattered, and what you need to do differently.
 
 - **The JSON error object gained fields and lost its silence.** A failure now
   writes `{ "ok": false, "command": "…", "error": { code, message, status?,
-  field?, received?, allowed?, hint?, details?, request? } }`. `error.code` is
+field?, received?, allowed?, hint?, details?, request? } }`. `error.code` is
   unchanged and still stable; `validation` is new, for the API's own 400 and
   422 field errors.
 
@@ -77,9 +77,23 @@ mattered, and what you need to do differently.
   own DTOs, and `--output table` warns at runtime when a declared column is
   absent from every row.
 
+- **`tags list --output table` no longer warns about columns it did not ask
+  for.** The count fields are returned only under `--counts`, so declaring them
+  unconditionally made every plain listing report that the API had withheld
+  `prompt_count` and `content_count` — a false alarm in front of a correct
+  table. The columns now follow the flag.
+
+- **`competitors batch-add` reports what the call did, from the API's own
+  counts.** The response carries `created_count`, `already_present_count`,
+  `skipped_over_cap_count` and `remaining_capacity`; the CLI was inferring
+  created-versus-already-tracked from each row's `created_at`, which made its
+  answer depend on the clock and read a row another command had inserted
+  seconds earlier as new. The timestamps remain as a fallback for a deployment
+  that does not send the counts, and a batch truncated at the 50-competitor
+  organization cap now says how many were discarded and how much room is left.
+
 - **Numeric flags are rejected rather than clamped.** `search --max-results
-  999` silently searched with 20 and `--max-results abc` silently searched with
-  5. Both now exit 2 naming the flag, the value and the accepted range.
+999` silently searched with 20 and `--max-results abc` silently searched with 5. Both now exit 2 naming the flag, the value and the accepted range.
 
 - **`plain` no longer stringifies nested data.** A nested object renders as an
   indented sub-block and an array of objects as numbered sub-blocks, so

@@ -64,10 +64,14 @@ describe("emit, in json", () => {
     // and every published Senso skill passes it, so a hint written only to
     // stderr reaches nobody.
     const { out } = capture(() => {
-      emit(ctx("json"), { items: [{ id: "a" }], total: 1 }, {
-        next: [{ why: "Read it", command: "senso kb get a" }],
-        warnings: ["one file was skipped"],
-      });
+      emit(
+        ctx("json"),
+        { items: [{ id: "a" }], total: 1 },
+        {
+          next: [{ why: "Read it", command: "senso kb get a" }],
+          warnings: ["one file was skipped"],
+        },
+      );
     });
 
     const envelope = JSON.parse(out) as { next: unknown; warnings: unknown };
@@ -394,10 +398,14 @@ describe("emit, in plain, on shapes that used to render as JSON strings", () => 
 
   it("says a list is empty rather than printing a blank envelope field", () => {
     const { out, err } = capture(() => {
-      emit(ctx("plain"), { gaps: [], total: 0 }, {
-        empty: "gaps",
-        emptyHint: "A gap seen once is weak and hidden. Try: senso gaps list --status weak",
-      });
+      emit(
+        ctx("plain"),
+        { gaps: [], total: 0 },
+        {
+          empty: "gaps",
+          emptyHint: "A gap seen once is weak and hidden. Try: senso gaps list --status weak",
+        },
+      );
     });
 
     expect(out).toContain("No gaps found.");

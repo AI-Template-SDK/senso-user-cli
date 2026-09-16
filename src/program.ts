@@ -104,7 +104,7 @@ Output:
       "error": { "code": "not_found", "message": "...", "status": 404,
                  "field": "--status", "received": "nope", "allowed": [...],
                  "hint": "...", "details": {...},
-                 "request": { "method": "GET", "path": "/org/kb/nodes/..." } } }
+                 "request": { "method": "GET", "path": "/org/kb/nodes/{id}" } } }
   error.code is stable; messages may be reworded.
 
 Docs: https://docs.senso.ai`;

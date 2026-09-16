@@ -66,7 +66,7 @@ export async function resolveIndustryId(
     throw usageError("<industry> is empty.", {
       field: "<industry>",
       received: industry,
-      hint: "Pass an industry_id UUID or a name, e.g. `senso industries prompts \"Airlines (Canada)\"`. List them with `senso industries list`.",
+      hint: 'Pass an industry_id UUID or a name, e.g. `senso industries prompts "Airlines (Canada)"`. List them with `senso industries list`.',
     });
   }
 
@@ -726,10 +726,14 @@ export function registerIndustriesCommands(program: Command): void {
         {
           comment: "Check the fuzzy match landed on the right brand",
           command:
-            'senso industries brand 5d6e7f80-9a0b-4c1d-8e2f-3a4b5c6d7e8f "Air Canada" --output json | jq \'.data.resolved | {matched_on, match_confidence, surface_forms}\'',
+            "senso industries brand 5d6e7f80-9a0b-4c1d-8e2f-3a4b5c6d7e8f \"Air Canada\" --output json | jq '.data.resolved | {matched_on, match_confidence, surface_forms}'",
         },
       ],
-      seeAlso: ["senso industries brand-by-id", "senso industries brands", "senso industries domain"],
+      seeAlso: [
+        "senso industries brand-by-id",
+        "senso industries brands",
+        "senso industries domain",
+      ],
     },
   );
 
@@ -743,7 +747,7 @@ export function registerIndustriesCommands(program: Command): void {
         .argument("<industry>", INDUSTRY_ARG)
         .argument(
           "<brandId>",
-          "A brand_id UUID — brands[].brand_id from `industries brands`, or resolved.brand_id from `industries brand`. NOT brand_key (\"air-canada\"), which is a display artifact",
+          'A brand_id UUID — brands[].brand_id from `industries brands`, or resolved.brand_id from `industries brand`. NOT brand_key ("air-canada"), which is a display artifact',
         ),
     ).action(
       runAction(
@@ -878,9 +882,7 @@ export function registerIndustriesCommands(program: Command): void {
               warnings: [
                 ...(cmdOpts.url === undefined
                   ? []
-                  : [
-                      `--url replaced <domain>: this reports on ${cmdOpts.url}, not on ${host}.`,
-                    ]),
+                  : [`--url replaced <domain>: this reports on ${cmdOpts.url}, not on ${host}.`]),
                 ...(data.cited === false
                   ? [
                       `${cmdOpts.url ?? host} was not cited in this industry over the window. That is an answer, not an error. Widen --from/--to, or see which domains were cited with \`senso industries brands ${industryId}\` (top_cited_domain per brand).`,
@@ -1079,7 +1081,7 @@ export function registerIndustriesCommands(program: Command): void {
         {
           comment: "Your own industry, from the organization record",
           command:
-            "senso industries import-prompts \"$(senso org get --output json | jq -r .data.industry_id)\" --prompt-ids 3f2a8d10-61b4-4b0e-9a55-8c0d2e4f6a91",
+            'senso industries import-prompts "$(senso org get --output json | jq -r .data.industry_id)" --prompt-ids 3f2a8d10-61b4-4b0e-9a55-8c0d2e4f6a91',
         },
         {
           comment: "Capture the job to poll",
@@ -1109,7 +1111,12 @@ interface ImportResponse {
     reason?: string | null;
   }[];
   defaults_seeded?: { models?: string[]; schedule_dows?: number[]; locations?: string[] };
-  history_import?: { status?: string; import_id?: string | null; days?: number; reason?: string | null };
+  history_import?: {
+    status?: string;
+    import_id?: string | null;
+    days?: number;
+    reason?: string | null;
+  };
 }
 
 /**

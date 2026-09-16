@@ -57,11 +57,11 @@ or an empty file, never a sentence you have to strip.
 
 **Formats.** Every command takes `--output`:
 
-| Format  | For                | Notes                                                    |
-| ------- | ------------------ | -------------------------------------------------------- |
+| Format  | For                | Notes                                                       |
+| ------- | ------------------ | ----------------------------------------------------------- |
 | `json`  | scripts and agents | One envelope; `data` is the API payload. Implies `--quiet`. |
-| `table` | reading a list     | Aligned columns; long cells truncated.                   |
-| `plain` | reading one thing  | Complete and untruncated. The default.                   |
+| `table` | reading a list     | Aligned columns; long cells truncated.                      |
+| `plain` | reading one thing  | Complete and untruncated. The default.                      |
 
 **One envelope, every time.** `--output json` writes this to stdout:
 
@@ -78,7 +78,9 @@ or an empty file, never a sentence you have to strip.
     "has_more": true,
     "next": "senso kb my-files --status complete --offset 50"
   },
-  "next": [{ "why": "Read one node, including its ingestion state", "command": "senso kb get <id>" }],
+  "next": [
+    { "why": "Read one node, including its ingestion state", "command": "senso kb get <id>" }
+  ],
   "warnings": ["2 files were skipped as duplicates"]
 }
 ```

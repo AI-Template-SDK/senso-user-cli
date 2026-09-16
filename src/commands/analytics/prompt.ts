@@ -88,133 +88,137 @@ export function addPromptCommand(analytics: Command, program: Command): void {
       seeAlso: ["senso analytics prompts", "senso analytics answers", "senso prompts get"],
     },
   ).action(
-      runAction(
-        program,
-        async (
-          ctx: Ctx,
-          promptId: string,
-          cmdOpts: {
-            from?: string;
-            to?: string;
-            models?: string;
-            location?: string;
-            includeAnswers?: boolean;
+    runAction(
+      program,
+      async (
+        ctx: Ctx,
+        promptId: string,
+        cmdOpts: {
+          from?: string;
+          to?: string;
+          models?: string;
+          location?: string;
+          includeAnswers?: boolean;
+        },
+      ) => {
+        const id = parseId(promptId, {
+          label: "<promptId>",
+          type: "Prompt",
+          idField: "prompt_id",
+          list: "senso analytics prompts",
+        });
+        const from = parseDateFlag("--from", cmdOpts.from);
+        const to = parseDateFlag("--to", cmdOpts.to);
+        assertRange("--from", from, "--to", to, { maxDays: 365 });
+
+        const data = await apiRequest<{
+          prompt_id: string;
+          prompt_text: string;
+          prompt_type: string;
+          tags: string[];
+          window: AnalyticsWindow;
+          totals: Totals;
+          metrics: Metrics;
+          series: MentionSeriesPoint[];
+          latest_answers: LatestAnswerItem[];
+          data_quality: DataQuality;
+          notes: string[];
+        }>({
+          path: `/org/analytics/prompts/${id}`,
+          params: {
+            from,
+            to,
+            models: parseModelsFlag(cmdOpts.models),
+            location: cmdOpts.location,
+            include_answers: cmdOpts.includeAnswers === false ? "false" : undefined,
           },
-        ) => {
-          const id = parseId(promptId, {
-            label: "<promptId>",
+          resource: {
             type: "Prompt",
+            id,
             idField: "prompt_id",
             list: "senso analytics prompts",
-          });
-          const from = parseDateFlag("--from", cmdOpts.from);
-          const to = parseDateFlag("--to", cmdOpts.to);
-          assertRange("--from", from, "--to", to, { maxDays: 365 });
+          },
+          apiKey: ctx.apiKey,
+          baseUrl: ctx.baseUrl,
+        });
+        requireBlocks("/org/analytics/prompts/{promptId}", {
+          totals: data.totals,
+          metrics: data.metrics,
+        });
 
-          const data = await apiRequest<{
-            prompt_id: string;
-            prompt_text: string;
-            prompt_type: string;
-            tags: string[];
-            window: AnalyticsWindow;
-            totals: Totals;
-            metrics: Metrics;
-            series: MentionSeriesPoint[];
-            latest_answers: LatestAnswerItem[];
-            data_quality: DataQuality;
-            notes: string[];
-          }>({
-            path: `/org/analytics/prompts/${id}`,
-            params: {
-              from,
-              to,
-              models: parseModelsFlag(cmdOpts.models),
-              location: cmdOpts.location,
-              include_answers: cmdOpts.includeAnswers === false ? "false" : undefined,
+        const series = data.series ?? [];
+        const answers = data.latest_answers ?? [];
+        const rows = metricRows(data.totals, data.metrics);
+        const context = [
+          "",
+          `  ${pc.bold(data.prompt_text)} ${pc.dim(`[${data.prompt_type}]`)}`,
+          `  ${pc.dim(`ID: ${data.prompt_id}${data.tags?.length ? ` · tags: ${data.tags.join(", ")}` : ""}`)}`,
+          windowLine(data.window),
+          qualityLine(data.data_quality),
+        ];
+        emitContext(ctx, context);
+        emit(ctx, data, {
+          next: [
+            {
+              why: "Compare this prompt with the rest",
+              command: "senso analytics prompts --order asc",
             },
-            resource: {
-              type: "Prompt",
-              id,
-              idField: "prompt_id",
-              list: "senso analytics prompts",
-            },
-            apiKey: ctx.apiKey,
-            baseUrl: ctx.baseUrl,
-          });
-          requireBlocks("/org/analytics/prompts/{promptId}", {
-            totals: data.totals,
-            metrics: data.metrics,
-          });
-
-          const series = data.series ?? [];
-          const answers = data.latest_answers ?? [];
-          const rows = metricRows(data.totals, data.metrics);
-          const context = [
+          ],
+          table: {
+            rows: series.map((p) => ({
+              period: p.period_start,
+              answered: count(p.answered_count),
+              mentioned: count(p.mentioned_count),
+              mention_rate: rate(p.mention_rate),
+              sov: rate(p.share_of_voice),
+              avg_rank: rate(p.avg_rank),
+            })),
+            columns: ["period", "answered", "mentioned", "mention_rate", "sov", "avg_rank"],
+          },
+          plain: [
+            ...context,
             "",
-            `  ${pc.bold(data.prompt_text)} ${pc.dim(`[${data.prompt_type}]`)}`,
-            `  ${pc.dim(`ID: ${data.prompt_id}${data.tags?.length ? ` · tags: ${data.tags.join(", ")}` : ""}`)}`,
-            windowLine(data.window),
-            qualityLine(data.data_quality),
-          ];
-          emitContext(ctx, context);
-          emit(ctx, data, {
-            next: [
-              {
-                why: "Compare this prompt with the rest",
-                command: "senso analytics prompts --order asc",
-              },
-            ],
-            table: {
-              rows: series.map((p) => ({
-                period: p.period_start,
-                answered: count(p.answered_count),
-                mentioned: count(p.mentioned_count),
-                mention_rate: rate(p.mention_rate),
-                sov: rate(p.share_of_voice),
-                avg_rank: rate(p.avg_rank),
-              })),
-              columns: ["period", "answered", "mentioned", "mention_rate", "sov", "avg_rank"],
-            },
-            plain: [
-              ...context,
-              "",
-              ...metricPlainLines(rows),
-              "",
-              `  ${pc.bold("Series")}`,
-              ...(series.length
-                ? series.map(
-                    (p) =>
-                      `  ${p.period_start}  answered ${count(p.answered_count)}  mentioned ${count(p.mentioned_count)}  rate ${rate(p.mention_rate)}  SoV ${rate(p.share_of_voice)}  rank ${rate(p.avg_rank)}`,
-                  )
-                : ["  No rollup days in this window."]),
-              ...(answers.length
-                ? [
-                    "",
-                    `  ${pc.bold("Latest answers")}`,
-                    ...answers.map((a) =>
-                      [
-                        `  ${pc.bold(`${a.model} · ${a.location}`)} ${pc.dim(a.run_at)}`,
-                        `     mentioned ${a.mentioned ? "yes" : "no"} · rank ${a.rank === null || a.rank === undefined ? NO_VALUE : `#${a.rank}`} · sentiment ${a.sentiment ?? NO_VALUE} · ${count(a.citations?.length ?? 0)} citations`,
-                        // Plain never truncates, and the citations and
-                        // competitor mentions are what this command is opened
-                        // for — hiding them behind --output json defeats it.
-                        `     ${pc.dim(a.response_text)}`,
-                        ...(a.citations ?? []).map(
-                          (c) => `     ${pc.dim(`↳ ${c.url} [${c.citation_type}]`)}`,
-                        ),
-                        ...(Object.keys(a.competitor_mentions ?? {}).length > 0
-                          ? [
-                              `     ${pc.dim(`competitors named: ${Object.entries(a.competitor_mentions).map(([brand, n]) => `${brand} ×${String(n)}`).join(", ")}`)}`,
-                            ]
-                          : []),
-                      ].join("\n"),
-                    ),
-                  ]
-                : []),
-            ],
-          });
-          emitNotes(ctx, data.notes);
-        },
-      ),
-    );
+            ...metricPlainLines(rows),
+            "",
+            `  ${pc.bold("Series")}`,
+            ...(series.length
+              ? series.map(
+                  (p) =>
+                    `  ${p.period_start}  answered ${count(p.answered_count)}  mentioned ${count(p.mentioned_count)}  rate ${rate(p.mention_rate)}  SoV ${rate(p.share_of_voice)}  rank ${rate(p.avg_rank)}`,
+                )
+              : ["  No rollup days in this window."]),
+            ...(answers.length
+              ? [
+                  "",
+                  `  ${pc.bold("Latest answers")}`,
+                  ...answers.map((a) =>
+                    [
+                      `  ${pc.bold(`${a.model} · ${a.location}`)} ${pc.dim(a.run_at)}`,
+                      `     mentioned ${a.mentioned ? "yes" : "no"} · rank ${a.rank === null || a.rank === undefined ? NO_VALUE : `#${a.rank}`} · sentiment ${a.sentiment ?? NO_VALUE} · ${count(a.citations?.length ?? 0)} citations`,
+                      // Plain never truncates, and the citations and
+                      // competitor mentions are what this command is opened
+                      // for — hiding them behind --output json defeats it.
+                      `     ${pc.dim(a.response_text)}`,
+                      ...(a.citations ?? []).map(
+                        (c) => `     ${pc.dim(`↳ ${c.url} [${c.citation_type}]`)}`,
+                      ),
+                      ...(Object.keys(a.competitor_mentions ?? {}).length > 0
+                        ? [
+                            `     ${pc.dim(
+                              `competitors named: ${Object.entries(a.competitor_mentions)
+                                .map(([brand, n]) => `${brand} ×${String(n)}`)
+                                .join(", ")}`,
+                            )}`,
+                          ]
+                        : []),
+                    ].join("\n"),
+                  ),
+                ]
+              : []),
+          ],
+        });
+        emitNotes(ctx, data.notes);
+      },
+    ),
+  );
 }

@@ -50,7 +50,10 @@ function assertName(body: ProductLineBody): void {
   if (body.name.trim().length > MAX_NAME_LENGTH) {
     throw usageError(
       `--data.name is ${String(body.name.trim().length)} characters; the maximum is ${String(MAX_NAME_LENGTH)}.`,
-      { field: "--data.name", hint: `Shorten the name to ${String(MAX_NAME_LENGTH)} characters or fewer.` },
+      {
+        field: "--data.name",
+        hint: `Shorten the name to ${String(MAX_NAME_LENGTH)} characters or fewer.`,
+      },
     );
   }
 }
@@ -67,7 +70,12 @@ function assertDetails(body: ProductLineBody): void {
   const isObject =
     typeof body.details === "object" && body.details !== null && !Array.isArray(body.details);
   if (!isObject) {
-    const got = body.details === null ? "null" : Array.isArray(body.details) ? "an array" : `a ${typeof body.details}`;
+    const got =
+      body.details === null
+        ? "null"
+        : Array.isArray(body.details)
+          ? "an array"
+          : `a ${typeof body.details}`;
     throw usageError(`--data.details must be a JSON object, got ${got}.`, {
       field: "--data.details",
       received: JSON.stringify(body.details),
@@ -132,7 +140,8 @@ See also: senso generate, senso brand-kit get, senso content-types list`,
             next: [
               {
                 why: "Use a product line in a generation",
-                command: "senso generate --prompt-id <prompt_id> --product-line-ids <product_line_id>",
+                command:
+                  "senso generate --prompt-id <prompt_id> --product-line-ids <product_line_id>",
               },
             ],
           });
@@ -326,14 +335,14 @@ See also: senso generate, senso brand-kit get, senso content-types list`,
             warnings: [
               "PUT replaced `details` wholesale: keys that were not in --data are gone, along with the evidence they provided to generation.",
             ],
-            next: [
-              { why: "Confirm the stored blob", command: `senso product-lines get ${id}` },
-            ],
+            next: [{ why: "Confirm the stored blob", command: `senso product-lines get ${id}` }],
           });
         }),
       ),
     {
-      returns: ["The product line as it now stands: product_line_id, name, details, created_at, updated_at"],
+      returns: [
+        "The product line as it now stands: product_line_id, name, details, created_at, updated_at",
+      ],
       exitCodes: {
         ...idExits,
         1: "409 — another product line already has that name",
@@ -361,10 +370,13 @@ See also: senso generate, senso brand-kit get, senso content-types list`,
     pl
       .command("patch")
       .description(
-        "Change a product line's name, its details, or both (PATCH). Top-level fields you omit are left alone — but `details` is REPLACED, not merged: sending {\"details\":{\"price_usd\":129}} makes that the entire blob and drops every other key. To change one key, read the current blob and send it back whole.",
+        'Change a product line\'s name, its details, or both (PATCH). Top-level fields you omit are left alone — but `details` is REPLACED, not merged: sending {"details":{"price_usd":129}} makes that the entire blob and drops every other key. To change one key, read the current blob and send it back whole.',
       )
       .argument("<id>", "A product_line_id (UUID) from `senso product-lines list`")
-      .requiredOption("--data <json>", 'JSON: at least one of { "name": "...", "details": { ... } }')
+      .requiredOption(
+        "--data <json>",
+        'JSON: at least one of { "name": "...", "details": { ... } }',
+      )
       .action(
         runAction(program, async (ctx, rawId: string, cmdOpts: { data: string }) => {
           const id = parseId(rawId, PRODUCT_LINE_ID);
@@ -398,7 +410,9 @@ See also: senso generate, senso brand-kit get, senso content-types list`,
         }),
       ),
     {
-      returns: ["The product line as it now stands: product_line_id, name, details, created_at, updated_at"],
+      returns: [
+        "The product line as it now stands: product_line_id, name, details, created_at, updated_at",
+      ],
       exitCodes: {
         ...idExits,
         1: "409 — another product line already has that name",

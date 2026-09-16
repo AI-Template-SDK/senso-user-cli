@@ -114,7 +114,7 @@ describe("`senso logout`", () => {
     // A confirmation, on stderr: there is no payload here, so a caller piping
     // this command should receive an empty stream rather than a sentence.
     expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("Credentials removed");
+    expect(res.stderr).toContain("Removed stored credentials");
   });
 
   it("succeeds when there was nothing stored, because logging out twice is not an error", async () => {

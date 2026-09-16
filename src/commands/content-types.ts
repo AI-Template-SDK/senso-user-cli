@@ -217,7 +217,7 @@ export function registerContentTypeCommands(program: Command): void {
         columns: ["content_type_id", "name", "created_at", "updated_at"],
         empty: "content types",
         emptyHint:
-          "Add one with `senso content-types create --data '{\"name\":\"Blog Post\",\"config\":{\"template\":\"## Introduction (100-150 words)\"}}'`.",
+          'Add one with `senso content-types create --data \'{"name":"Blog Post","config":{"template":"## Introduction (100-150 words)"}}\'`.',
       });
     }),
   );
@@ -236,7 +236,7 @@ export function registerContentTypeCommands(program: Command): void {
       returns: [
         "content_type_id — use it with content-types get/update/patch/delete and the generate commands",
         "name — as stored",
-        "config — canonicalized: all five keys are present, with \"\" or null for the ones that were omitted, and template_spec derived from the template that was sent",
+        'config — canonicalized: all five keys are present, with "" or null for the ones that were omitted, and template_spec derived from the template that was sent',
         "config.template_spec.sections[] — one per Markdown heading, with the word budget read out of the heading text and ENFORCED on generated output",
       ],
       exitCodes: {
@@ -276,7 +276,10 @@ export function registerContentTypeCommands(program: Command): void {
       emit(ctx, created, {
         warnings,
         next: [
-          { why: "Read the template_spec the API derived from your template", command: `senso content-types get ${id}` },
+          {
+            why: "Read the template_spec the API derived from your template",
+            command: `senso content-types get ${id}`,
+          },
         ],
       });
     }),
@@ -310,7 +313,9 @@ export function registerContentTypeCommands(program: Command): void {
             "senso content-types get 9c8b7a6d-1111-4222-8333-444455556666 --output json | jq -r .data.config.template",
         },
       ],
-      notes: ["Sending your own template_spec has no effect; it is always re-derived from template."],
+      notes: [
+        "Sending your own template_spec has no effect; it is always re-derived from template.",
+      ],
       seeAlso: ["senso content-types patch <id>", "senso content-types list", "senso generate"],
     },
   ).action(
@@ -345,7 +350,9 @@ export function registerContentTypeCommands(program: Command): void {
         `JSON: { "name": "Updated Name", "config": { ... } }. Both required. Accepted config keys: ${CONFIG_KEYS.join(", ")}; keys omitted from config are CLEARED.`,
       ),
     {
-      returns: ["The content type after the replacement, with template_spec re-derived from the new template"],
+      returns: [
+        "The content type after the replacement, with template_spec re-derived from the new template",
+      ],
       exitCodes: {
         ...idExits,
         2: "--data is not JSON, is missing name or config, name is blank, config has an unknown key, a wrongly typed value or a relative cta_destination; or <id> is not a UUID",
@@ -395,7 +402,9 @@ export function registerContentTypeCommands(program: Command): void {
         `JSON with at least one of "name" and "config", e.g. { "config": { "template": "Updated template instruction" } }. Accepted config keys: ${CONFIG_KEYS.join(", ")}.`,
       ),
     {
-      returns: ["The content type after the merge, with template_spec re-derived from the merged template"],
+      returns: [
+        "The content type after the merge, with template_spec re-derived from the merged template",
+      ],
       exitCodes: {
         ...idExits,
         2: "--data is not JSON, names neither name nor config, has a blank name, or a config key that is unknown or wrongly typed; or <id> is not a UUID",
@@ -467,7 +476,9 @@ export function registerContentTypeCommands(program: Command): void {
       },
       examples: [
         { command: "senso content-types delete 9c8b7a6d-1111-4222-8333-444455556666" },
-        { command: "senso content-types delete 9c8b7a6d-1111-4222-8333-444455556666 --output json" },
+        {
+          command: "senso content-types delete 9c8b7a6d-1111-4222-8333-444455556666 --output json",
+        },
       ],
       notes: [
         "Content already generated is unaffected. Anything that still names this content_type_id when generating will fail.",

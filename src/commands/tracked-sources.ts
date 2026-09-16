@@ -161,7 +161,9 @@ function buildSourceBody(cmdOpts: SourceFlags): SourceBody {
 /** "pattern was normalized from X to Y", when the API stored something else. */
 function normalizationWarning(sent: string | undefined, stored: string | undefined): string[] {
   if (sent === undefined || stored === undefined || sent === stored) return [];
-  return [`--pattern was normalized from "${sent}" to "${stored}"; that stored form is what \`list\` and \`--search\` match.`];
+  return [
+    `--pattern was normalized from "${sent}" to "${stored}"; that stored form is what \`list\` and \`--search\` match.`,
+  ];
 }
 
 export function registerTrackedSourcesCommands(program: Command): void {
@@ -238,7 +240,7 @@ See also: senso analytics, senso competitors, senso publish-records`,
         "tracked_sources[].id — the <sourceId> for update and delete",
         'tracked_sources[].pattern — the stored, normalized pattern (lowercased, "www." stripped, scheme, query and fragment removed)',
         "tracked_sources[].match_type — domain (eTLD+1 and every subdomain) | host (that exact host) | path_prefix (host + path prefix) | exact_url (host + that exact path)",
-        "tracked_sources[].tier — primary (UI \"Owned\") | tracked (UI \"Tracked\") | secondary (UI \"External\", and the default for an unmatched citation)",
+        'tracked_sources[].tier — primary (UI "Owned") | tracked (UI "Tracked") | secondary (UI "External", and the default for an unmatched citation)',
         `tracked_sources[].category — sub-label, only ever set on the tracked tier: ${CATEGORIES}`,
         "tracked_sources[].label — free-text human label, if any",
         "tracked_sources[].priority — tiebreaker between rules of the same match type; higher wins. Default 0",
@@ -257,7 +259,7 @@ See also: senso analytics, senso competitors, senso publish-records`,
         {
           comment: "The rules you are allowed to edit",
           command:
-            "senso tracked-sources list --limit 100 --output json | jq -r '.data.tracked_sources[] | select(.source_origin==\"manual\") | \"\\(.id) \\(.pattern) \\(.tier)\"'",
+            'senso tracked-sources list --limit 100 --output json | jq -r \'.data.tracked_sources[] | select(.source_origin=="manual") | "\\(.id) \\(.pattern) \\(.tier)"\'',
         },
       ],
       seeAlso: ["senso tracked-sources add", "senso tracked-sources update <sourceId>"],
@@ -347,7 +349,10 @@ See also: senso analytics, senso competitors, senso publish-records`,
       .description(
         "REPLACE a citation-classification rule (PUT). What happens depends on the rule's source_origin: a manual or onboarding rule takes every field, while a published rule accepts ONLY --active/--no-active — the API takes a new pattern, match type or tier, answers 200, and silently keeps the old values, so this command reports that as a failure rather than letting it look like a write. Omission is not uniform: --label and --category are CLEARED when you omit them, while --priority and the active flag are KEPT. Requires update:org.",
       )
-      .argument("<sourceId>", "A tracked source id (UUID) — the `id` field of `senso tracked-sources list`")
+      .argument(
+        "<sourceId>",
+        "A tracked source id (UUID) — the `id` field of `senso tracked-sources list`",
+      )
       .requiredOption(
         "--pattern <pattern>",
         "Value to match cited URLs against, interpreted per --match-type. Normalized before storage",
@@ -398,7 +403,9 @@ See also: senso analytics, senso competitors, senso publish-records`,
           const warnings = [...normalizationWarning(body.pattern, data.pattern)];
           if (data.source_origin !== "published") {
             if (cmdOpts.label === undefined) {
-              warnings.push("The stored label was cleared: this PUT clears `label` when --label is not given.");
+              warnings.push(
+                "The stored label was cleared: this PUT clears `label` when --label is not given.",
+              );
             }
             if (cmdOpts.category === undefined) {
               warnings.push(
@@ -436,7 +443,7 @@ See also: senso analytics, senso competitors, senso publish-records`,
       },
       notes: [
         RECALC_NOTE,
-        "The API cannot express \"leave the label alone\" on this endpoint: `label` and `category` are reassigned on every PUT, so omitting them clears them. Send them back to keep them.",
+        'The API cannot express "leave the label alone" on this endpoint: `label` and `category` are reassigned on every PUT, so omitting them clears them. Send them back to keep them.',
       ],
       examples: [
         {
@@ -459,7 +466,10 @@ See also: senso analytics, senso competitors, senso publish-records`,
       .description(
         'Delete a citation-classification rule. A rule with source_origin="published" CANNOT be deleted — the publishing pipeline maintains it and would recreate it — so deactivate it instead with `tracked-sources update <sourceId> --pattern <its pattern> --match-type <its match_type> --tier <its tier> --no-active`. Citations that only this rule matched fall back to the External (secondary) tier. Requires update:org.',
       )
-      .argument("<sourceId>", "A tracked source id (UUID) — the `id` field of `senso tracked-sources list`")
+      .argument(
+        "<sourceId>",
+        "A tracked source id (UUID) — the `id` field of `senso tracked-sources list`",
+      )
       .action(
         runAction(program, async (ctx, rawId: string) => {
           const sourceId = parseId(rawId, SOURCE_ID);
@@ -479,9 +489,7 @@ See also: senso analytics, senso competitors, senso publish-records`,
                 "Citations that only this rule matched now fall back to the External (secondary) tier.",
                 RECALC_NOTE,
               ],
-              next: [
-                { why: "Confirm the remaining rules", command: "senso tracked-sources list" },
-              ],
+              next: [{ why: "Confirm the remaining rules", command: "senso tracked-sources list" }],
             },
           );
         }),
@@ -519,7 +527,10 @@ See also: senso analytics, senso competitors, senso publish-records`,
  */
 function fieldsTheApiIgnored(sent: SourceBody, got: TrackedSourceResponse): string[] {
   const ignored: string[] = [];
-  if (sent.pattern !== undefined && normalizePattern(sent.pattern) !== normalizePattern(got.pattern ?? "")) {
+  if (
+    sent.pattern !== undefined &&
+    normalizePattern(sent.pattern) !== normalizePattern(got.pattern ?? "")
+  ) {
     ignored.push("--pattern");
   }
   if (sent.match_type !== undefined && sent.match_type !== got.match_type) {

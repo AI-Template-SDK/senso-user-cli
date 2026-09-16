@@ -211,7 +211,10 @@ describe("evals, when the API refuses", () => {
     // that can never work, and a poll loop acts on it forever.
     server.use(
       http.get(apiUrl("/org/evals/evaluators"), () =>
-        HttpResponse.json({ message: "Evals are not enabled in this environment" }, { status: 503 }),
+        HttpResponse.json(
+          { message: "Evals are not enabled in this environment" },
+          { status: 503 },
+        ),
       ),
     );
 

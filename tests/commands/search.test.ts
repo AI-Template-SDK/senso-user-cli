@@ -804,11 +804,7 @@ describe("search stream, reassembling the token stream", () => {
   it("joins an event: line that was split across two chunks", async () => {
     // The event name is carried between reads as well — it lives outside the
     // per-chunk loop precisely so that this works.
-    captureStream([
-      "even",
-      't: token\ndata: {"token":"split header"}\n\n',
-      sourcesFrame(),
-    ]);
+    captureStream(["even", 't: token\ndata: {"token":"split header"}\n\n', sourcesFrame()]);
 
     const res = await runCli(["search", "stream", QUERY]);
 

@@ -46,48 +46,48 @@ export function addGlossaryCommand(analytics: Command, program: Command): void {
       seeAlso: ["senso analytics summary", "senso analytics citations"],
     },
   ).action(
-      runAction(program, async (ctx) => {
-        const data = await apiRequest<{ entries: GlossaryEntry[] }>({
-          path: "/org/analytics/glossary",
-          apiKey: ctx.apiKey,
-          baseUrl: ctx.baseUrl,
-        });
+    runAction(program, async (ctx) => {
+      const data = await apiRequest<{ entries: GlossaryEntry[] }>({
+        path: "/org/analytics/glossary",
+        apiKey: ctx.apiKey,
+        baseUrl: ctx.baseUrl,
+      });
 
-        const entries = data.entries ?? [];
-        emitContext(ctx, [
+      const entries = data.entries ?? [];
+      emitContext(ctx, [
+        "",
+        `  ${pc.bold("Metric glossary")} ${pc.dim(`${entries.length} metrics — gotchas shown in plain and json output`)}`,
+      ]);
+      emit(ctx, data, {
+        table: {
+          rows: entries.map((e) => ({
+            metric: e.metric,
+            // `||` not `??`: an empty denominator string is as absent as a
+            // missing one, and should render as the placeholder.
+            // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+            denominator: e.denominator || NO_VALUE,
+            definition: e.definition,
+            // The gotcha carries the warning that stops a number being
+            // misquoted, so it is a column rather than a plain-only extra.
+            // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+            gotcha: e.gotcha || NO_VALUE,
+          })),
+          columns: ["metric", "denominator", "definition", "gotcha"],
+        },
+        plain: [
           "",
-          `  ${pc.bold("Metric glossary")} ${pc.dim(`${entries.length} metrics — gotchas shown in plain and json output`)}`,
-        ]);
-        emit(ctx, data, {
-          table: {
-            rows: entries.map((e) => ({
-              metric: e.metric,
-              // `||` not `??`: an empty denominator string is as absent as a
-              // missing one, and should render as the placeholder.
-              // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-              denominator: e.denominator || NO_VALUE,
-              definition: e.definition,
-              // The gotcha carries the warning that stops a number being
-              // misquoted, so it is a column rather than a plain-only extra.
-              // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-              gotcha: e.gotcha || NO_VALUE,
-            })),
-            columns: ["metric", "denominator", "definition", "gotcha"],
-          },
-          plain: [
-            "",
-            `  ${pc.bold("Metric glossary")}`,
-            "",
-            ...entries.map((e) =>
-              [
-                `  ${pc.bold(e.metric)}`,
-                `     ${e.definition}`,
-                ...(e.denominator ? [`     ${pc.dim(`Denominator: ${e.denominator}`)}`] : []),
-                ...(e.gotcha ? [`     ${pc.yellow("Gotcha:")} ${e.gotcha}`] : []),
-              ].join("\n"),
-            ),
-          ],
-        });
-      }),
-    );
+          `  ${pc.bold("Metric glossary")}`,
+          "",
+          ...entries.map((e) =>
+            [
+              `  ${pc.bold(e.metric)}`,
+              `     ${e.definition}`,
+              ...(e.denominator ? [`     ${pc.dim(`Denominator: ${e.denominator}`)}`] : []),
+              ...(e.gotcha ? [`     ${pc.yellow("Gotcha:")} ${e.gotcha}`] : []),
+            ].join("\n"),
+          ),
+        ],
+      });
+    }),
+  );
 }

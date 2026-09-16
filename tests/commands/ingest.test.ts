@@ -163,9 +163,7 @@ function rejected(filename: string, status: string, error?: string) {
     filename,
     status,
     ...(error === undefined ? {} : { error }),
-    ...(status === "conflict"
-      ? { existing_content_id: uuidFor(`existing:${filename}`) }
-      : {}),
+    ...(status === "conflict" ? { existing_content_id: uuidFor(`existing:${filename}`) } : {}),
   };
 }
 
@@ -307,9 +305,12 @@ describe("ingest upload, when the command line is wrong", () => {
 
 describe("ingest upload, when the request fails", () => {
   it("exits 3 and explains how to authenticate when there is no API key", async () => {
-    const res = await runCli(["ingest", "upload", tempFile("a.txt", "hi"), "--folder-id", FOLDER_ID], {
-      withKey: false,
-    });
+    const res = await runCli(
+      ["ingest", "upload", tempFile("a.txt", "hi"), "--folder-id", FOLDER_ID],
+      {
+        withKey: false,
+      },
+    );
 
     expect(res.exitCode).toBe(3);
     expect(res.stdout).toBe("");
@@ -324,7 +325,13 @@ describe("ingest upload, when the request fails", () => {
       ),
     );
 
-    const res = await runCli(["ingest", "upload", tempFile("a.txt", "hi"), "--folder-id", FOLDER_ID]);
+    const res = await runCli([
+      "ingest",
+      "upload",
+      tempFile("a.txt", "hi"),
+      "--folder-id",
+      FOLDER_ID,
+    ]);
 
     // The exit code survives the upload's own error handling: a rejected key is
     // 3, not the flat 1 that every upload failure used to produce.
@@ -340,7 +347,13 @@ describe("ingest upload, when the request fails", () => {
       ),
     );
 
-    const res = await runCli(["ingest", "upload", tempFile("a.txt", "hi"), "--folder-id", FOLDER_ID]);
+    const res = await runCli([
+      "ingest",
+      "upload",
+      tempFile("a.txt", "hi"),
+      "--folder-id",
+      FOLDER_ID,
+    ]);
 
     expect(res.exitCode).toBe(3);
     expect(res.stdout).toBe("");
@@ -394,7 +407,13 @@ describe("ingest upload, when the request fails", () => {
   it("exits 1 on a 500 and says it is not the caller's fault", async () => {
     server.use(http.post(apiUrl("/org/kb/upload"), () => new HttpResponse(null, { status: 500 })));
 
-    const res = await runCli(["ingest", "upload", tempFile("a.txt", "hi"), "--folder-id", FOLDER_ID]);
+    const res = await runCli([
+      "ingest",
+      "upload",
+      tempFile("a.txt", "hi"),
+      "--folder-id",
+      FOLDER_ID,
+    ]);
 
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toBe("");
@@ -407,7 +426,13 @@ describe("ingest upload, when the request fails", () => {
     // here. Inheriting the 5xx "retry shortly" hint sent callers into a loop.
     server.use(http.post(apiUrl("/org/kb/upload"), () => new HttpResponse(null, { status: 503 })));
 
-    const res = await runCli(["ingest", "upload", tempFile("a.txt", "hi"), "--folder-id", FOLDER_ID]);
+    const res = await runCli([
+      "ingest",
+      "upload",
+      tempFile("a.txt", "hi"),
+      "--folder-id",
+      FOLDER_ID,
+    ]);
 
     expect(res.exitCode).toBe(1);
     expect(res.stderr).toContain("not a transient failure");
@@ -417,7 +442,13 @@ describe("ingest upload, when the request fails", () => {
   it("exits 5 when the API rate-limits, because retrying is the right response", async () => {
     server.use(http.post(apiUrl("/org/kb/upload"), () => new HttpResponse(null, { status: 429 })));
 
-    const res = await runCli(["ingest", "upload", tempFile("a.txt", "hi"), "--folder-id", FOLDER_ID]);
+    const res = await runCli([
+      "ingest",
+      "upload",
+      tempFile("a.txt", "hi"),
+      "--folder-id",
+      FOLDER_ID,
+    ]);
 
     expect(res.exitCode).toBe(5);
     expect(res.stdout).toBe("");
@@ -675,7 +706,13 @@ describe("ingest upload, when the API declines some of the files", () => {
   it("falls back to a readable reason for an unrecognized status", async () => {
     serveUpload([rejected("odd.txt", "quarantined")]);
 
-    const res = await runCli(["ingest", "upload", tempFile("odd.txt", "x"), "--folder-id", FOLDER_ID]);
+    const res = await runCli([
+      "ingest",
+      "upload",
+      tempFile("odd.txt", "x"),
+      "--folder-id",
+      FOLDER_ID,
+    ]);
 
     expect(res.stderr).toContain("Unexpected status: quarantined");
     expect(res.stderr).toContain("No files were uploaded");

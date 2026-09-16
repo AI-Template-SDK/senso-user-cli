@@ -132,7 +132,10 @@ describe("members list, when the request fails", () => {
   it("says a 403 about a product is a plan question, not a scope question", async () => {
     server.use(
       http.get(apiUrl("/org/members"), () =>
-        HttpResponse.json({ message: "organization is not entitled to this product" }, { status: 403 }),
+        HttpResponse.json(
+          { message: "organization is not entitled to this product" },
+          { status: 403 },
+        ),
       ),
     );
 
@@ -168,7 +171,10 @@ describe("members list, when the request fails", () => {
     // server. Telling a caller to retry is advice that can never work.
     server.use(
       http.get(apiUrl("/org/members"), () =>
-        HttpResponse.json({ message: "Members are not enabled in this environment" }, { status: 503 }),
+        HttpResponse.json(
+          { message: "Members are not enabled in this environment" },
+          { status: 503 },
+        ),
       ),
     );
 

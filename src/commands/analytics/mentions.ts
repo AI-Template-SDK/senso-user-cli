@@ -58,7 +58,10 @@ export function addMentionsCommand(analytics: Command, program: Command): void {
         3: "no key, the organization lacks the GEO product, or the key lacks read:prompt",
       },
       examples: [
-        { comment: "Weekly visibility over the default window", command: "senso analytics mentions --group-by week" },
+        {
+          comment: "Weekly visibility over the default window",
+          command: "senso analytics mentions --group-by week",
+        },
         {
           comment: "One model, one quarter, as data",
           command:
@@ -68,66 +71,66 @@ export function addMentionsCommand(analytics: Command, program: Command): void {
       seeAlso: ["senso analytics summary", "senso analytics citations", "senso analytics filters"],
     },
   ).action(
-      runAction(program, async (ctx, cmdOpts: WindowFilters & { groupBy?: string }) => {
-        const data = await apiRequest<{
-          window: AnalyticsWindow;
-          group_by: string;
-          totals: Totals;
-          metrics: Metrics;
-          series: MentionSeriesPoint[];
-          data_quality: DataQuality;
-          notes: string[];
-        }>({
-          path: "/org/analytics/mentions",
-          params: {
-            ...windowParams(cmdOpts),
-            group_by: parseEnumFlag("--group-by", cmdOpts.groupBy, GROUP_BY_VALUES),
-          },
-          apiKey: ctx.apiKey,
-          baseUrl: ctx.baseUrl,
-        });
+    runAction(program, async (ctx, cmdOpts: WindowFilters & { groupBy?: string }) => {
+      const data = await apiRequest<{
+        window: AnalyticsWindow;
+        group_by: string;
+        totals: Totals;
+        metrics: Metrics;
+        series: MentionSeriesPoint[];
+        data_quality: DataQuality;
+        notes: string[];
+      }>({
+        path: "/org/analytics/mentions",
+        params: {
+          ...windowParams(cmdOpts),
+          group_by: parseEnumFlag("--group-by", cmdOpts.groupBy, GROUP_BY_VALUES),
+        },
+        apiKey: ctx.apiKey,
+        baseUrl: ctx.baseUrl,
+      });
 
-        requireBlocks("/org/analytics/mentions", {
-          totals: data.totals,
-          metrics: data.metrics,
-        });
+      requireBlocks("/org/analytics/mentions", {
+        totals: data.totals,
+        metrics: data.metrics,
+      });
 
-        const series = data.series ?? [];
-        const context = [
+      const series = data.series ?? [];
+      const context = [
+        "",
+        `  ${pc.bold("Mentions")} ${pc.dim(`by ${data.group_by}`)}`,
+        windowLine(data.window),
+        qualityLine(data.data_quality),
+        `  ${pc.dim(`Window totals — mention rate ${rate(data.metrics.mention_rate)}, share of voice ${rate(data.metrics.share_of_voice)}, avg rank ${rate(data.metrics.avg_rank)}`)}`,
+      ];
+      emitContext(ctx, context);
+      emit(ctx, data, {
+        table: {
+          rows: series.map((p) => ({
+            period: p.period_start,
+            answered: count(p.answered_count),
+            mentioned: count(p.mentioned_count),
+            mention_rate: rate(p.mention_rate),
+            sov: rate(p.share_of_voice),
+            avg_rank: rate(p.avg_rank),
+          })),
+          columns: ["period", "answered", "mentioned", "mention_rate", "sov", "avg_rank"],
+        },
+        empty: "rollup days",
+        emptyHint:
+          "No rollup days fell in this window. `senso analytics filters` shows the date range that has data.",
+        plain: [
+          ...context,
           "",
-          `  ${pc.bold("Mentions")} ${pc.dim(`by ${data.group_by}`)}`,
-          windowLine(data.window),
-          qualityLine(data.data_quality),
-          `  ${pc.dim(`Window totals — mention rate ${rate(data.metrics.mention_rate)}, share of voice ${rate(data.metrics.share_of_voice)}, avg rank ${rate(data.metrics.avg_rank)}`)}`,
-        ];
-        emitContext(ctx, context);
-        emit(ctx, data, {
-          table: {
-            rows: series.map((p) => ({
-              period: p.period_start,
-              answered: count(p.answered_count),
-              mentioned: count(p.mentioned_count),
-              mention_rate: rate(p.mention_rate),
-              sov: rate(p.share_of_voice),
-              avg_rank: rate(p.avg_rank),
-            })),
-            columns: ["period", "answered", "mentioned", "mention_rate", "sov", "avg_rank"],
-          },
-          empty: "rollup days",
-          emptyHint:
-            "No rollup days fell in this window. `senso analytics filters` shows the date range that has data.",
-          plain: [
-            ...context,
-            "",
-            ...(series.length
-              ? series.map(
-                  (p) =>
-                    `  ${pc.bold(p.period_start)}  answered ${count(p.answered_count)}  mentioned ${count(p.mentioned_count)}  rate ${rate(p.mention_rate)} (${count(p.mentioned_count)}/${count(p.answered_count)})  SoV ${rate(p.share_of_voice)} (${count(p.mention_total)}/${count(p.brand_mention_total)})  rank ${rate(p.avg_rank)}`,
-                )
-              : ["  No rollup days in this window."]),
-          ],
-        });
-        emitNotes(ctx, data.notes);
-      }),
-    );
+          ...(series.length
+            ? series.map(
+                (p) =>
+                  `  ${pc.bold(p.period_start)}  answered ${count(p.answered_count)}  mentioned ${count(p.mentioned_count)}  rate ${rate(p.mention_rate)} (${count(p.mentioned_count)}/${count(p.answered_count)})  SoV ${rate(p.share_of_voice)} (${count(p.mention_total)}/${count(p.brand_mention_total)})  rank ${rate(p.avg_rank)}`,
+              )
+            : ["  No rollup days in this window."]),
+        ],
+      });
+      emitNotes(ctx, data.notes);
+    }),
+  );
 }

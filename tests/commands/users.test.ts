@@ -278,7 +278,10 @@ describe("users, when an id or a flag is wrong", () => {
     // 404 has to name which id space was wanted.
     server.use(
       http.get(apiUrl("/org/users/:userId"), () =>
-        HttpResponse.json({ message: "User is not a member of this organization" }, { status: 404 }),
+        HttpResponse.json(
+          { message: "User is not a member of this organization" },
+          { status: 404 },
+        ),
       ),
     );
 
@@ -736,7 +739,14 @@ describe("users invite-existing, on the wire", () => {
       }),
     );
 
-    await runCli(["users", "invite-existing", "--email", "ada@example.com", "--role-id", ROLE_VIEWER]);
+    await runCli([
+      "users",
+      "invite-existing",
+      "--email",
+      "ada@example.com",
+      "--role-id",
+      ROLE_VIEWER,
+    ]);
 
     expect(seen?.method).toBe("POST");
     expect(new URL(seen?.url ?? "").pathname).toBe("/api/v1/org/users/invite/existing");
@@ -889,7 +899,13 @@ describe("users update and set-current, on success", () => {
       ),
     );
 
-    const res = await runCli(["users", "update", USER_ADA, "--data", `{"role_id":"${ROLE_VIEWER}"}`]);
+    const res = await runCli([
+      "users",
+      "update",
+      USER_ADA,
+      "--data",
+      `{"role_id":"${ROLE_VIEWER}"}`,
+    ]);
 
     expect(res.exitCode).toBe(0);
     expect(res.stderr).toContain(`role_id → ${ROLE_VIEWER}`);
@@ -900,9 +916,7 @@ describe("users update and set-current, on success", () => {
   it("returns the API's own membership record from set-current, not a synthetic one", async () => {
     // This was the one command in the group whose JSON was not the API's
     // payload: it discarded the response in favor of a confirmation object.
-    server.use(
-      http.patch(apiUrl("/org/users/:userId/current"), () => HttpResponse.json(ONE_USER)),
-    );
+    server.use(http.patch(apiUrl("/org/users/:userId/current"), () => HttpResponse.json(ONE_USER)));
 
     const res = await runCli(["users", "set-current", USER_ADA, "--output", "json"]);
 
@@ -912,9 +926,7 @@ describe("users update and set-current, on success", () => {
   });
 
   it("confirms set-current on stderr and prints the membership on stdout", async () => {
-    server.use(
-      http.patch(apiUrl("/org/users/:userId/current"), () => HttpResponse.json(ONE_USER)),
-    );
+    server.use(http.patch(apiUrl("/org/users/:userId/current"), () => HttpResponse.json(ONE_USER)));
 
     const res = await runCli(["users", "set-current", USER_ADA]);
 

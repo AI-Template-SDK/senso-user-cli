@@ -162,7 +162,15 @@ describe("gaps get, resolve and undo, when an id is not usable", () => {
   });
 
   it("exits 2 when --content-id is not a UUID, and says which id space it wants", async () => {
-    const res = await runCli(["gaps", "answer", GAP_ID, "--content-id", "doc-1", "--output", "json"]);
+    const res = await runCli([
+      "gaps",
+      "answer",
+      GAP_ID,
+      "--content-id",
+      "doc-1",
+      "--output",
+      "json",
+    ]);
 
     expect(res.exitCode).toBe(2);
     expect(res.stdout).toBe("");
@@ -469,7 +477,6 @@ describe("gaps list, the guidance a JSON caller gets", () => {
     });
     expect(envelope(res).page?.next).toContain("--offset 1");
   });
-
 });
 
 describe("gaps get, what it prints", () => {
@@ -698,7 +705,9 @@ describe("gaps resolve, answer and dismiss, on the wire", () => {
 
     const env = envelope(res);
     expect(env.warnings?.join(" ")).toContain("The gap is now dismissed");
-    expect(env.warnings?.join(" ")).toContain("stays closed even if the same question is asked again");
+    expect(env.warnings?.join(" ")).toContain(
+      "stays closed even if the same question is asked again",
+    );
     expect(env.next).toContainEqual(
       expect.objectContaining({ command: `senso gaps undo ${GAP_ID} ${RESOLUTION_ID}` }),
     );
@@ -821,7 +830,12 @@ describe("gaps get, the next steps for each kind of gap", () => {
         {
           answer_text: "We only bill monthly.",
           sources: [
-            { content_id: CONTENT_ID, kb_node_id: KB_NODE_ID, title: "Old pricing", available: true },
+            {
+              content_id: CONTENT_ID,
+              kb_node_id: KB_NODE_ID,
+              title: "Old pricing",
+              available: true,
+            },
           ],
           feedback: [{ user_name: "Dana", comment: "We have an annual plan now." }],
         },

@@ -90,37 +90,45 @@ See also: senso kb tags, senso content tags, senso prompts tags, senso auto-tag`
         "Also return machine-minted tags (curated=false). Maps to `include_uncurated=true`",
       )
       .action(
-        runAction(program, async (ctx, cmdOpts: { counts?: boolean; includeUncurated?: boolean }) => {
-          const data = await apiRequest({
-            path: "/org/tags",
-            params: {
-              ...(cmdOpts.counts ? { counts: "true" } : {}),
-              ...(cmdOpts.includeUncurated ? { include_uncurated: "true" } : {}),
-            },
-            apiKey: ctx.apiKey,
-            baseUrl: ctx.baseUrl,
-            resource: { type: "Tag", list: "senso tags list" },
-          });
-          // `id`, not `tag_id`: dto.TagResponse marshals `id`, and the count
-          // columns are absent — not zero — unless --counts was passed.
-          emit(ctx, data, {
-            columns: ["id", "name", "curated", "prompt_count", "content_count", "created_at"],
-            empty: "tags",
-            emptyHint: cmdOpts.includeUncurated
-              ? "Create one with `senso tags create --name pricing`, or attach one by name from a resource command."
-              : "Auto-minted tags are hidden by default. Retry with --include-uncurated, or create one with `senso tags create --name pricing`.",
-            next: [
-              {
-                why: "See the tags auto-tagging minted but nobody adopted",
-                command: "senso tags list --include-uncurated",
+        runAction(
+          program,
+          async (ctx, cmdOpts: { counts?: boolean; includeUncurated?: boolean }) => {
+            const data = await apiRequest({
+              path: "/org/tags",
+              params: {
+                ...(cmdOpts.counts ? { counts: "true" } : {}),
+                ...(cmdOpts.includeUncurated ? { include_uncurated: "true" } : {}),
               },
-              {
-                why: "Attach a tag to a KB node, creating it if it does not exist",
-                command: "senso kb tags attach <kb_node_id> --name pricing",
-              },
-            ],
-          });
-        }),
+              apiKey: ctx.apiKey,
+              baseUrl: ctx.baseUrl,
+              resource: { type: "Tag", list: "senso tags list" },
+            });
+            // `id`, not `tag_id`: dto.TagResponse marshals `id`, and the count
+            // columns are absent — not zero — unless --counts was passed, so
+            // declaring them unconditionally made every plain `list --output
+            // table` warn that the API had not returned a field this command
+            // had not asked it for.
+            emit(ctx, data, {
+              columns: cmdOpts.counts
+                ? ["id", "name", "curated", "prompt_count", "content_count", "created_at"]
+                : ["id", "name", "curated", "created_at"],
+              empty: "tags",
+              emptyHint: cmdOpts.includeUncurated
+                ? "Create one with `senso tags create --name pricing`, or attach one by name from a resource command."
+                : "Auto-minted tags are hidden by default. Retry with --include-uncurated, or create one with `senso tags create --name pricing`.",
+              next: [
+                {
+                  why: "See the tags auto-tagging minted but nobody adopted",
+                  command: "senso tags list --include-uncurated",
+                },
+                {
+                  why: "Attach a tag to a KB node, creating it if it does not exist",
+                  command: "senso kb tags attach <kb_node_id> --name pricing",
+                },
+              ],
+            });
+          },
+        ),
       ),
     {
       returns: [
@@ -135,8 +143,7 @@ See also: senso kb tags, senso content tags, senso prompts tags, senso auto-tag`
         { command: "senso tags list --counts" },
         {
           comment: "Read the ids and names out of the payload",
-          command:
-            "senso tags list --output json | jq -r '.data.items[] | \"\\(.id) \\(.name)\"'",
+          command: "senso tags list --output json | jq -r '.data.items[] | \"\\(.id) \\(.name)\"'",
         },
       ],
       seeAlso: ["senso tags get <id>", "senso kb tags attach", "senso auto-tag get"],
@@ -149,7 +156,10 @@ See also: senso kb tags, senso content tags, senso prompts tags, senso auto-tag`
       .description(
         "Create a tag with no attachments. You rarely need this: `senso kb tags attach`, `senso content tags attach` and `senso prompts tags attach` create a tag by name when it does not exist.",
       )
-      .requiredOption("--name <name>", "Tag name. 1-255 characters, unique per org (case-insensitive)")
+      .requiredOption(
+        "--name <name>",
+        "Tag name. 1-255 characters, unique per org (case-insensitive)",
+      )
       .action(
         runAction(program, async (ctx, cmdOpts: { name: string }) => {
           const name = parseTagName(cmdOpts.name);
@@ -198,7 +208,9 @@ See also: senso kb tags, senso content tags, senso prompts tags, senso auto-tag`
   describeCommand(
     tags
       .command("get")
-      .description("Read one tag with its full usage counts. Unlike `tags list`, counts are always included here.")
+      .description(
+        "Read one tag with its full usage counts. Unlike `tags list`, counts are always included here.",
+      )
       .argument(
         "<id>",
         "A tag id (UUID) — the `id` field of `senso tags list`. NOT a kb_node_id, content_id or prompt_id",
@@ -253,7 +265,10 @@ See also: senso kb tags, senso content tags, senso prompts tags, senso auto-tag`
         "Rename a tag. It keeps its id and every attachment, so the new name appears immediately on every prompt, content item, KB node and search turn it is on. There is no merge: renaming onto an existing name is a conflict, not a fold.",
       )
       .argument("<id>", "A tag id (UUID) — the `id` field of `senso tags list`")
-      .requiredOption("--name <name>", "The new name. 1-255 characters, unique per org (case-insensitive)")
+      .requiredOption(
+        "--name <name>",
+        "The new name. 1-255 characters, unique per org (case-insensitive)",
+      )
       .action(
         runAction(program, async (ctx, rawId: string, cmdOpts: { name: string }) => {
           const id = parseId(rawId, TAG_ID);

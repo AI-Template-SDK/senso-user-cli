@@ -200,7 +200,11 @@ export function registerRunConfigCommands(program: Command): void {
       notes: [
         "`senso run-config set-scheduler-models` changes the scheduler's list without changing this one, so after using it the two reads can disagree.",
       ],
-      seeAlso: ["senso run-config model-options", "senso run-config set-models", "senso run-config schedule"],
+      seeAlso: [
+        "senso run-config model-options",
+        "senso run-config set-models",
+        "senso run-config schedule",
+      ],
     },
   ).action(
     runAction(program, async (ctx) => {
@@ -213,7 +217,7 @@ export function registerRunConfigCommands(program: Command): void {
         columns: ["name", "geo_model_id", "created_at"],
         empty: "run models",
         emptyHint:
-          "No models are configured, so no runs will be produced. Set them with `senso run-config set-models --data '{\"models\":[\"chatgpt\"]}'`.",
+          'No models are configured, so no runs will be produced. Set them with `senso run-config set-models --data \'{"models":["chatgpt"]}\'`.',
       });
     }),
   );
@@ -240,15 +244,17 @@ export function registerRunConfigCommands(program: Command): void {
         1: "the API refused the name. Its error carries valid_models and suggestions in error.details",
       },
       examples: [
-        { command: 'senso run-config set-models --data \'{"models":["chatgpt","claude","perplexity"]}\'' },
+        {
+          command:
+            'senso run-config set-models --data \'{"models":["chatgpt","claude","perplexity"]}\'',
+        },
         {
           comment: "Discover the names first",
-          command: "senso run-config model-options --output json | jq -r '.data.valid_models[].name'",
+          command:
+            "senso run-config model-options --output json | jq -r '.data.valid_models[].name'",
         },
       ],
-      notes: [
-        "The write is all-or-nothing: nothing is stored if any name is rejected.",
-      ],
+      notes: ["The write is all-or-nothing: nothing is stored if any name is rejected."],
       seeAlso: [
         "senso run-config model-options",
         "senso run-config models",
@@ -295,7 +301,10 @@ export function registerRunConfigCommands(program: Command): void {
       },
       examples: [
         { command: "senso run-config model-options" },
-        { command: "senso run-config model-options --output json | jq -r '.data.valid_models[].name'" },
+        {
+          command:
+            "senso run-config model-options --output json | jq -r '.data.valid_models[].name'",
+        },
       ],
       notes: [
         "Not exhaustive on purpose: `gpt` (the direct OpenAI API model) is accepted by set-models but deliberately not offered here, and the aliases aioverview, claude-sonnet-4-6 and gpt-4.1 are accepted too. A name in `run-config models` that is missing from this list is why.",
@@ -322,7 +331,8 @@ export function registerRunConfigCommands(program: Command): void {
         rows: data.valid_models ?? [],
         columns: ["name", "display_name"],
         empty: "model options",
-        emptyHint: "No models are offered for org runs in this deployment. Check with your Senso partner.",
+        emptyHint:
+          "No models are offered for org runs in this deployment. Check with your Senso partner.",
         next: [
           {
             why: "Configure the models that answer your prompts",
@@ -449,7 +459,11 @@ export function registerRunConfigCommands(program: Command): void {
         { command: "senso run-config schedule" },
         { command: "senso run-config schedule --output json | jq -r '.data.schedule | @csv'" },
       ],
-      seeAlso: ["senso run-config set-schedule", "senso run-config models", "senso prompts get <promptId>"],
+      seeAlso: [
+        "senso run-config set-schedule",
+        "senso run-config models",
+        "senso prompts get <promptId>",
+      ],
     },
   ).action(
     runAction(program, async (ctx) => {
@@ -463,7 +477,9 @@ export function registerRunConfigCommands(program: Command): void {
       // them is the whole difference between an answer and a lookup table.
       const days = describeDays(data.schedule);
       emit(ctx, data, {
-        plain: days ? [`  schedule  ${days}`] : ["  No run days configured — scheduled runs will not fire."],
+        plain: days
+          ? [`  schedule  ${days}`]
+          : ["  No run days configured — scheduled runs will not fire."],
         next: days
           ? []
           : [
@@ -494,10 +510,15 @@ export function registerRunConfigCommands(program: Command): void {
         3: "no API key, or (JWT callers) no update:org permission",
       },
       examples: [
-        { command: 'senso run-config set-schedule --data \'{"schedule":[1,3,5]}\'' },
-        { comment: "Every day", command: 'senso run-config set-schedule --data \'{"schedule":[0,1,2,3,4,5,6]}\'' },
+        { command: "senso run-config set-schedule --data '{\"schedule\":[1,3,5]}'" },
+        {
+          comment: "Every day",
+          command: "senso run-config set-schedule --data '{\"schedule\":[0,1,2,3,4,5,6]}'",
+        },
       ],
-      notes: ["Day granularity only: the time of day and the timezone are not configurable through the API."],
+      notes: [
+        "Day granularity only: the time of day and the timezone are not configurable through the API.",
+      ],
       seeAlso: ["senso run-config schedule", "senso run-config set-models"],
     },
   ).action(
@@ -513,7 +534,9 @@ export function registerRunConfigCommands(program: Command): void {
       });
       const days = describeDays(data.schedule);
       emit(ctx, data, {
-        plain: days ? [`  schedule  ${days}`] : ["  No run days configured — scheduled runs will not fire."],
+        plain: days
+          ? [`  schedule  ${days}`]
+          : ["  No run days configured — scheduled runs will not fire."],
         warnings: ["This replaced the whole schedule; days that were not listed no longer run."],
       });
     }),

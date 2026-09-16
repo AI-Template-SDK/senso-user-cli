@@ -60,18 +60,15 @@ export function addSummaryCommand(analytics: Command, program: Command): void {
         { comment: "The default 30-day window", command: "senso analytics summary" },
         {
           comment: "One month, two models",
-          command: "senso analytics summary --from 2026-08-01 --to 2026-08-31 --models chatgpt,gemini",
+          command:
+            "senso analytics summary --from 2026-08-01 --to 2026-08-31 --models chatgpt,gemini",
         },
         {
           comment: "Read one metric, and its null-ness, from a script",
           command: "senso analytics summary --output json | jq '.data.metrics.mention_rate'",
         },
       ],
-      seeAlso: [
-        "senso analytics glossary",
-        "senso analytics prompts",
-        "senso analytics filters",
-      ],
+      seeAlso: ["senso analytics glossary", "senso analytics prompts", "senso analytics filters"],
     },
   ).action(
     runAction(program, async (ctx, cmdOpts: WindowFilters) => {

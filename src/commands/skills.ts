@@ -109,11 +109,7 @@ function distance(a: string, b: string): number {
     for (let j = 1; j <= b.length; j++) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1;
       current.push(
-        Math.min(
-          (current[j - 1] ?? 0) + 1,
-          (previous[j] ?? 0) + 1,
-          (previous[j - 1] ?? 0) + cost,
-        ),
+        Math.min((current[j - 1] ?? 0) + 1, (previous[j] ?? 0) + 1, (previous[j - 1] ?? 0) + cost),
       );
     }
     previous = current;
@@ -198,9 +194,7 @@ export async function runShipables(
     encoding: "utf8",
     timeout: SHIPABLES_TIMEOUT_MS,
     ...(opts.cwd === undefined ? {} : { cwd: opts.cwd }),
-    ...(opts.apiKey === undefined
-      ? {}
-      : { env: { ...process.env, SENSO_API_KEY: opts.apiKey } }),
+    ...(opts.apiKey === undefined ? {} : { env: { ...process.env, SENSO_API_KEY: opts.apiKey } }),
   };
   if (bin === "npx") {
     return execFileAsync("npx", ["--yes", "@senso-ai/shipables", ...args], execOpts);
@@ -407,7 +401,10 @@ export function registerSkillsCommands(program: Command): void {
               {
                 warnings,
                 next: [
-                  { why: "See what this directory now has", command: "senso skills list --output json" },
+                  {
+                    why: "See what this directory now has",
+                    command: "senso skills list --output json",
+                  },
                 ],
               },
             );
@@ -422,8 +419,8 @@ export function registerSkillsCommands(program: Command): void {
       returns: [
         "installed[] — {name, package} per skill that installed",
         "failed[] — always empty on exit 0; on a failure the same list is in error.details.failed, with a reason each",
-        "scope — the directory installed into, or \"global\"",
-        "agent — the agent named with --agent, or \"all detected\"",
+        'scope — the directory installed into, or "global"',
+        'agent — the agent named with --agent, or "all detected"',
       ],
       exitCodes: {
         ...localExits,
@@ -436,10 +433,14 @@ export function registerSkillsCommands(program: Command): void {
         "Skills are independent: one failing does not stop the others, but the command still exits non-zero.",
       ],
       examples: [
-        { comment: "Every official skill, for Claude Code", command: "senso skills install --all --agent claude" },
+        {
+          comment: "Every official skill, for Claude Code",
+          command: "senso skills install --all --agent claude",
+        },
         {
           comment: "Two by name, machine-readable",
-          command: "senso skills install search ingest --output json | jq -r '.data.installed[].name'",
+          command:
+            "senso skills install search ingest --output json | jq -r '.data.installed[].name'",
         },
       ],
       seeAlso: ["senso skills list-available", "senso skills list", "senso skills remove <name>"],
@@ -461,10 +462,14 @@ export function registerSkillsCommands(program: Command): void {
           try {
             ({ stdout } = await runShipables(["list", ...globalFlag, "--json"]));
           } catch (err) {
-            throw new CliError(`shipables could not list skills: ${childFailure(err).reason}`, EXIT.ERROR, {
-              hint: "Install the lister once with `npm install -g @senso-ai/shipables`, then retry.",
-              cause: err,
-            });
+            throw new CliError(
+              `shipables could not list skills: ${childFailure(err).reason}`,
+              EXIT.ERROR,
+              {
+                hint: "Install the lister once with `npm install -g @senso-ai/shipables`, then retry.",
+                cause: err,
+              },
+            );
           }
 
           let data: unknown;
@@ -528,7 +533,7 @@ export function registerSkillsCommands(program: Command): void {
       ),
     {
       returns: [
-        "scope — the directory this listing is for, or \"global\"",
+        'scope — the directory this listing is for, or "global"',
         "skills[] — {name (the short name remove takes), package, version, agents[]}",
         "An empty skills[] means nothing is installed in THIS scope; other projects are not shown.",
       ],
@@ -575,9 +580,7 @@ export function registerSkillsCommands(program: Command): void {
         }),
       ),
     {
-      returns: [
-        "skills[] — {name (the short name install and remove take), package, description}",
-      ],
+      returns: ["skills[] — {name (the short name install and remove take), package, description}"],
       exitCodes: { 0: "success" },
       examples: [
         { command: "senso skills list-available" },
@@ -650,10 +653,10 @@ export function registerSkillsCommands(program: Command): void {
       ),
     {
       returns: [
-        "action — always \"removed\"",
-        "resource — always \"skill\"",
+        'action — always "removed"',
+        'resource — always "skill"',
         "id — the short name that was removed",
-        "package, scope — the package name, and the directory (or \"global\") it came out of",
+        'package, scope — the package name, and the directory (or "global") it came out of',
       ],
       exitCodes: {
         ...localExits,

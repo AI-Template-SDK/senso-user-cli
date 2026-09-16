@@ -88,7 +88,11 @@ export function addPromptsCommand(analytics: Command, program: Command): void {
           command: "senso analytics prompts --output json | jq -r '.data.prompts[].prompt_id'",
         },
       ],
-      seeAlso: ["senso analytics prompt <promptId>", "senso analytics answers", "senso prompts list"],
+      seeAlso: [
+        "senso analytics prompt <promptId>",
+        "senso analytics answers",
+        "senso prompts list",
+      ],
     },
   ).action(
     runAction(

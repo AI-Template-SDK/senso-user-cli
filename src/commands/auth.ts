@@ -50,88 +50,88 @@ export function registerAuthCommands(program: Command): void {
         "Authenticate with Senso. Paste your API key and it will be validated against your organization, then stored locally. Interactive only: without a terminal it exits 2 and names the two alternatives.",
       )
       .action(
-      runAction(program, async (ctx) => {
-        // Without a terminal there is nobody to answer the prompt, and clack
-        // waits on a keypress that will never arrive — the command used to hang
-        // forever in CI and in an agent's shell. Fail immediately instead, and
-        // name the two ways to authenticate that do not need a terminal.
-        if (!process.stdin.isTTY) {
-          throw new CliError("`senso login` needs an interactive terminal.", EXIT.USAGE, {
-            code: "usage",
-            hint: "Set SENSO_API_KEY in the environment, or pass --api-key, instead of logging in.",
+        runAction(program, async (ctx) => {
+          // Without a terminal there is nobody to answer the prompt, and clack
+          // waits on a keypress that will never arrive — the command used to hang
+          // forever in CI and in an agent's shell. Fail immediately instead, and
+          // name the two ways to authenticate that do not need a terminal.
+          if (!process.stdin.isTTY) {
+            throw new CliError("`senso login` needs an interactive terminal.", EXIT.USAGE, {
+              code: "usage",
+              hint: "Set SENSO_API_KEY in the environment, or pass --api-key, instead of logging in.",
+            });
+          }
+
+          banner();
+
+          log.raw(`  ${pc.bold("Welcome to Senso CLI!")}\n`);
+          log.raw(`  ${pc.dim("1.")} Create an account at ${pc.cyan("https://app.senso.ai")}`);
+          log.raw(
+            `  ${pc.dim("2.")} Generate an API key: ${pc.cyan("Settings → API keys")} in the app\n`,
+          );
+
+          const result = await p.text({
+            message: "Paste your API key:",
+            placeholder: "tgr_...",
+            validate: (val) => {
+              if (!val || val.trim().length < 4) return "API key is required";
+            },
           });
-        }
 
-        banner();
+          // `isCancel` narrows to clack's unique cancel symbol, which does not
+          // remove `symbol` from the union — hence the explicit typeof, which both
+          // satisfies the compiler and is true rather than an `as string` cast.
+          if (p.isCancel(result) || typeof result !== "string") {
+            p.cancel("Login canceled.");
+            return;
+          }
 
-        log.raw(`  ${pc.bold("Welcome to Senso CLI!")}\n`);
-        log.raw(`  ${pc.dim("1.")} Create an account at ${pc.cyan("https://app.senso.ai")}`);
-        log.raw(
-          `  ${pc.dim("2.")} Generate an API key: ${pc.cyan("Settings → API keys")} in the app\n`,
-        );
+          const apiKey = result.trim();
+          const spin = p.spinner();
+          spin.start("Verifying API key...");
 
-        const result = await p.text({
-          message: "Paste your API key:",
-          placeholder: "tgr_...",
-          validate: (val) => {
-            if (!val || val.trim().length < 4) return "API key is required";
-          },
-        });
+          let org: OrgMeResponse;
+          try {
+            org = await verifyApiKey(apiKey, ctx.baseUrl);
+          } catch (err) {
+            // Stop the spinner before the error surfaces, or the terminal is left
+            // with a spinning frame and a hidden cursor.
+            spin.stop("Verification failed");
+            throw err;
+          }
+          spin.stop("API key verified");
 
-        // `isCancel` narrows to clack's unique cancel symbol, which does not
-        // remove `symbol` from the union — hence the explicit typeof, which both
-        // satisfies the compiler and is true rather than an `as string` cast.
-        if (p.isCancel(result) || typeof result !== "string") {
-          p.cancel("Login canceled.");
-          return;
-        }
+          // Written only after the key has been proven to work. Storing first and
+          // verifying after would leave a bad key on disk for the next command to
+          // fail with.
+          writeConfig({
+            apiKey,
+            ...(ctx.baseUrl ? { baseUrl: ctx.baseUrl } : {}),
+            orgName: org.name,
+            orgId: org.org_id,
+            orgSlug: org.slug,
+            isFreeTier: org.is_free_tier,
+          });
 
-        const apiKey = result.trim();
-        const spin = p.spinner();
-        spin.start("Verifying API key...");
+          log.success(`Authenticated as ${pc.bold(`"${org.name}"`)} (${pc.dim(org.org_id)})`);
+          log.success(`Config saved to ${pc.dim(getConfigPath())}`);
 
-        let org: OrgMeResponse;
-        try {
-          org = await verifyApiKey(apiKey, ctx.baseUrl);
-        } catch (err) {
-          // Stop the spinner before the error surfaces, or the terminal is left
-          // with a spinning frame and a hidden cursor.
-          spin.stop("Verification failed");
-          throw err;
-        }
-        spin.stop("API key verified");
-
-        // Written only after the key has been proven to work. Storing first and
-        // verifying after would leave a bad key on disk for the next command to
-        // fail with.
-        writeConfig({
-          apiKey,
-          ...(ctx.baseUrl ? { baseUrl: ctx.baseUrl } : {}),
-          orgName: org.name,
-          orgId: org.org_id,
-          orgSlug: org.slug,
-          isFreeTier: org.is_free_tier,
-        });
-
-        log.success(`Authenticated as ${pc.bold(`"${org.name}"`)} (${pc.dim(org.org_id)})`);
-        log.success(`Config saved to ${pc.dim(getConfigPath())}`);
-
-        // stdout stays empty in plain — the two ticks above are the human
-        // rendering — but a caller that drove this through a pty with
-        // --output json now gets a record of which organization it logged into.
-        emit(
-          ctx,
-          {
-            org_id: org.org_id,
-            name: org.name,
-            slug: org.slug,
-            is_free_tier: org.is_free_tier,
-            config_path: getConfigPath(),
-          },
-          { plain: [] },
-        );
-      }),
-    ),
+          // stdout stays empty in plain — the two ticks above are the human
+          // rendering — but a caller that drove this through a pty with
+          // --output json now gets a record of which organization it logged into.
+          emit(
+            ctx,
+            {
+              org_id: org.org_id,
+              name: org.name,
+              slug: org.slug,
+              is_free_tier: org.is_free_tier,
+              config_path: getConfigPath(),
+            },
+            { plain: [] },
+          );
+        }),
+      ),
     {
       returns: [
         "org_id, name, slug, is_free_tier — the organization the key belongs to (--output json only)",
@@ -220,102 +220,102 @@ export function registerAuthCommands(program: Command): void {
         "Show which organization you are authenticated as, including org ID, slug, tier, API key prefix and which credential source is in effect. Makes one request to GET /org/me.",
       )
       .action(
-      runAction(program, async (ctx) => {
-        const apiKey = getApiKey({ apiKey: ctx.apiKey });
+        runAction(program, async (ctx) => {
+          const apiKey = getApiKey({ apiKey: ctx.apiKey });
 
-        if (!apiKey) {
-          throw new CliError("Not authenticated: no API key found.", EXIT.AUTH, {
-            code: "unauthorized",
-            hint: "Run `senso login`, set SENSO_API_KEY, or pass --api-key.",
-          });
-        }
+          if (!apiKey) {
+            throw new CliError("Not authenticated: no API key found.", EXIT.AUTH, {
+              code: "unauthorized",
+              hint: "Run `senso login`, set SENSO_API_KEY, or pass --api-key.",
+            });
+          }
 
-        const config = readConfig();
-        const source = credentialSource(ctx.apiKey);
-        // A prefix, never the key. `whoami` is the command people paste into a
-        // support thread.
-        const prefix = apiKey.slice(0, 8) + "...";
+          const config = readConfig();
+          const source = credentialSource(ctx.apiKey);
+          // A prefix, never the key. `whoami` is the command people paste into a
+          // support thread.
+          const prefix = apiKey.slice(0, 8) + "...";
 
-        try {
-          const org = await verifyApiKey(apiKey, ctx.baseUrl);
-          // snake_case, like every other payload in this CLI. These keys used to
-          // be camelCase, so a jq expression written from the /org/me DTO —
-          // `.org_id`, `.is_free_tier` — silently yielded null on the one
-          // command whose job is to say who you are.
-          emit(
-            ctx,
-            {
-              org_id: org.org_id,
-              name: org.name,
-              slug: org.slug,
-              is_free_tier: org.is_free_tier,
-              api_key_prefix: prefix,
-              credential_source: source,
-              config_path: getConfigPath(),
-              cached: false,
-            },
-            {
-              plain: [
-                "",
-                `  ${pc.bold("Organization:")}  ${org.name}`,
-                `  ${pc.bold("Org ID:")}        ${org.org_id}`,
-                `  ${pc.bold("Slug:")}          ${org.slug}`,
-                `  ${pc.bold("Tier:")}          ${org.is_free_tier ? "Free" : "Paid"}`,
-                `  ${pc.bold("API Key:")}       ${prefix}`,
-                `  ${pc.bold("Key from:")}      ${source}`,
-                `  ${pc.bold("Config:")}        ${getConfigPath()}`,
-                "",
-              ],
-              next: [
-                {
-                  why: "See products, websites and limits for this organization",
-                  command: "senso org get",
-                },
-              ],
-            },
-          );
-        } catch (err) {
-          // Offline. If a previous login cached the org there is still something
-          // true to say, and saying it beats failing — "which org am I pointed
-          // at" is answerable without the network.
-          //
-          // ONLY offline. Falling back on anything that was not a network
-          // failure meant a revoked key (401) or a deleted organization (404)
-          // printed cached values and exited 0, from the one command whose whole
-          // job is to say whether you are authenticated.
-          const mapped = toCliError(err);
-          if (mapped.exitCode !== EXIT.NETWORK) throw mapped;
-          if (!config.orgName) throw mapped;
+          try {
+            const org = await verifyApiKey(apiKey, ctx.baseUrl);
+            // snake_case, like every other payload in this CLI. These keys used to
+            // be camelCase, so a jq expression written from the /org/me DTO —
+            // `.org_id`, `.is_free_tier` — silently yielded null on the one
+            // command whose job is to say who you are.
+            emit(
+              ctx,
+              {
+                org_id: org.org_id,
+                name: org.name,
+                slug: org.slug,
+                is_free_tier: org.is_free_tier,
+                api_key_prefix: prefix,
+                credential_source: source,
+                config_path: getConfigPath(),
+                cached: false,
+              },
+              {
+                plain: [
+                  "",
+                  `  ${pc.bold("Organization:")}  ${org.name}`,
+                  `  ${pc.bold("Org ID:")}        ${org.org_id}`,
+                  `  ${pc.bold("Slug:")}          ${org.slug}`,
+                  `  ${pc.bold("Tier:")}          ${org.is_free_tier ? "Free" : "Paid"}`,
+                  `  ${pc.bold("API Key:")}       ${prefix}`,
+                  `  ${pc.bold("Key from:")}      ${source}`,
+                  `  ${pc.bold("Config:")}        ${getConfigPath()}`,
+                  "",
+                ],
+                next: [
+                  {
+                    why: "See products, websites and limits for this organization",
+                    command: "senso org get",
+                  },
+                ],
+              },
+            );
+          } catch (err) {
+            // Offline. If a previous login cached the org there is still something
+            // true to say, and saying it beats failing — "which org am I pointed
+            // at" is answerable without the network.
+            //
+            // ONLY offline. Falling back on anything that was not a network
+            // failure meant a revoked key (401) or a deleted organization (404)
+            // printed cached values and exited 0, from the one command whose whole
+            // job is to say whether you are authenticated.
+            const mapped = toCliError(err);
+            if (mapped.exitCode !== EXIT.NETWORK) throw mapped;
+            if (!config.orgName) throw mapped;
 
-          emit(
-            ctx,
-            {
-              org_id: config.orgId,
-              name: config.orgName,
-              slug: config.orgSlug,
-              is_free_tier: config.isFreeTier,
-              api_key_prefix: prefix,
-              credential_source: source,
-              config_path: getConfigPath(),
-              cached: true,
-            },
-            {
-              plain: [
-                "",
-                `  ${pc.bold("Organization:")}  ${config.orgName} ${pc.dim("(cached)")}`,
-                `  ${pc.bold("Org ID:")}        ${config.orgId ?? pc.dim("unknown")}`,
-                `  ${pc.bold("Key from:")}      ${source}`,
-                `  ${pc.bold("Config:")}        ${getConfigPath()}`,
-                "",
-              ],
-              warnings: [
-                "Could not reach the Senso API. These values are from the last login, not from the server.",
-              ],
-            },
-          );
-        }
-      }),
-    ),
+            emit(
+              ctx,
+              {
+                org_id: config.orgId,
+                name: config.orgName,
+                slug: config.orgSlug,
+                is_free_tier: config.isFreeTier,
+                api_key_prefix: prefix,
+                credential_source: source,
+                config_path: getConfigPath(),
+                cached: true,
+              },
+              {
+                plain: [
+                  "",
+                  `  ${pc.bold("Organization:")}  ${config.orgName} ${pc.dim("(cached)")}`,
+                  `  ${pc.bold("Org ID:")}        ${config.orgId ?? pc.dim("unknown")}`,
+                  `  ${pc.bold("Key from:")}      ${source}`,
+                  `  ${pc.bold("Config:")}        ${getConfigPath()}`,
+                  "",
+                ],
+                warnings: [
+                  "Could not reach the Senso API. These values are from the last login, not from the server.",
+                ],
+              },
+            );
+          }
+        }),
+      ),
     {
       returns: [
         "org_id, name, slug — the organization this key belongs to",

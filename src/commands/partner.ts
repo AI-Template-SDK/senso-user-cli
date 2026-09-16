@@ -97,12 +97,16 @@ async function resolveIndustryId(
 
   const match = data.industries?.[0];
   if (!match?.industry_id) {
-    throw new CliError(`No industry this partner key can see matches "${industry}".`, EXIT.NOT_FOUND, {
-      code: "not_found",
-      field: "<industry>",
-      received: industry,
-      hint: "List them with `senso partner industries list`, or pass an industry_id UUID.",
-    });
+    throw new CliError(
+      `No industry this partner key can see matches "${industry}".`,
+      EXIT.NOT_FOUND,
+      {
+        code: "not_found",
+        field: "<industry>",
+        received: industry,
+        hint: "List them with `senso partner industries list`, or pass an industry_id UUID.",
+      },
+    );
   }
   return match.industry_id;
 }
@@ -203,7 +207,11 @@ export function registerPartnerCommands(program: Command): void {
         "industries[].location_count — countries it runs in; the values --location takes on the reads below.",
         "total / limit / offset — the page window. total counts every matching industry, not just this page.",
       ],
-      exitCodes: { ...apiExits, 2: "--limit is outside 1-100, or --offset is negative", ...partnerExits },
+      exitCodes: {
+        ...apiExits,
+        2: "--limit is outside 1-100, or --offset is negative",
+        ...partnerExits,
+      },
       notes: [
         PARTNER_KEY_NOTE,
         "The API defaults to 10 rows here, where `senso industries list` defaults to 50. Pass --limit explicitly, and page with --offset: `total` will tell you how many were left behind.",
@@ -342,7 +350,10 @@ export function registerPartnerCommands(program: Command): void {
                 why: "The industry totals these numbers are a share of",
                 command: `senso partner industries summary ${industryId}`,
               },
-              { why: "What each metric above actually measured", command: "senso partner glossary" },
+              {
+                why: "What each metric above actually measured",
+                command: "senso partner glossary",
+              },
             ],
           });
         },
@@ -376,7 +387,9 @@ export function registerPartnerCommands(program: Command): void {
         WINDOW_NOTE,
       ],
       examples: [
-        { command: "senso partner industries brand Automotive Toyota --api-key $SENSO_PARTNER_KEY" },
+        {
+          command: "senso partner industries brand Automotive Toyota --api-key $SENSO_PARTNER_KEY",
+        },
         {
           comment: "Where the brand ranks in its industry",
           command:
@@ -510,7 +523,11 @@ export function registerPartnerCommands(program: Command): void {
       .action(
         runPartnerAction(
           program,
-          async (ctx, industry: string, cmdOpts: WindowFilters & { limit?: string; offset?: string }) => {
+          async (
+            ctx,
+            industry: string,
+            cmdOpts: WindowFilters & { limit?: string; offset?: string },
+          ) => {
             const limit = parseIntFlag("--limit", cmdOpts.limit, { min: 1, max: 100 });
             const offset = parseIntFlag("--offset", cmdOpts.offset, { min: 0 });
             const params = windowParams(cmdOpts);
@@ -588,7 +605,8 @@ export function registerPartnerCommands(program: Command): void {
       ],
       examples: [
         {
-          command: "senso partner industries prompt-metrics Automotive --api-key $SENSO_PARTNER_KEY",
+          command:
+            "senso partner industries prompt-metrics Automotive --api-key $SENSO_PARTNER_KEY",
         },
         {
           comment: "Prompt text and id, one per line",

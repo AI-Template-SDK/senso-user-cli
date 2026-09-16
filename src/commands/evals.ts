@@ -369,7 +369,12 @@ export function registerEvalsCommands(program: Command): void {
         "scope — what the evaluator reads: the knowledge base, or the brand kit",
       ],
       exitCodes: { ...apiExits, 3: "the key lacks read access, or evals are not enabled here" },
-      examples: [{ comment: "What can run, and at what version", command: "senso evals evaluators --output json" }],
+      examples: [
+        {
+          comment: "What can run, and at what version",
+          command: "senso evals evaluators --output json",
+        },
+      ],
       seeAlso: ["senso evals text", "senso evals content"],
     },
   ).action(
@@ -382,7 +387,8 @@ export function registerEvalsCommands(program: Command): void {
       emit(ctx, data, {
         columns: ["key", "display_name", "evaluation_unit", "scope", "latest_version"],
         empty: "evaluators",
-        emptyHint: "No evaluator is enabled for this organization. This is a deployment setting, not something a flag can widen.",
+        emptyHint:
+          "No evaluator is enabled for this organization. This is a deployment setting, not something a flag can widen.",
       });
     }),
   );
@@ -396,7 +402,10 @@ export function registerEvalsCommands(program: Command): void {
         ),
     )
       .option("--text <text>", "The text to judge. Mutually exclusive with --text-file")
-      .option("--text-file <path>", "Read the text to judge from a file. Mutually exclusive with --text")
+      .option(
+        "--text-file <path>",
+        "Read the text to judge from a file. Mutually exclusive with --text",
+      )
       .option("--title <title>", "Optional title, stored with the run's subject (max 255 chars)"),
     {
       returns: [
@@ -404,7 +413,9 @@ export function registerEvalsCommands(program: Command): void {
         "status — one of:",
         ...statusLines(),
         "accuracy_pct — 0-100, absent unless status is completed",
-        `band — ${Object.entries(BAND_MEANING).map(([k, v]) => `${k} (${v})`).join("; ")}`,
+        `band — ${Object.entries(BAND_MEANING)
+          .map(([k, v]) => `${k} (${v})`)
+          .join("; ")}`,
         "claims_scored / claims_total — the denominator behind the score; they differ because not_verifiable claims are excluded rather than failed",
       ],
       exitCodes: {
@@ -417,8 +428,14 @@ export function registerEvalsCommands(program: Command): void {
         "--wait polls rather than holding the connection: a judge run that took 18 seconds once took over 30 the next time, and the request budget is 30.",
       ],
       examples: [
-        { comment: "Judge a claim and wait for the verdict", command: `senso evals text --text "Acme was founded in 1999" --wait --output json` },
-        { comment: "Grade a draft against the brand kit", command: "senso evals text --text-file draft.md --evaluator brand_alignment --wait" },
+        {
+          comment: "Judge a claim and wait for the verdict",
+          command: `senso evals text --text "Acme was founded in 1999" --wait --output json`,
+        },
+        {
+          comment: "Grade a draft against the brand kit",
+          command: "senso evals text --text-file draft.md --evaluator brand_alignment --wait",
+        },
       ],
       seeAlso: ["senso evals get <runId>", "senso evals claims --run-id <runId>"],
     },
@@ -502,13 +519,19 @@ export function registerEvalsCommands(program: Command): void {
         ...statusLines(),
         "accuracy_pct, band, claims_scored, claims_total — the score and its denominator",
       ],
-      exitCodes: { ...apiExits, 2: "--from or --to is not an RFC 3339 instant, or a page flag is out of range" },
+      exitCodes: {
+        ...apiExits,
+        2: "--from or --to is not an RFC 3339 instant, or a page flag is out of range",
+      },
       notes: [
         "--from and --to are RFC 3339 instants here (2026-09-01T00:00:00Z), NOT the YYYY-MM-DD dates `senso analytics` and `senso industries` take.",
       ],
       examples: [
         { comment: "The most recent runs", command: "senso evals runs --limit 10 --output json" },
-        { comment: "Everything judged since a point in time", command: "senso evals runs --from 2026-09-01T00:00:00Z" },
+        {
+          comment: "Everything judged since a point in time",
+          command: "senso evals runs --from 2026-09-01T00:00:00Z",
+        },
       ],
       seeAlso: ["senso evals get <runId>", "senso evals claims"],
     },
@@ -523,7 +546,8 @@ export function registerEvalsCommands(program: Command): void {
       emit(ctx, data, {
         columns: RUN_COLUMNS,
         empty: "eval runs",
-        emptyHint: "Nothing has been judged in this window. Judge something with `senso evals text --text \"...\"`.",
+        emptyHint:
+          'Nothing has been judged in this window. Judge something with `senso evals text --text "..."`.',
       });
     }),
   );
@@ -575,24 +599,38 @@ export function registerEvalsCommands(program: Command): void {
         .description(
           "List the individual claims evaluators have judged, across runs. This is the grain a score is built from: each row carries the claim, the verdict, whether it counted toward the score, and the evidence the judge relied on. Narrow to one run with --run-id.",
         ),
-    ).option("--run-id <id>", "Only claims from this eval run (an eval_run_id from `senso evals runs`)"),
+    ).option(
+      "--run-id <id>",
+      "Only claims from this eval run (an eval_run_id from `senso evals runs`)",
+    ),
     {
       returns: [
         "eval_claim_id / eval_run_id — the claim, and the run it belongs to",
-        `verdict — for kb_accuracy: ${Object.entries(KB_VERDICT_MEANING).map(([k, v]) => `${k} (${v})`).join("; ")}`,
-        `verdict — for brand_alignment: ${Object.entries(BRAND_VERDICT_MEANING).map(([k, v]) => `${k} (${v})`).join("; ")}`,
+        `verdict — for kb_accuracy: ${Object.entries(KB_VERDICT_MEANING)
+          .map(([k, v]) => `${k} (${v})`)
+          .join("; ")}`,
+        `verdict — for brand_alignment: ${Object.entries(BRAND_VERDICT_MEANING)
+          .map(([k, v]) => `${k} (${v})`)
+          .join("; ")}`,
         "passed — whether it counted toward the score; a not_verifiable claim is excluded, not failed",
         "about_brand, verifiable, confidence — why the judge did or did not score it",
       ],
-      exitCodes: { ...apiExits, 2: "--run-id is not a UUID, or a date flag is not an RFC 3339 instant" },
-      examples: [{ comment: "Every claim behind one score", command: "senso evals claims --run-id <runId> --output json" }],
+      exitCodes: {
+        ...apiExits,
+        2: "--run-id is not a UUID, or a date flag is not an RFC 3339 instant",
+      },
+      examples: [
+        {
+          comment: "Every claim behind one score",
+          command: "senso evals claims --run-id <runId> --output json",
+        },
+      ],
       seeAlso: ["senso evals get <runId>"],
     },
   ).action(
     runAction(program, async (ctx: Ctx, cmdOpts: ListFilters & { runId?: string }) => {
       // The API requires a UUID here and answers anything else with a 400.
-      const runId =
-        cmdOpts.runId === undefined ? undefined : parseId(cmdOpts.runId, RUN_ID_FLAG);
+      const runId = cmdOpts.runId === undefined ? undefined : parseId(cmdOpts.runId, RUN_ID_FLAG);
       const data = await apiRequest({
         path: "/org/evals/claims",
         params: { ...listParams(cmdOpts), run_id: runId },
@@ -626,14 +664,13 @@ export function registerEvalsCommands(program: Command): void {
         .description(
           "Judge a saved content item by its content id. Its latest saved version is what gets judged. Add --wait to poll until the run finishes.",
         )
-        .argument("<contentId>", "A content_id — the `content_id` on a `senso kb get` node, or an id from `senso content verification`. NOT a kb_node_id"),
+        .argument(
+          "<contentId>",
+          "A content_id — the `content_id` on a `senso kb get` node, or an id from `senso content verification`. NOT a kb_node_id",
+        ),
     ),
     {
-      returns: [
-        "eval_run_id — the id `evals get` takes",
-        "status — one of:",
-        ...statusLines(),
-      ],
+      returns: ["eval_run_id — the id `evals get` takes", "status — one of:", ...statusLines()],
       exitCodes: {
         ...idExits,
         1: "the API refused, or --wait was passed and the run ended `failed`",
@@ -644,7 +681,12 @@ export function registerEvalsCommands(program: Command): void {
         "Only an item whose latest version is raw text can be judged. An uploaded file or a crawled page stores a pointer rather than text of its own, and the API answers 422.",
         "This takes a content_id, not a kb_node_id. They are both UUIDs and are not interchangeable.",
       ],
-      examples: [{ comment: "Check a stored document against the knowledge base", command: "senso evals content <contentId> --wait --output json" }],
+      examples: [
+        {
+          comment: "Check a stored document against the knowledge base",
+          command: "senso evals content <contentId> --wait --output json",
+        },
+      ],
       seeAlso: ["senso kb get <kb_node_id>", "senso evals get <runId>"],
     },
   ).action(

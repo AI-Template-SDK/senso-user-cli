@@ -83,7 +83,11 @@ const CATALOG = {
 /** dto.OrgIndustryPromptListResponse. */
 const PROMPTS = {
   prompts: [
-    { id: PROMPT_A, text: "Which airline has the best business class in Canada?", funnel_stage: "consideration" },
+    {
+      id: PROMPT_A,
+      text: "Which airline has the best business class in Canada?",
+      funnel_stage: "consideration",
+    },
     { id: PROMPT_B, text: "Cheapest flights Toronto to Vancouver", funnel_stage: "decision" },
   ],
   total: 2,
@@ -521,7 +525,11 @@ describe("industries, resolving the <industry> argument", () => {
     expect(res.exitCode).toBe(4);
     expect(res.stdout).toBe("");
     const { error } = errorEnvelope(res);
-    expect(error).toMatchObject({ code: "not_found", field: "<industry>", received: "Nonexistent Sector" });
+    expect(error).toMatchObject({
+      code: "not_found",
+      field: "<industry>",
+      received: "Nonexistent Sector",
+    });
     expect(error.message).toContain('matches "Nonexistent Sector"');
     expect(error.hint).toContain("senso industries list");
   });
@@ -1051,9 +1059,7 @@ describe("industries brand", () => {
     // resolved.match_confidence is the field that says whether to trust the
     // numbers, so it must not arrive as part of a stringified blob.
     server.use(
-      http.get(apiUrl("/org/industries/:id/brands/:brand"), () =>
-        HttpResponse.json(brandDetail()),
-      ),
+      http.get(apiUrl("/org/industries/:id/brands/:brand"), () => HttpResponse.json(brandDetail())),
     );
 
     const res = await runCli(["industries", "brand", INDUSTRY_UUID, "Air Canada"]);
@@ -1416,9 +1422,7 @@ describe("industries import-prompts, on success", () => {
     // The whole point of the async contract: under --output json stderr is
     // silent, so this is the only place the caller learns what to poll.
     server.use(
-      http.post(apiUrl("/org/industries/:id/prompts/import"), () =>
-        HttpResponse.json(imported()),
-      ),
+      http.post(apiUrl("/org/industries/:id/prompts/import"), () => HttpResponse.json(imported())),
     );
 
     const res = await runCli([
@@ -1441,9 +1445,7 @@ describe("industries import-prompts, on success", () => {
 
   it("puts the payload on stdout and the confirmation on stderr in plain output", async () => {
     server.use(
-      http.post(apiUrl("/org/industries/:id/prompts/import"), () =>
-        HttpResponse.json(imported()),
-      ),
+      http.post(apiUrl("/org/industries/:id/prompts/import"), () => HttpResponse.json(imported())),
     );
 
     const res = await runCli([
@@ -1563,9 +1565,7 @@ describe("industries import-prompts, on success", () => {
 
   it("renders the per-prompt outcomes as a table under --output table", async () => {
     server.use(
-      http.post(apiUrl("/org/industries/:id/prompts/import"), () =>
-        HttpResponse.json(imported()),
-      ),
+      http.post(apiUrl("/org/industries/:id/prompts/import"), () => HttpResponse.json(imported())),
     );
 
     const res = await runCli([

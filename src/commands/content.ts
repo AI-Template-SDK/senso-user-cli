@@ -210,7 +210,10 @@ function assertEvents(events: unknown): void {
     assertMember(`${at}.edit_source`, record.edit_source, EDIT_SOURCES);
 
     const clientEventId = record.client_event_id;
-    if (clientEventId !== undefined && (typeof clientEventId !== "string" || !isUuid(clientEventId))) {
+    if (
+      clientEventId !== undefined &&
+      (typeof clientEventId !== "string" || !isUuid(clientEventId))
+    ) {
       throw usageError(`${at}.client_event_id is not a UUID.`, {
         field: "--data",
         received: cell(clientEventId),
@@ -223,10 +226,12 @@ function assertEvents(events: unknown): void {
 /** Exact membership, not case-folded: the API compares these literally. */
 function assertMember(at: string, value: unknown, allowed: string[]): void {
   if (typeof value === "string" && allowed.includes(value)) return;
-  throw usageError(
-    value === undefined ? `${at} is missing.` : `Invalid ${at}: ${cell(value)}.`,
-    { field: "--data", received: cell(value), allowed, hint: `Must be one of: ${allowed.join(", ")}.` },
-  );
+  throw usageError(value === undefined ? `${at} is missing.` : `Invalid ${at}: ${cell(value)}.`, {
+    field: "--data",
+    received: cell(value),
+    allowed,
+    hint: `Must be one of: ${allowed.join(", ")}.`,
+  });
 }
 
 /**
@@ -287,15 +292,17 @@ export function registerContentCommands(program: Command): void {
         "nodes[].content.processing_status — pending | processing | complete | failed",
         "total — nodes at this level, for paging",
       ],
-      exitCodes: { ...apiExits, 2: "--limit or --offset is not a whole number, or below its floor" },
+      exitCodes: {
+        ...apiExits,
+        2: "--limit or --offset is not a whole number, or below its floor",
+      },
       notes: [
         "The API silently substitutes its own defaults for an unparseable --limit or --offset, so both are checked here first.",
       ],
       examples: [
         { comment: "The ids this prints belong to the kb group", command: "senso content list" },
         {
-          command:
-            "senso content list --limit 50 --output json | jq -r '.data.nodes[].kb_node_id'",
+          command: "senso content list --limit 50 --output json | jq -r '.data.nodes[].kb_node_id'",
         },
       ],
       seeAlso: ["senso kb my-files", "senso kb find", "senso kb get <kb_node_id>"],
@@ -327,7 +334,8 @@ export function registerContentCommands(program: Command): void {
           columns: ["kb_node_id", "name", "type", "processing_status"],
         },
         empty: "content",
-        emptyHint: "Upload something with `senso kb upload <file>`, or look deeper with `senso kb find --q <text>`.",
+        emptyHint:
+          "Upload something with `senso kb upload <file>`, or look deeper with `senso kb find --q <text>`.",
       });
     }),
   );
@@ -595,7 +603,10 @@ export function registerContentCommands(program: Command): void {
         3: "the organization lacks the GEO product, or the key lacks read:content",
       },
       examples: [
-        { comment: "What is waiting for review", command: "senso content verification --status draft" },
+        {
+          comment: "What is waiting for review",
+          command: "senso content verification --status draft",
+        },
         {
           comment: "Live pages whose newest version is an unpublished draft",
           command: "senso content verification --status published --substatus pending_draft",
@@ -846,7 +857,10 @@ export function registerContentCommands(program: Command): void {
         "<id>",
         "content_id of a published item, from `senso content verification --status published` (items[].content_id). Not a kb_node_id, and not from `content list`",
       )
-      .option("--start-date <YYYY-MM-DD>", "Inclusive start of the window. Omit both dates for all time")
+      .option(
+        "--start-date <YYYY-MM-DD>",
+        "Inclusive start of the window. Omit both dates for all time",
+      )
       .option("--end-date <YYYY-MM-DD>", "Inclusive end of the window; not before --start-date")
       .option(
         "--models <list>",
@@ -933,7 +947,10 @@ export function registerContentCommands(program: Command): void {
         "<id>",
         "content_id of a published item, from `senso content verification --status published` (items[].content_id). Not a kb_node_id, and not from `content list`",
       )
-      .option("--start-date <YYYY-MM-DD>", "Inclusive start of the window. Omit both dates for all time")
+      .option(
+        "--start-date <YYYY-MM-DD>",
+        "Inclusive start of the window. Omit both dates for all time",
+      )
       .option("--end-date <YYYY-MM-DD>", "Inclusive end of the window; not before --start-date")
       .option(
         "--models <list>",
@@ -969,7 +986,11 @@ export function registerContentCommands(program: Command): void {
             "senso content citation-prompts 9d7e1c40-5b3a-4c22-8f16-0a3b7e5d2c81 --models chatgpt --output json | jq -r '.data.prompts[].prompt'",
         },
       ],
-      seeAlso: ["senso content citation-details <id>", "senso content verification", "senso questions list"],
+      seeAlso: [
+        "senso content citation-details <id>",
+        "senso content verification",
+        "senso questions list",
+      ],
     },
   ).action(
     runAction(program, async (ctx, idArg: string, cmdOpts: Record<string, string>) => {
@@ -1134,7 +1155,8 @@ export function registerContentCommands(program: Command): void {
       emit(ctx, data, {
         columns: ["version_id", "version_num", "editorial_status", "is_current", "updated_at"],
         empty: "versions",
-        emptyHint: "An item with no versions cannot be published. Check it with `senso content get <id>`.",
+        emptyHint:
+          "An item with no versions cannot be published. Check it with `senso content get <id>`.",
       });
     }),
   );
@@ -1227,7 +1249,11 @@ export function registerContentCommands(program: Command): void {
             "senso content verification --status rejected --output json | jq -r '.data.items[].version_id' | xargs -n1 senso content restore",
         },
       ],
-      seeAlso: ["senso content reject <versionId>", "senso engine publish", "senso content unpublish <id>"],
+      seeAlso: [
+        "senso content reject <versionId>",
+        "senso engine publish",
+        "senso content unpublish <id>",
+      ],
     },
   ).action(
     runAction(program, async (ctx, versionIdArg: string) => {
@@ -1282,7 +1308,11 @@ export function registerContentCommands(program: Command): void {
             "senso content owners 9d7e1c40-5b3a-4c22-8f16-0a3b7e5d2c81 --output json | jq -r '.data[].email'",
         },
       ],
-      seeAlso: ["senso content set-owners <id>", "senso content remove-owner <id> <userId>", "senso members list"],
+      seeAlso: [
+        "senso content set-owners <id>",
+        "senso content remove-owner <id> <userId>",
+        "senso members list",
+      ],
     },
   ).action(
     runAction(program, async (ctx, idArg: string) => {
@@ -1326,7 +1356,11 @@ export function registerContentCommands(program: Command): void {
             "senso content set-owners 9d7e1c40-5b3a-4c22-8f16-0a3b7e5d2c81 --user-ids c3d4e5f6-7a8b-4c9d-8e0f-1a2b3c4d5e6f",
         },
       ],
-      seeAlso: ["senso content owners <id>", "senso content remove-owner <id> <userId>", "senso members list"],
+      seeAlso: [
+        "senso content owners <id>",
+        "senso content remove-owner <id> <userId>",
+        "senso members list",
+      ],
     },
   ).action(
     runAction(program, async (ctx, idArg: string, cmdOpts: { userIds: string[] }) => {
@@ -1347,7 +1381,9 @@ export function registerContentCommands(program: Command): void {
       // used to, forced a second `content owners` call to see what was written.
       if (data) {
         emit(ctx, data, {
-          warnings: ["This replaced the whole owner list: anyone not named in --user-ids was removed."],
+          warnings: [
+            "This replaced the whole owner list: anyone not named in --user-ids was removed.",
+          ],
         });
       } else {
         emitConfirmation(ctx, `Owners updated for content ${id}.`, {
@@ -1433,7 +1469,11 @@ export function registerContentCommands(program: Command): void {
         "curated — true when the tag is part of the organization's working vocabulary, false when it was machine-minted from a search query and has not been adopted",
         "*_count — usage counts across the organization, present on some listings only",
       ],
-      exitCodes: { ...idExits, 2: "<id> is not a UUID", 4: "no content with this id in your organization" },
+      exitCodes: {
+        ...idExits,
+        2: "<id> is not a UUID",
+        4: "no content with this id in your organization",
+      },
       examples: [
         { command: "senso content tags list 9d7e1c40-5b3a-4c22-8f16-0a3b7e5d2c81" },
         {
@@ -1466,7 +1506,10 @@ export function registerContentCommands(program: Command): void {
         "REPLACE the whole tag collection of one content item: any tag not named in --names or --ids is detached. To empty the collection pass --clear; a bare `set` with no flags is refused rather than silently removing every tag, which is what the API does with an empty body.",
       )
       .argument("<id>", "content_id, for a KB document or a generated item")
-      .option("--names <list>", "Comma-separated tag names. Names not in the tag library are created")
+      .option(
+        "--names <list>",
+        "Comma-separated tag names. Names not in the tag library are created",
+      )
       .option("--ids <list>", "Comma-separated existing tag UUIDs, from `senso tags list`")
       .option("--clear", "Detach every tag. Mutually exclusive with --names and --ids"),
     {
@@ -1478,7 +1521,10 @@ export function registerContentCommands(program: Command): void {
         1: "a tag id does not exist or belongs to another organization",
       },
       examples: [
-        { command: "senso content tags set 9d7e1c40-5b3a-4c22-8f16-0a3b7e5d2c81 --names refunds,policy" },
+        {
+          command:
+            "senso content tags set 9d7e1c40-5b3a-4c22-8f16-0a3b7e5d2c81 --names refunds,policy",
+        },
         { command: "senso content tags set 9d7e1c40-5b3a-4c22-8f16-0a3b7e5d2c81 --clear" },
       ],
       seeAlso: ["senso content tags add <id>", "senso content tags remove <id>", "senso tags list"],
@@ -1494,10 +1540,13 @@ export function registerContentCommands(program: Command): void {
         // something a caller has to ask for rather than something a forgotten
         // flag does for them.
         if (Object.keys(body).length === 0 && !cmdOpts.clear) {
-          throw usageError("`content tags set` with no --names and no --ids would remove every tag.", {
-            field: "--names",
-            hint: `Pass --names <a,b> or --ids <uuid,uuid> to replace the collection, or --clear to empty it: senso content tags set ${id} --clear`,
-          });
+          throw usageError(
+            "`content tags set` with no --names and no --ids would remove every tag.",
+            {
+              field: "--names",
+              hint: `Pass --names <a,b> or --ids <uuid,uuid> to replace the collection, or --clear to empty it: senso content tags set ${id} --clear`,
+            },
+          );
         }
         if (cmdOpts.clear && Object.keys(body).length > 0) {
           throw usageError("--clear cannot be combined with --names or --ids.", {
@@ -1534,7 +1583,9 @@ export function registerContentCommands(program: Command): void {
       .option("--name <name>", "Tag name. Created in the organization's tag library if it is new")
       .option("--id <tagId>", "Existing tag UUID, from `senso tags list`"),
     {
-      returns: ["Nothing. The API answers 204 No Content; read the result with `senso content tags list <id>`."],
+      returns: [
+        "Nothing. The API answers 204 No Content; read the result with `senso content tags list <id>`.",
+      ],
       exitCodes: {
         ...idExits,
         2: "<id> or --id is not a UUID, neither --name nor --id was given, or both were",
@@ -1548,7 +1599,11 @@ export function registerContentCommands(program: Command): void {
             "senso content tags add 9d7e1c40-5b3a-4c22-8f16-0a3b7e5d2c81 --id 5e2a7b91-6c04-4d3f-9a18-b2c7e4f01d65",
         },
       ],
-      seeAlso: ["senso content tags list <id>", "senso content tags remove <id>", "senso tags list"],
+      seeAlso: [
+        "senso content tags list <id>",
+        "senso content tags remove <id>",
+        "senso tags list",
+      ],
     },
   ).action(
     runAction(program, async (ctx, idArg: string, cmdOpts: { name?: string; id?: string }) => {
@@ -1574,7 +1629,9 @@ export function registerContentCommands(program: Command): void {
         ctx,
         `Tag ${cmdOpts.name ?? cmdOpts.id} attached to content ${id}.`,
         { action: "attached", resource: "content_tag", id, tag: cmdOpts.name ?? cmdOpts.id },
-        { next: [{ why: "See the resulting collection", command: `senso content tags list ${id}` }] },
+        {
+          next: [{ why: "See the resulting collection", command: `senso content tags list ${id}` }],
+        },
       );
     }),
   );
@@ -1599,13 +1656,19 @@ export function registerContentCommands(program: Command): void {
         "The two flags use different routes: --name sends DELETE …/tags?name=, --id sends DELETE …/tags/<tagId>.",
       ],
       examples: [
-        { command: "senso content tags remove 9d7e1c40-5b3a-4c22-8f16-0a3b7e5d2c81 --name refunds" },
+        {
+          command: "senso content tags remove 9d7e1c40-5b3a-4c22-8f16-0a3b7e5d2c81 --name refunds",
+        },
         {
           command:
             "senso content tags remove 9d7e1c40-5b3a-4c22-8f16-0a3b7e5d2c81 --id 5e2a7b91-6c04-4d3f-9a18-b2c7e4f01d65",
         },
       ],
-      seeAlso: ["senso content tags list <id>", "senso content tags add <id>", "senso content tags set <id>"],
+      seeAlso: [
+        "senso content tags list <id>",
+        "senso content tags add <id>",
+        "senso content tags set <id>",
+      ],
     },
   ).action(
     runAction(program, async (ctx, idArg: string, cmdOpts: { name?: string; id?: string }) => {
@@ -1644,7 +1707,9 @@ export function registerContentCommands(program: Command): void {
         {
           next: [{ why: "Confirm what is left", command: `senso content tags list ${id}` }],
           warnings: cmdOpts.name
-            ? ["Detaching by name is a no-op when no tag of that name is attached, and the API cannot tell the two apart."]
+            ? [
+                "Detaching by name is a no-op when no tag of that name is attached, and the API cannot tell the two apart.",
+              ]
             : undefined,
         },
       );

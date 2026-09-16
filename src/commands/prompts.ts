@@ -204,7 +204,7 @@ export function registerPromptCommands(program: Command): void {
         empty: "prompts",
         emptyHint: cmdOpts.search
           ? "--search matches the question text only, as a substring. Drop it to see every prompt: `senso prompts list`."
-          : "Add one with `senso prompts create --data '{\"question_text\":\"...\",\"type\":\"decision\"}'`.",
+          : 'Add one with `senso prompts create --data \'{"question_text":"...","type":"decision"}\'`.',
       });
     }),
   );
@@ -245,7 +245,11 @@ export function registerPromptCommands(program: Command): void {
       notes: [
         "This endpoint models question_text and type only. To attach tags, use `senso prompts tags set` afterwards, or create through `senso questions create`, which takes tag_ids.",
       ],
-      seeAlso: ["senso prompts tags set <promptId>", "senso questions create", "senso run-config schedule"],
+      seeAlso: [
+        "senso prompts tags set <promptId>",
+        "senso questions create",
+        "senso run-config schedule",
+      ],
     },
   ).action(
     runAction(program, async (ctx, cmdOpts: { data: string }) => {
@@ -263,8 +267,14 @@ export function registerPromptCommands(program: Command): void {
       const id = created.prompt_id ?? "<promptId>";
       emit(ctx, created, {
         next: [
-          { why: "Tags are assigned asynchronously; read them back", command: `senso prompts tags list ${id}` },
-          { why: "Prompts run on the org schedule, not on creation", command: "senso run-config schedule" },
+          {
+            why: "Tags are assigned asynchronously; read them back",
+            command: `senso prompts tags list ${id}`,
+          },
+          {
+            why: "Prompts run on the org schedule, not on creation",
+            command: "senso run-config schedule",
+          },
         ],
       });
     }),
@@ -325,7 +335,9 @@ export function registerPromptCommands(program: Command): void {
       const noRuns = (data.runs ?? []).length === 0;
       emit(ctx, data, {
         warnings: noRuns
-          ? ["This prompt has no runs yet. Runs are produced by the scheduler, not by creating a prompt."]
+          ? [
+              "This prompt has no runs yet. Runs are produced by the scheduler, not by creating a prompt.",
+            ]
           : [],
         next: noRuns
           ? [{ why: "See which days runs fire", command: "senso run-config schedule" }]
@@ -346,7 +358,7 @@ export function registerPromptCommands(program: Command): void {
       ),
     {
       returns: [
-        "Nothing on stdout in plain output. Under --output json: { action: \"deleted\", resource: \"prompt\", id }",
+        'Nothing on stdout in plain output. Under --output json: { action: "deleted", resource: "prompt", id }',
       ],
       exitCodes: {
         ...idExits,
@@ -455,12 +467,19 @@ export function registerPromptCommands(program: Command): void {
           command:
             "senso prompts tags set 7c9e6679-7425-40de-944b-e07fc1f90ae7 --names crm,buying-guide",
         },
-        { comment: "Remove every tag", command: "senso prompts tags set 7c9e6679-7425-40de-944b-e07fc1f90ae7 --clear" },
+        {
+          comment: "Remove every tag",
+          command: "senso prompts tags set 7c9e6679-7425-40de-944b-e07fc1f90ae7 --clear",
+        },
       ],
       notes: [
         "At least one of --names, --ids or --clear is required. An empty body would clear the prompt's tags, which is too destructive to be the default for a forgotten flag.",
       ],
-      seeAlso: ["senso prompts tags add <promptId>", "senso prompts tags remove <promptId>", "senso tags list"],
+      seeAlso: [
+        "senso prompts tags add <promptId>",
+        "senso prompts tags remove <promptId>",
+        "senso tags list",
+      ],
     },
   ).action(
     runAction(
@@ -531,13 +550,20 @@ export function registerPromptCommands(program: Command): void {
         1: "the API refused: the tag id does not exist, or belongs to another organization",
       },
       examples: [
-        { command: "senso prompts tags add 7c9e6679-7425-40de-944b-e07fc1f90ae7 --name buying-guide" },
+        {
+          command:
+            "senso prompts tags add 7c9e6679-7425-40de-944b-e07fc1f90ae7 --name buying-guide",
+        },
         {
           command:
             "senso prompts tags add 7c9e6679-7425-40de-944b-e07fc1f90ae7 --id 3fa85f64-5717-4562-b3fc-2c963f66afa6",
         },
       ],
-      seeAlso: ["senso prompts tags list <promptId>", "senso prompts tags set <promptId>", "senso tags list"],
+      seeAlso: [
+        "senso prompts tags list <promptId>",
+        "senso prompts tags set <promptId>",
+        "senso tags list",
+      ],
     },
   ).action(
     runAction(program, async (ctx, promptId: string, cmdOpts: { name?: string; id?: string }) => {
@@ -587,7 +613,10 @@ export function registerPromptCommands(program: Command): void {
         4: "no prompt with this id in your organization",
       },
       examples: [
-        { command: "senso prompts tags remove 7c9e6679-7425-40de-944b-e07fc1f90ae7 --name buying-guide" },
+        {
+          command:
+            "senso prompts tags remove 7c9e6679-7425-40de-944b-e07fc1f90ae7 --name buying-guide",
+        },
         {
           command:
             "senso prompts tags remove 7c9e6679-7425-40de-944b-e07fc1f90ae7 --id 3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -628,7 +657,12 @@ export function registerPromptCommands(program: Command): void {
           warnings: [
             "The API answers 204 whether or not the tag was attached, so this is not proof that anything changed.",
           ],
-          next: [{ why: "Confirm what the prompt is tagged with now", command: `senso prompts tags list ${id}` }],
+          next: [
+            {
+              why: "Confirm what the prompt is tagged with now",
+              command: `senso prompts tags list ${id}`,
+            },
+          ],
         },
       );
     }),
@@ -666,10 +700,10 @@ function tagSelector(
   }
   if (name) {
     if (name.length > MAX_TAG_NAME) {
-      throw usageError(
-        `Invalid --name: it is longer than ${String(MAX_TAG_NAME)} characters.`,
-        { field: "--name", hint: `A tag name is 1-${String(MAX_TAG_NAME)} characters.` },
-      );
+      throw usageError(`Invalid --name: it is longer than ${String(MAX_TAG_NAME)} characters.`, {
+        field: "--name",
+        hint: `A tag name is 1-${String(MAX_TAG_NAME)} characters.`,
+      });
     }
     return { tag_name: name };
   }

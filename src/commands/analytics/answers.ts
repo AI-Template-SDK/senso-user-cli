@@ -36,36 +36,36 @@ export function addAnswersCommand(analytics: Command, program: Command): void {
     addPagingOptions(
       analytics
         .command("answers")
-      .description(
-        "The newest stored answer per prompt × model × location, with its citations and competitor mentions. This is a snapshot, not a window: --from/--to filter on when each answer was collected, so narrowing them hides combinations instead of returning older answers. Historical answer text is not retained.",
-      )
-      .option(
-        "--from <date>",
-        "Answers collected on or after this date, YYYY-MM-DD (hides rows, never reveals older answers)",
-      )
-      .option(
-        "--to <date>",
-        "Answers collected on or before this date, YYYY-MM-DD (hides rows, never reveals older answers)",
-      )
-      .option(
-        "--models <list>",
-        `Comma-separated model ids: ${MODEL_VALUES.join(", ")} — 'senso analytics filters' lists the ones with data`,
-      )
-      .option("--location <list>", "Comma-separated location filter, case-sensitive")
-      .option(
-        "--prompt-type <type>",
-        "Funnel stage: awareness | consideration | evaluation | decision",
-      )
-      .option("--tag <tag>", "Restrict to prompts carrying this tag")
-      .option(
-        "--mentioned <bool>",
-        "Only answers that did (true) or did not (false) name your brand",
-      )
-      .option("--cited <bool>", "Only answers that did (true) or did not (false) cite anything")
-      .option(
-        "--citation-tier <tier>",
-        "Only answers citing this tier: primary | tracked | secondary",
-      ),
+        .description(
+          "The newest stored answer per prompt × model × location, with its citations and competitor mentions. This is a snapshot, not a window: --from/--to filter on when each answer was collected, so narrowing them hides combinations instead of returning older answers. Historical answer text is not retained.",
+        )
+        .option(
+          "--from <date>",
+          "Answers collected on or after this date, YYYY-MM-DD (hides rows, never reveals older answers)",
+        )
+        .option(
+          "--to <date>",
+          "Answers collected on or before this date, YYYY-MM-DD (hides rows, never reveals older answers)",
+        )
+        .option(
+          "--models <list>",
+          `Comma-separated model ids: ${MODEL_VALUES.join(", ")} — 'senso analytics filters' lists the ones with data`,
+        )
+        .option("--location <list>", "Comma-separated location filter, case-sensitive")
+        .option(
+          "--prompt-type <type>",
+          "Funnel stage: awareness | consideration | evaluation | decision",
+        )
+        .option("--tag <tag>", "Restrict to prompts carrying this tag")
+        .option(
+          "--mentioned <bool>",
+          "Only answers that did (true) or did not (false) name your brand",
+        )
+        .option("--cited <bool>", "Only answers that did (true) or did not (false) cite anything")
+        .option(
+          "--citation-tier <tier>",
+          "Only answers citing this tier: primary | tracked | secondary",
+        ),
       25,
     ),
     {
@@ -96,7 +96,11 @@ export function addAnswersCommand(analytics: Command, program: Command): void {
           command: "senso analytics answers --models chatgpt --limit 100",
         },
       ],
-      seeAlso: ["senso analytics prompt <promptId>", "senso analytics prompts", "senso analytics filters"],
+      seeAlso: [
+        "senso analytics prompt <promptId>",
+        "senso analytics prompts",
+        "senso analytics filters",
+      ],
     },
   ).action(
     runAction(
@@ -207,7 +211,11 @@ export function addAnswersCommand(analytics: Command, program: Command): void {
                     ),
                     ...(Object.keys(a.competitor_mentions ?? {}).length > 0
                       ? [
-                          `     ${pc.dim(`competitors named: ${Object.entries(a.competitor_mentions).map(([brand, n]) => `${brand} ×${String(n)}`).join(", ")}`)}`,
+                          `     ${pc.dim(
+                            `competitors named: ${Object.entries(a.competitor_mentions)
+                              .map(([brand, n]) => `${brand} ×${String(n)}`)
+                              .join(", ")}`,
+                          )}`,
                         ]
                       : []),
                   ].join("\n"),

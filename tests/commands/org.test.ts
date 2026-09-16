@@ -207,7 +207,14 @@ describe("org update, when the flag is wrong", () => {
   it("names the accepted keys when --data carries one the API would silently drop", async () => {
     // The Go binder ignores an unrecognized key, so `{"website": …}` would be a
     // 200 that changed nothing — a write that reads as a success.
-    const res = await runCli(["org", "update", "--data", '{"website":"https://acme.example"}', "--output", "json"]);
+    const res = await runCli([
+      "org",
+      "update",
+      "--data",
+      '{"website":"https://acme.example"}',
+      "--output",
+      "json",
+    ]);
 
     expect(res.exitCode).toBe(2);
     expect(res.stdout).toBe("");
@@ -483,7 +490,7 @@ describe("org get, on success", () => {
     );
 
     const withoutIndustry = await runCli(["org", "get", "--output", "json"]);
-    expect((withoutIndustry.data<{ industry_id?: string }>()).industry_id).toBeUndefined();
+    expect(withoutIndustry.data<{ industry_id?: string }>().industry_id).toBeUndefined();
     expect((envelope(withoutIndustry).next ?? []).map((s) => s.command)).toContain(
       "senso org set-industry <industry_id>",
     );
@@ -675,7 +682,10 @@ describe("org update, on success", () => {
   it("exits 1 and passes the API's own message through on a taken slug", async () => {
     server.use(
       http.put(apiUrl("/org/me"), () =>
-        HttpResponse.json({ message: "Organization with that slug already exists" }, { status: 409 }),
+        HttpResponse.json(
+          { message: "Organization with that slug already exists" },
+          { status: 409 },
+        ),
       ),
     );
 

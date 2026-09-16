@@ -49,7 +49,7 @@ describe("windowParams, mapping flags to query parameters", () => {
       windowParams({
         from: "2025-08-01",
         to: "2025-08-30",
-        models: "gpt-4o,claude-sonnet",
+        models: "chatgpt,claude-sonnet-4-6",
         location: "US,US/California",
         promptType: "consideration",
         tag: "launch",
@@ -57,7 +57,7 @@ describe("windowParams, mapping flags to query parameters", () => {
     ).toEqual({
       from: "2025-08-01",
       to: "2025-08-30",
-      models: "gpt-4o,claude-sonnet",
+      models: "chatgpt,claude-sonnet-4-6",
       location: "US,US/California",
       // The two that are not a straight copy. A rename here is invisible at
       // runtime: the API ignores the unknown key and returns unfiltered rows.

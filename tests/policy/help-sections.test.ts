@@ -77,23 +77,50 @@ describe("every leaf command's --help", () => {
   }
 
   it("names the values of every status field it returns", () => {
-    // A `returns` line that names a status field without its set is the failure
-    // mode this catches: an agent reading `"processing_status": "pending"` with
-    // no set to compare it against cannot tell whether to poll or to give up.
+    // The failure this catches: a Returns line that names a status field and
+    // stops. An agent reading `"processing_status": "pending"` with no set to
+    // compare it against cannot tell whether to poll or to give up.
+    //
+    // Only a FIELD DEFINITION is checked, not prose that happens to use the
+    // word. Commander hard-wraps long help lines, so the block is de-wrapped
+    // first: a new entry starts at the two-space indent, and anything more
+    // indented is a continuation of it.
+    const NAMES_A_STATE = /^([a-z_[\]().]*(?:status|verdict|band|tier))\b[^—]*—(.*)$/s;
     const offenders: string[] = [];
+
     for (const leaf of leaves) {
-      const returns = leaf.help.split("Returns:")[1]?.split(/\n[A-Z][a-z]/)[0] ?? "";
-      const mentionsStatus = /\b(status|processing_status|verdict|band|tier)\b/.test(returns);
-      if (!mentionsStatus) continue;
-      // Either the values are listed inline, or the line points at the command
-      // that lists them.
-      const listsValues = /\|| one of|:\s*\w+\s*,\s*\w+|senso /.test(returns);
-      if (!listsValues) offenders.push(leaf.path);
+      const section = leaf.help.split("Returns:")[1]?.split(/\n\w[\w ]*:\n/)[0] ?? "";
+
+      // Re-join the wrapped lines into one entry per field.
+      const entries: string[] = [];
+      for (const line of section.split("\n")) {
+        if (/^ {2}\S/.test(line)) entries.push(line.trim());
+        else if (/^\s+\S/.test(line) && entries.length > 0) {
+          entries[entries.length - 1] = `${entries[entries.length - 1] ?? ""} ${line.trim()}`;
+        }
+      }
+
+      for (const entry of entries) {
+        const match = NAMES_A_STATE.exec(entry);
+        if (!match) continue;
+        const field = (match[1] ?? "").trim();
+        // `is_free_tier` and friends are booleans; "true or false" is not a set
+        // anyone has to be told.
+        if (field.startsWith("is_")) continue;
+        const body = match[2] ?? "";
+        const listsValues =
+          /\bone of\b/.test(body) ||
+          body.includes("|") ||
+          /\b\w+\s*\/\s*\w+/.test(body) ||
+          body.includes(";") ||
+          body.includes(",");
+        if (!listsValues) offenders.push(`${leaf.path} — ${field}`);
+      }
     }
 
     expect(
       offenders,
-      `These commands name a status field in Returns without saying what its values are:\n  ${offenders.join("\n  ")}`,
+      `These commands define a status-like field in Returns without saying what its values are.\nList them inline ("pending | processing | complete | failed") or say "one of:" and indent them:\n  ${offenders.join("\n  ")}`,
     ).toEqual([]);
   });
 });

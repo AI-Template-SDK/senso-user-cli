@@ -53,7 +53,10 @@ export function addPagesCommand(analytics: Command, program: Command): void {
       )
         .option("--tier <tier>", "Filter by tier: primary | tracked | secondary")
         .option("--domain <domain>", "Restrict to one exact domain (exact match, not a substring)")
-        .option("--domain-contains <text>", "Substring filter on the domain; combines with --domain")
+        .option(
+          "--domain-contains <text>",
+          "Substring filter on the domain; combines with --domain",
+        )
         .option("--url-contains <text>", "Substring filter on the URL")
         .option("--sort <field>", "Sort by: citations | coverage (default: citations)"),
       50,

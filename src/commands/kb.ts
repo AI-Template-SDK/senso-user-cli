@@ -351,7 +351,8 @@ const UPLOADABLE_TYPES = new Set([
   "image/tiff",
 ]);
 
-const ACCEPTED_EXTENSIONS = ".pdf, .doc, .docx, .txt, .html, .csv, .xls, .xlsx, .ppt, .pptx, .png, .jpg, .gif, .bmp, .tiff";
+const ACCEPTED_EXTENSIONS =
+  ".pdf, .doc, .docx, .txt, .html, .csv, .xls, .xlsx, .ppt, .pptx, .png, .jpg, .gif, .bmp, .tiff";
 
 function getMimeType(filename: string): string {
   const ext = filename.slice(filename.lastIndexOf(".")).toLowerCase();
@@ -531,7 +532,9 @@ export function registerKBCommands(program: Command): void {
     addListOptions(
       kb
         .command("my-files")
-        .description("List the top level of the knowledge base — files and folders under the root."),
+        .description(
+          "List the top level of the knowledge base — files and folders under the root.",
+        ),
       "50",
     ).action(
       runAction(program, async (ctx, cmdOpts: Record<string, string>) => {
@@ -748,7 +751,12 @@ export function registerKBCommands(program: Command): void {
             "senso kb get 3f2a8c14-9e05-4b77-8d21-6c0b7a4e1f39 --output json | jq -r .data.content.processing_status",
         },
       ],
-      seeAlso: ["senso kb get-content", "senso kb children", "senso kb ancestors", "senso kb tags list"],
+      seeAlso: [
+        "senso kb get-content",
+        "senso kb children",
+        "senso kb ancestors",
+        "senso kb tags list",
+      ],
     },
   );
 
@@ -757,7 +765,10 @@ export function registerKBCommands(program: Command): void {
       kb
         .command("children")
         .description("List the direct children of a folder — one level deep.")
-        .argument("<id>", "kb_node_id of a FOLDER, from `senso kb root`, `kb my-files` or `kb find`"),
+        .argument(
+          "<id>",
+          "kb_node_id of a FOLDER, from `senso kb root`, `kb my-files` or `kb find`",
+        ),
       "50",
     ).action(
       runAction(program, async (ctx, rawId: string, cmdOpts: Record<string, string>) => {
@@ -853,7 +864,11 @@ export function registerKBCommands(program: Command): void {
         "These entries carry no content block and no effective_role, unlike `kb get`.",
         "An empty list means the node sits directly under the organization root.",
       ],
-      exitCodes: { ...idExits, 2: "<id> is not a UUID", 4: "no node with this id, or your key cannot see it" },
+      exitCodes: {
+        ...idExits,
+        2: "<id> is not a UUID",
+        4: "no node with this id, or your key cannot see it",
+      },
       examples: [
         { command: "senso kb ancestors 3f2a8c14-9e05-4b77-8d21-6c0b7a4e1f39" },
         {
@@ -942,7 +957,12 @@ export function registerKBCommands(program: Command): void {
           command: "senso kb get-content 3f2a8c14-9e05-4b77-8d21-6c0b7a4e1f39 --rev 2",
         },
       ],
-      seeAlso: ["senso kb get", "senso kb download-url", "senso kb update-raw", "senso kb patch-raw"],
+      seeAlso: [
+        "senso kb get",
+        "senso kb download-url",
+        "senso kb update-raw",
+        "senso kb patch-raw",
+      ],
     },
   );
 
@@ -1133,7 +1153,9 @@ export function registerKBCommands(program: Command): void {
           if (!ctx.quiet) log.success(`Node ${id} renamed to "${name}".`);
           emit(ctx, data, {
             ...nodeDetail(ctx, data),
-            next: [{ why: "Re-read the node, with its ingestion state", command: `senso kb get ${id}` }],
+            next: [
+              { why: "Re-read the node, with its ingestion state", command: `senso kb get ${id}` },
+            ],
           });
         }),
       ),
@@ -1241,7 +1263,12 @@ export function registerKBCommands(program: Command): void {
             "senso kb move 3f2a8c14-9e05-4b77-8d21-6c0b7a4e1f39 --parent-id $(senso kb root --output json | jq -r .data.kb_node_id)",
         },
       ],
-      seeAlso: ["senso kb ancestors", "senso kb sync-status", "senso kb create-folder", "senso kb rename"],
+      seeAlso: [
+        "senso kb ancestors",
+        "senso kb sync-status",
+        "senso kb create-folder",
+        "senso kb rename",
+      ],
     },
   );
 
@@ -1554,7 +1581,7 @@ export function registerKBCommands(program: Command): void {
         4: "no node with this id, your key cannot see it, or <id> is a folder",
       },
       notes: [
-        "Full replacement: omitting `summary` sends \"\" and CLEARS it. Use `senso kb patch-raw` to leave a field alone.",
+        'Full replacement: omitting `summary` sends "" and CLEARS it. Use `senso kb patch-raw` to leave a field alone.',
         "Raw (text/markdown) documents only. For an uploaded file use `senso kb update-file`.",
         "Re-ingestion re-runs auto-tagging, which may add tags after this call.",
         "The tag write happens after the content write commits, so a failure reported at that point means the text WAS replaced.",
@@ -1735,7 +1762,10 @@ export function registerKBCommands(program: Command): void {
             if (item.status === "upload_pending" && item.upload_url) {
               const match = fileData.find((f) => f.meta.filename === item.filename);
               if (!match) {
-                failed.push({ filename: item.filename, reason: "Could not match to a local file." });
+                failed.push({
+                  filename: item.filename,
+                  reason: "Could not match to a local file.",
+                });
                 continue;
               }
               try {
@@ -1833,7 +1863,12 @@ export function registerKBCommands(program: Command): void {
             "NODE=$(senso kb upload ./a.pdf --output json | jq -r '.data.results[0].kb_node_id') && senso kb get \"$NODE\"",
         },
       ],
-      seeAlso: ["senso kb create-raw", "senso kb update-file", "senso kb get", "senso ingest upload"],
+      seeAlso: [
+        "senso kb create-raw",
+        "senso kb update-file",
+        "senso kb get",
+        "senso ingest upload",
+      ],
     },
   );
 
@@ -1906,7 +1941,7 @@ export function registerKBCommands(program: Command): void {
         "kb_node_id — the node you updated; unchanged.",
         "content_id — the document behind it; unchanged.",
         "ingestion_run_id — the run that will process the new version, readable with `senso ingest runs`.",
-        'status — always "upload_pending" on success: the bytes are in S3 and a worker will pick them up.',
+        'status — upload_pending | conflict | duplicate | invalid. Always "upload_pending" on success: the bytes are in S3 and a worker will pick them up; the other three mean this version was NOT stored.',
         "The consumed presigned upload_url is not echoed.",
       ],
       exitCodes: {
@@ -1923,7 +1958,8 @@ export function registerKBCommands(program: Command): void {
       ],
       examples: [
         {
-          command: "senso kb update-file 3f2a8c14-9e05-4b77-8d21-6c0b7a4e1f39 ./refund-policy-v2.pdf",
+          command:
+            "senso kb update-file 3f2a8c14-9e05-4b77-8d21-6c0b7a4e1f39 ./refund-policy-v2.pdf",
         },
       ],
       seeAlso: ["senso kb upload", "senso kb update-raw", "senso kb get", "senso ingest runs"],
@@ -1967,7 +2003,11 @@ export function registerKBCommands(program: Command): void {
         "  true   part of the organization's working vocabulary",
         "  false  machine-minted from a search query, awaiting adoption",
       ],
-      exitCodes: { ...idExits, 2: "<id> is not a UUID", 4: "no node with this id, or your key cannot see it" },
+      exitCodes: {
+        ...idExits,
+        2: "<id> is not a UUID",
+        4: "no node with this id, or your key cannot see it",
+      },
       notes: [
         "A folder is accepted here and returns an empty list — folders are not tagged. `kb tags set` on the same folder is an error.",
       ],
@@ -1987,7 +2027,10 @@ export function registerKBCommands(program: Command): void {
       .command("set")
       .description("Replace a document's entire tag set.")
       .argument("<id>", "kb_node_id of a CONTENT node")
-      .option("--names <list>", "Comma-separated tag names (created in the org's library if missing)")
+      .option(
+        "--names <list>",
+        "Comma-separated tag names (created in the org's library if missing)",
+      )
       .option("--ids <list>", "Comma-separated existing tag UUIDs from `senso tags list`")
       .option("--clear", "Remove every tag. Required to clear — passing no flags is an error")
       .action(
@@ -2066,7 +2109,9 @@ export function registerKBCommands(program: Command): void {
         "Auto-tagging may add tags after this call if ingestion has not finished.",
       ],
       examples: [
-        { command: "senso kb tags set 3f2a8c14-9e05-4b77-8d21-6c0b7a4e1f39 --names policy,refunds" },
+        {
+          command: "senso kb tags set 3f2a8c14-9e05-4b77-8d21-6c0b7a4e1f39 --names policy,refunds",
+        },
         {
           command:
             "senso kb tags set 3f2a8c14-9e05-4b77-8d21-6c0b7a4e1f39 --ids c3d9a0b2-6e11-4f77-8a25-0d4b9e6f2c18",
@@ -2293,7 +2338,7 @@ export function registerKBCommands(program: Command): void {
         { command: "senso kb permissions list 3f2a8c14-9e05-4b77-8d21-6c0b7a4e1f39" },
         {
           command:
-            'senso kb permissions list 3f2a8c14-9e05-4b77-8d21-6c0b7a4e1f39 --output json | jq -r \'.data.grants[] | "\\(.id) \\(.role) \\(.grantee.display_name)"\'',
+            "senso kb permissions list 3f2a8c14-9e05-4b77-8d21-6c0b7a4e1f39 --output json | jq -r '.data.grants[] | \"\\(.id) \\(.role) \\(.grantee.display_name)\"'",
         },
       ],
       seeAlso: ["senso kb permissions add", "senso kb get", "senso kb ancestors"],
@@ -2320,7 +2365,11 @@ export function registerKBCommands(program: Command): void {
             cmdOpts: { granteeType: string; granteeId: string; role: string },
           ) => {
             const id = parseId(rawId, nodeSpec("<id>"));
-            const granteeType = requireEnumFlag("--grantee-type", cmdOpts.granteeType, GRANTEE_TYPES);
+            const granteeType = requireEnumFlag(
+              "--grantee-type",
+              cmdOpts.granteeType,
+              GRANTEE_TYPES,
+            );
             const role = requireEnumFlag("--role", cmdOpts.role, GRANTABLE_ROLES);
             const granteeId = parseId(cmdOpts.granteeId, {
               label: "--grantee-id",
@@ -2439,9 +2488,7 @@ export function registerKBCommands(program: Command): void {
                 role,
               },
               {
-                next: [
-                  { why: "Confirm the new role", command: `senso kb permissions list ${id}` },
-                ],
+                next: [{ why: "Confirm the new role", command: `senso kb permissions list ${id}` }],
               },
             );
           },
@@ -2471,10 +2518,14 @@ export function registerKBCommands(program: Command): void {
         {
           comment: "Find one person's grant id",
           command:
-            'senso kb permissions list 3f2a8c14-9e05-4b77-8d21-6c0b7a4e1f39 --output json | jq -r \'.data.grants[] | select(.grantee.email=="ada@example.com") | .id\'',
+            "senso kb permissions list 3f2a8c14-9e05-4b77-8d21-6c0b7a4e1f39 --output json | jq -r '.data.grants[] | select(.grantee.email==\"ada@example.com\") | .id'",
         },
       ],
-      seeAlso: ["senso kb permissions list", "senso kb permissions add", "senso kb permissions remove"],
+      seeAlso: [
+        "senso kb permissions list",
+        "senso kb permissions add",
+        "senso kb permissions remove",
+      ],
     },
   );
 

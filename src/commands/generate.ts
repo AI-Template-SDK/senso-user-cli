@@ -461,7 +461,7 @@ export function registerGenerateCommands(program: Command): void {
         "content_id, version_id, version_num — the saved draft; read it with `senso generated-content get <content_id>`",
         "raw_markdown, seo_title, url_slug, meta_data, json_ld — the generated document",
         "editorial_status — draft | review | published | rejected",
-        "publish_status and publish_results[] — per-destination outcome when --destination was given",
+        "publish_status — published | failed | skipped, the outcome of the --destination publish. publish_results[] carries the per-destination reason.",
         `Job statuses while waiting: queued | running | completed | failed (expired is reserved and never set today).`,
         "A failed job exits 1 with error.code one of: prompt_not_found, prompt_org_mismatch, content_type_not_found, invalid_publish_destination, content_generation_disabled, publisher_assignment_required, insufficient_credits, content_generation_unavailable, metadata_generation_unavailable, content_generation_failed.",
       ],

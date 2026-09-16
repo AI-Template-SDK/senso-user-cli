@@ -444,7 +444,7 @@ export function registerIngestCommands(program: Command): void {
         "kb_node_id — unchanged; the id to poll with `senso kb get <kb_node_id>`",
         "content_id — unchanged; the document keeps its identity across versions",
         "ingestion_run_id — the run that will parse, chunk and embed the new version",
-        "status — upload_pending when the replacement was accepted and the bytes were sent",
+        "status — upload_pending (accepted, bytes sent) | conflict (the same content is already in the knowledge base) | duplicate (already uploaded) | invalid (unsupported type or over the size limit). Only upload_pending means the new version was stored.",
       ],
       exitCodes: {
         ...idExits,

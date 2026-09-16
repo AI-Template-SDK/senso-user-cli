@@ -36,12 +36,22 @@ import { server } from "../setup.js";
 import { apiUrl, envelope, errorEnvelope, runCli } from "../helpers.js";
 
 const ORG_ID = "b1e9f6c2-7f4a-4d2e-9a3b-1c5d7e9f0a2b";
+// api_key_id values, not keys. Named without "key" so a secret scanner reading
+// `KEY_… = "<high entropy>"` does not have to guess whether this is a
+// credential — see .gitleaks.toml, which asks for strings that cannot be
+// mistaken for one rather than an allowlist entry.
 const CI_ID = "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f";
 const LAPTOP_ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
 const NODE_POLICIES = "3f2a1b0c-9d8e-4f7a-b6c5-d4e3f2a1b0c9";
 const NODE_RATES = "d4e3f2a1-b0c9-4d8e-9f7a-6b5c4d3e2f1a";
 
-/** The secret, which must appear on stdout and on no other stream. */
+/**
+ * The created key's secret, which must appear on stdout and on no other stream.
+ *
+ * Deliberately in the placeholder form .gitleaks.toml allowlists by shape — a
+ * run of x's, which no real key has. The previous fixture was invented to look
+ * like a live Stripe key and the scanner was right to stop it.
+ */
 const SECRET = "tgr_test_xxxxxxxxxxxxxxxxxxxx";
 
 /**
@@ -567,9 +577,7 @@ describe("api-keys kb-permissions, on the wire", () => {
 
     expect(res.exitCode).toBe(0);
     expect(seen?.method).toBe("GET");
-    expect(new URL(seen?.url ?? "").pathname).toBe(
-      `/api/v1/org/api-keys/${CI_ID}/kb-permissions`,
-    );
+    expect(new URL(seen?.url ?? "").pathname).toBe(`/api/v1/org/api-keys/${CI_ID}/kb-permissions`);
   });
 
   it("PUTs the grants array verbatim, keeping node_id and role", async () => {
@@ -608,9 +616,7 @@ describe("api-keys kb-permissions, on the wire", () => {
 
     expect(res.exitCode).toBe(0);
     expect(seen?.method).toBe("DELETE");
-    expect(new URL(seen?.url ?? "").pathname).toBe(
-      `/api/v1/org/api-keys/${CI_ID}/kb-permissions`,
-    );
+    expect(new URL(seen?.url ?? "").pathname).toBe(`/api/v1/org/api-keys/${CI_ID}/kb-permissions`);
   });
 });
 

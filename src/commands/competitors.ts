@@ -44,6 +44,24 @@ interface CompetitorListResponse {
   total?: number;
 }
 
+/**
+ * dto.CompetitorBatchResponse: the list, plus what the call actually did.
+ *
+ * The counts are not derivable from the rows — an already-tracked item comes
+ * back looking exactly like one that was just inserted, and an item dropped at
+ * the organization cap does not come back at all — which is why the API reports
+ * them, and why they are preferred over the timestamp heuristic below.
+ */
+interface CompetitorBatchResponse extends CompetitorListResponse {
+  created_count?: number;
+  already_present_count?: number;
+  skipped_count?: number;
+  skipped_over_cap_count?: number;
+  skipped_invalid_count?: number;
+  competitor_cap?: number;
+  remaining_capacity?: number;
+}
+
 interface BatchItem {
   name?: unknown;
   url?: unknown;
@@ -387,7 +405,11 @@ See also: senso analytics, senso tracked-sources`,
         { command: 'senso competitors add --name "Acme Analytics" --url https://acme.example.com' },
         { command: 'senso competitors add --name "Acme Analytics" --output json | jq -r .data.id' },
       ],
-      seeAlso: ["senso competitors suggest", "senso competitors batch-add", "senso competitors list"],
+      seeAlso: [
+        "senso competitors suggest",
+        "senso competitors batch-add",
+        "senso competitors list",
+      ],
     },
   );
 
@@ -432,9 +454,9 @@ See also: senso analytics, senso tracked-sources`,
           const sent = body.items.map((item) => asText((item as BatchItem).name).trim());
           const startedAt = Date.now();
 
-          let data: CompetitorListResponse;
+          let data: CompetitorBatchResponse;
           try {
-            data = await apiRequest<CompetitorListResponse>({
+            data = await apiRequest<CompetitorBatchResponse>({
               method: "POST",
               path: "/org/competitors/batch",
               body,
@@ -453,16 +475,44 @@ See also: senso analytics, senso tracked-sources`,
           const rows = data.competitors ?? [];
           const returnedNames = new Set(rows.map((r) => (r.name ?? "").trim().toLowerCase()));
           const dropped = sent.filter((name) => !returnedNames.has(name.toLowerCase()));
-          const alreadyTracked = rows.filter((r) => existedBefore(r, startedAt));
-          const created = rows.length - alreadyTracked.length;
+
+          // What the call DID, taken from the API's own counts when it reports
+          // them. The created_at heuristic is the fallback for a deployment
+          // that does not: it makes the answer depend on the clock, and a row
+          // this org created seconds earlier by another command reads as new.
+          const preexisting = rows.filter((r) => existedBefore(r, startedAt));
+          const counted =
+            typeof data.created_count === "number" &&
+            typeof data.already_present_count === "number";
+          const alreadyPresent = counted ? (data.already_present_count ?? 0) : preexisting.length;
+          const created = counted ? (data.created_count ?? 0) : rows.length - preexisting.length;
+          const overCap = data.skipped_over_cap_count ?? 0;
+          const invalid = data.skipped_invalid_count ?? 0;
 
           const warnings: string[] = [];
-          if (alreadyTracked.length > 0) {
+          if (alreadyPresent > 0) {
+            // Named only when the timestamps agree with the count. They cannot
+            // say WHICH rows the API counted, so a disagreement would put a
+            // list in the warning that contradicts the number beside it.
+            const named =
+              preexisting.length === alreadyPresent
+                ? preexisting.map((r) => `"${r.name ?? r.id ?? "?"}"`).join(", ")
+                : "";
             warnings.push(
-              `Already tracked, returned unchanged with their original source and created_at: ${alreadyTracked
-                .map((r) => `"${r.name ?? r.id ?? "?"}"`)
-                .join(", ")}.`,
+              `${String(alreadyPresent)} item(s) were already tracked and came back unchanged, with their original id, source and created_at${named ? `: ${named}` : ""}.`,
             );
+          }
+          if (overCap > 0) {
+            const room =
+              typeof data.remaining_capacity === "number"
+                ? ` (${String(data.remaining_capacity)} slot(s) left)`
+                : "";
+            warnings.push(
+              `${String(overCap)} item(s) were discarded because the organization is at its ${String(ORG_CAP)}-competitor cap${room}. Free a slot with \`senso competitors delete <competitorId>\`, then send them again.`,
+            );
+          }
+          if (invalid > 0) {
+            warnings.push(`${String(invalid)} item(s) were dropped for a blank name.`);
           }
           if (dropped.length > 0) {
             warnings.push(
@@ -472,7 +522,7 @@ See also: senso analytics, senso tracked-sources`,
 
           if (!ctx.quiet) {
             log.success(
-              `Added ${String(created)} competitor(s). ${String(alreadyTracked.length)} already tracked, ${String(dropped.length)} not created.`,
+              `Added ${String(created)} competitor(s). ${String(alreadyPresent)} already tracked, ${String(dropped.length)} not created.`,
             );
           }
           emit(ctx, data, {
@@ -547,9 +597,11 @@ See also: senso analytics, senso tracked-sources`,
             columns: ["name", "confidence", "already_tracked", "source", "url"],
             empty: "suggestions",
             emptyHint:
-              "The model found no candidates. Add one by hand with `senso competitors add --name \"…\"`.",
+              'The model found no candidates. Add one by hand with `senso competitors add --name "…"`.',
             warnings: data.cached
-              ? ["cached=true: this is a replay of a call made in the last 10 minutes, not a fresh one."]
+              ? [
+                  "cached=true: this is a replay of a call made in the last 10 minutes, not a fresh one.",
+                ]
               : [],
             next: [
               {
@@ -596,15 +648,21 @@ See also: senso analytics, senso tracked-sources`,
     competitors
       .command("update")
       .description(
-        "REPLACE a tracked competitor's name and URL. This is a PUT and the API cannot express \"leave the URL alone\": a request without a URL deletes the stored one, so this command requires either --url or --clear-url. Provenance is preserved — source, rationale and confidence keep whatever they were set to and cannot be changed here. Requires update:org.",
+        'REPLACE a tracked competitor\'s name and URL. This is a PUT and the API cannot express "leave the URL alone": a request without a URL deletes the stored one, so this command requires either --url or --clear-url. Provenance is preserved — source, rationale and confidence keep whatever they were set to and cannot be changed here. Requires update:org.',
       )
       .argument(
         "<competitorId>",
         "A competitor id (UUID) — the `id` field of `senso competitors list`",
       )
       .requiredOption("--name <name>", "Competitor brand name. 1-255 characters after trimming")
-      .option("--url <url>", "The website to store. Absolute URL with a scheme, at most 2048 characters")
-      .option("--clear-url", "Delete the stored URL, which is what the API does with a request that omits it")
+      .option(
+        "--url <url>",
+        "The website to store. Absolute URL with a scheme, at most 2048 characters",
+      )
+      .option(
+        "--clear-url",
+        "Delete the stored URL, which is what the API does with a request that omits it",
+      )
       .action(
         runAction(
           program,
