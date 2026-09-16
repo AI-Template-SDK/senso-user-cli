@@ -2990,11 +2990,7 @@ The sensov2 web app consumes these endpoints, so none of this was made.
       per-endpoint: `nodes`, `gaps`, `prompts`, `tags`, `contents`, `grants`,
       and some lists are bare arrays. This is the single largest remaining
       inconsistency and the one an agent trips over most.
-- [ ] **Every `204` that should carry what it did.** `gaps undo`, `prompts
-    delete`, `tags add`/`delete`, `publish-records retry`, `kb bulk-delete`,
-      `remove-owner`, and the legacy unpublish path — which is why
-      `content unpublish` still cannot report `unpublished_count` on the
-      unpublish-everywhere case.
+- [ ] **Every `204` that should carry what it did.** These: `gaps undo`, `prompts delete`, `tags add`, `tags delete`, `publish-records retry`, `kb bulk-delete`, `remove-owner`, and the legacy unpublish path — which is why `content unpublish` still cannot report `unpublished_count` on the unpublish-everywhere case.
 - [ ] **Three analytics rate fields are non-pointer**, so a zero denominator
       renders `0.0%` instead of `null`: `BrandDetailMetrics.mention_rate`,
       `.share_of_voice`, and `IndustryDomainDetailResponse.share_of_citations`.
