@@ -1502,6 +1502,14 @@ The registry models this organization is opted into for scheduled runs. `run-con
 senso run-config scheduler-models [options]
 ```
 
+### senso run-config scheduler-model-options
+
+Every registry model the scheduler can run, which is the catalog `run-config set-scheduler-models` validates against. Use it to discover a provider/model id rather than sending one and reading it back off the rejection.
+
+```
+senso run-config scheduler-model-options [options]
+```
+
 ### senso run-config set-scheduler-models
 
 Replace the registry models the scheduler runs for this organization. Advanced: for the usual case use `run-config set-models`, which sets both lists. This does NOT update the run-model list, so afterwards `run-config models` and `run-config scheduler-models` can disagree.

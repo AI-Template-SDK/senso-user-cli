@@ -292,7 +292,7 @@ describe("run-config set-models, refusing a request before making it", () => {
 
     expect(res.exitCode).toBe(2);
     expect(res.stderr).toContain('Invalid model: "anthropic/claude"');
-    expect(res.stderr).toContain("senso run-config set-scheduler-models");
+    expect(res.stderr).toContain("senso run-config scheduler-model-options");
   });
 });
 

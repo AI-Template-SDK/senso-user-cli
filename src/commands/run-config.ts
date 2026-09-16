@@ -142,7 +142,7 @@ function parseRunModels(models: unknown): string[] {
       field: "models",
       received: model,
       allowed: RUN_MODELS,
-      hint: `Run \`senso run-config model-options\` for the authoritative list. Accepted aliases: ${Object.keys(RUN_MODEL_ALIASES).join(", ")}. For the scheduler's provider/model ids, use \`senso run-config set-scheduler-models\`.`,
+      hint: `Run \`senso run-config model-options\` for the authoritative list. Accepted aliases: ${Object.keys(RUN_MODEL_ALIASES).join(", ")}. For the scheduler's provider/model ids, use \`senso run-config scheduler-model-options\`.`,
     });
   });
 }
@@ -370,7 +370,7 @@ export function registerRunConfigCommands(program: Command): void {
       ],
       notes: [
         "An empty list means the scheduler will run nothing for this organization.",
-        "No endpoint serves the full catalog, so this and the error from a rejected write are the only sources of valid ids.",
+        "This is what the organization is opted INTO. For every id the scheduler can run, use `senso run-config scheduler-model-options`.",
       ],
       seeAlso: ["senso run-config set-scheduler-models", "senso run-config models"],
     },
@@ -386,6 +386,57 @@ export function registerRunConfigCommands(program: Command): void {
         empty: "scheduler models",
         emptyHint:
           "Nothing is opted in, so the scheduler will run nothing. Set the run models with `senso run-config set-models`, which updates this list too.",
+      });
+    }),
+  );
+
+  describeCommand(
+    rc
+      .command("scheduler-model-options")
+      .description(
+        "Every registry model the scheduler can run, which is the catalog `run-config set-scheduler-models` validates against. Use it to discover a provider/model id rather than sending one and reading it back off the rejection.",
+      ),
+    {
+      returns: [
+        'models[].provider + "/" + models[].model — the identifier `set-scheduler-models` takes, e.g. anthropic/claude',
+        "models[].execution_mode — batch_async: answered in a batch, hours of latency. single_sync: answered one request at a time",
+        "models[].adapter_key — which integration runs it (bd_dataset, bd_serp, anthropic, openai)",
+        "models[].id — the registry row id. No command takes it",
+      ],
+      exitCodes: {
+        ...apiExits,
+        3: "no API key, or the organization does not have the GEO product",
+      },
+      examples: [
+        { command: "senso run-config scheduler-model-options" },
+        {
+          comment: "Just the ids, ready to paste into set-scheduler-models",
+          command:
+            "senso run-config scheduler-model-options --output json | jq -r '.data.models[] | .provider + \"/\" + .model'",
+        },
+      ],
+      notes: [
+        "This is the whole catalog. `run-config scheduler-models` is the subset this organization is opted into.",
+        "Prefer `run-config set-models`, which writes both model lists. These ids are only needed for the advanced path.",
+      ],
+      seeAlso: [
+        "senso run-config set-scheduler-models",
+        "senso run-config scheduler-models",
+        "senso run-config model-options",
+      ],
+    },
+  ).action(
+    runAction(program, async (ctx) => {
+      const data = await apiRequest({
+        path: "/org/scheduler-models/supported",
+        apiKey: ctx.apiKey,
+        baseUrl: ctx.baseUrl,
+      });
+      emit(ctx, data, {
+        columns: ["provider", "model", "execution_mode", "adapter_key", "id"],
+        empty: "scheduler models",
+        emptyHint:
+          "This deployment's scheduler registry is empty, which is a server-side configuration matter rather than anything a flag can widen.",
       });
     }),
   );
