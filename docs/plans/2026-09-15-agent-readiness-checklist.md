@@ -138,7 +138,7 @@ has to change for the CLI to be able to say the right thing. Check items off in 
 - [x] Name the two id spaces once, up front: `kb_node_id` for every `kb` command, `content_id` for `--content-ids`, `gaps answer`, `evals content`, `content *` (generated content only).
 - [x] senso-ingest: the `existing_content_id` guidance depends on A2 (409 body preserved).
 - [x] Add the gap-report loop (`gaps list --status weak` after probes, `--no-gap-signals` on tests) to senso-search.
-- [ ] Policy test in the CLI repo that every `senso …` command named in a SKILL.md exists in the command tree (the reference list is `docs/reference/commands.md`).
+- [x] Policy test in the CLI repo that every `senso …` command named in a SKILL.md exists in the command tree (the reference list is `docs/reference/commands.md`).
 
 ---
 
