@@ -133,12 +133,25 @@ describe("mapping an HTTP failure onto the contract", () => {
     expect(err.code).toBe("rate_limited");
   });
 
-  it("maps any 5xx to a server error and says it is not the caller's fault", () => {
-    for (const status of [500, 502, 503]) {
+  it("maps a 5xx to a server error whose hint says to retry", () => {
+    for (const status of [500, 502, 504]) {
       const err = toCliError(api(status));
       expect(err.exitCode).toBe(EXIT.ERROR);
       expect(err.code).toBe("server_error");
-      expect(err.message).toContain("not your fault");
+      expect(err.hint).toContain("Retry");
+    }
+  });
+
+  it("does not tell the caller to retry a 501 or a 503, which never will work", () => {
+    // A deployment that does not offer an endpoint answers every attempt the
+    // same way. Inheriting the generic 5xx "retry shortly" hint sent agents
+    // into a loop against "History imports are not available for this
+    // deployment" and "Evals are not enabled in this environment".
+    for (const status of [501, 503]) {
+      const err = toCliError(api(status, { message: "Evals are not enabled in this environment" }));
+      expect(err.code).toBe("server_error");
+      expect(err.message).toBe("Evals are not enabled in this environment");
+      expect(err.hint).toContain("not a transient failure");
     }
   });
 

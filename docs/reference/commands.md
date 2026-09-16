@@ -8,43 +8,43 @@ Generated from the command tree of `@senso-ai/cli`. Every command accepts the [g
 
 - [`senso login`](#senso-login) — Authenticate with Senso.
 - [`senso logout`](#senso-logout) — Remove stored API key and organization info from local config.
-- [`senso whoami`](#senso-whoami) — Show which organization you are authenticated as, including org ID, slug, tier, and API key prefix.
-- [`senso org`](#senso-org) — View and update organization profile and settings.
-- [`senso users`](#senso-users) — Manage users within the organization.
-- [`senso api-keys`](#senso-api-keys) — Manage org-scoped API keys.
+- [`senso whoami`](#senso-whoami) — Show which organization you are authenticated as, including org ID, slug, tier, API key prefix and which credential source is in effect.
+- [`senso org`](#senso-org) — Read and change the organization your API key belongs to.
+- [`senso users`](#senso-users) — Memberships of the organization your API key belongs to.
+- [`senso api-keys`](#senso-api-keys) — Inspect the API keys of the organization your key belongs to.
 - [`senso search`](#senso-search) — Search the knowledge base with natural language queries.
 - [`senso ingest`](#senso-ingest) — Ingest files into the knowledge base.
 - [`senso website-import`](#senso-website-import) — Import your organization's website into the knowledge base.
-- [`senso content`](#senso-content) — Manage content items in the knowledge base.
-- [`senso ctas`](#senso-ctas) — Manage call-to-action (CTA) templates — the card attached to a published content-engine page — and choose which one each content item carries.
+- [`senso content`](#senso-content) — Inspect and manage GENERATED content — items created by `senso engine draft` and `senso engine publish` — through review, publication and ownership.
+- [`senso ctas`](#senso-ctas) — Call-to-action templates: the card attached to a published content-engine page, and which one each content item carries.
 - [`senso evals`](#senso-evals) — Judge text against your organization's ground truth.
 - [`senso gaps`](#senso-gaps) — The gap report: questions and claims your knowledge base could not back up, and what was decided about each — the same queue the Senso app shows.
-- [`senso generate`](#senso-generate) — AI content generation.
-- [`senso engine`](#senso-engine) — Publish or draft content through the content engine.
-- [`senso destinations`](#senso-destinations) — Manage publish destinations.
-- [`senso publish-records`](#senso-publish-records) — Inspect and retry publish records.
-- [`senso brand-kit`](#senso-brand-kit) — Manage the organization's brand kit guidelines that inform AI content generation about your brand voice, tone, and style.
-- [`senso content-types`](#senso-content-types) — Manage content type configurations.
-- [`senso prompts`](#senso-prompts) — Manage prompts (GEO questions).
-- [`senso run-config`](#senso-run-config) — Configure which AI models are used for question runs and on which days they run.
-- [`senso skills`](#senso-skills) — Install and manage Senso agent skills.
-- [`senso members`](#senso-members) — View the organization member directory.
-- [`senso credits`](#senso-credits) — View your organization's credit balance.
-- [`senso questions`](#senso-questions) — Manage org-scoped geo questions.
-- [`senso kb`](#senso-kb) — Manage the knowledge base.
-- [`senso permissions`](#senso-permissions) — View available role permissions for the organization.
-- [`senso tags`](#senso-tags) — Manage the organization's tag library.
-- [`senso product-lines`](#senso-product-lines) — Manage product lines — flexible org-scoped product/service definitions.
-- [`senso roles`](#senso-roles) — Inspect the roles defined for your organization.
-- [`senso competitors`](#senso-competitors) — Manage the curated list of competitor brands your organization tracks.
-- [`senso tracked-sources`](#senso-tracked-sources) — Manage citation-classification rules that tier each cited URL as Owned (primary), Tracked, or External (secondary).
-- [`senso generated-content`](#senso-generated-content) — Browse AI-generated content (GEO).
+- [`senso generate`](#senso-generate) — Content generation: read and change the engine's settings, generate one piece of content for a prompt, or start a full run and follow it.
+- [`senso engine`](#senso-engine) — Create, update and publish content through the content engine.
+- [`senso destinations`](#senso-destinations) — Where published content lands.
+- [`senso publish-records`](#senso-publish-records) — Retry a publish that failed for ONE destination, without republishing the whole item.
+- [`senso brand-kit`](#senso-brand-kit) — One brand kit per organization: the brand facts and voice rules the AI writer follows when generating content.
+- [`senso content-types`](#senso-content-types) — Manage content types — the reusable output formats for AI-generated content (blog post, FAQ, landing page).
+- [`senso prompts`](#senso-prompts) — Manage prompts — the tracked GEO questions AI models are asked on your run schedule, which also seed content generation.
+- [`senso run-config`](#senso-run-config) — Configure which AI models answer this organization's prompts, and on which days.
+- [`senso skills`](#senso-skills) — Install and manage the official Senso skills for AI coding agents (Claude Code, Cursor, Codex, Copilot, Gemini, Cline).
+- [`senso members`](#senso-members) — Read-only directory of the organization's members, with email, name, role name and groups.
+- [`senso credits`](#senso-credits) — The credit balance of the organization this API key belongs to.
+- [`senso questions`](#senso-questions) — Manage the organization's geo questions.
+- [`senso kb`](#senso-kb) — The organization's knowledge base: a tree of folders and documents that Senso search and generation read from.
+- [`senso permissions`](#senso-permissions) — The catalog of permission keys (action:resource, e.g.
+- [`senso tags`](#senso-tags) — Manage the organization's tag library — the shared vocabulary that prompts, KB nodes and content items are labeled with.
+- [`senso product-lines`](#senso-product-lines) — Manage product lines — the organization's product and service definitions.
+- [`senso roles`](#senso-roles) — The roles of the organization your key belongs to.
+- [`senso competitors`](#senso-competitors) — Manage the organization's curated competitor list.
+- [`senso tracked-sources`](#senso-tracked-sources) — Manage the rules that classify every URL an AI answer cites into one of three tiers.
+- [`senso generated-content`](#senso-generated-content) — Browse content produced by the content engine (`senso engine draft` and `senso engine publish`).
 - [`senso analytics`](#senso-analytics) — GEO analytics for your organization — brand visibility, share of voice, and citations across the AI models you monitor.
-- [`senso history-imports`](#senso-history-imports) — Track the run-history import jobs started by `senso industries import-prompts`.
+- [`senso history-imports`](#senso-history-imports) — Read-only view of the run-history import jobs that back-fill this organization's prompts with the history already collected for its industry.
 - [`senso industries`](#senso-industries) — Browse the public industry catalog and the competitive intelligence Senso collects for it — brand leaderboards, domain citations and the prompts each industry runs.
 - [`senso partner`](#senso-partner) — Partner-network commands.
-- [`senso update`](#senso-update) — Update CLI to the latest version
-- [`senso uninstall`](#senso-uninstall) — Remove this CLI, the Senso agent skills it installed, and the stored API key.
+- [`senso update`](#senso-update) — Update this CLI to the newest @senso-ai/cli published on npm.
+- [`senso uninstall`](#senso-uninstall) — Remove everything this CLI put on the machine: the Senso agent skills, the stored API key, then the npm package itself — in that order, so a failure leaves you the CLI to retry with.
 
 ## Global options
 
@@ -74,7 +74,7 @@ These are accepted by every command.
 
 ## senso login
 
-Authenticate with Senso. Paste your API key and it will be validated against your organization, then stored locally.
+Authenticate with Senso. Paste your API key and it will be validated against your organization, then stored locally. Interactive only: without a terminal it exits 2 and names the two alternatives.
 
 ```
 senso login [options]
@@ -82,7 +82,7 @@ senso login [options]
 
 ## senso logout
 
-Remove stored API key and organization info from local config.
+Remove stored API key and organization info from local config. Does not affect SENSO_API_KEY or --api-key.
 
 ```
 senso logout [options]
@@ -90,7 +90,7 @@ senso logout [options]
 
 ## senso whoami
 
-Show which organization you are authenticated as, including org ID, slug, tier, and API key prefix.
+Show which organization you are authenticated as, including org ID, slug, tier, API key prefix and which credential source is in effect. Makes one request to GET /org/me.
 
 ```
 senso whoami [options]
@@ -98,7 +98,7 @@ senso whoami [options]
 
 ## senso org
 
-View and update organization profile and settings. Includes name, slug, logo, websites, locations, and tier information.
+Read and change the organization your API key belongs to. There is no organization id to pass — every command here acts on the key's own organization (see `senso whoami`). Workflow: `org get` reads the record, `org update` changes name/slug/logo and REPLACES the websites and locations lists, `org set-industry` picks an industry from `senso industries list` once and for all, `org set-runs` is the org-wide pause switch for every scheduled run.
 
 ```
 senso org [options] [command]
@@ -106,7 +106,7 @@ senso org [options] [command]
 
 ### senso org get
 
-Get full organization details including name, slug, tier, websites, locations, configured AI models, publishers, and schedule.
+Read the organization your API key belongs to: name, slug, logo, websites, locations, industry, AI models, schedules and the org-wide runs switch. Read-only.
 
 ```
 senso org get [options]
@@ -114,7 +114,7 @@ senso org get [options]
 
 ### senso org update
 
-Update organization details. Only the fields you pass are changed; omitting a field leaves it alone. But 'websites' and 'locations' REPLACE their whole list when passed — sending one website deletes the rest. To add to either list, run 'org get' first and send back every entry you want to keep.
+Change the organization's name, slug, logo, websites or locations. Only the keys you pass are changed, but `websites` and `locations` REPLACE their whole list: every entry you leave out is deleted. Returns the organization record after the write, and warns about the entries the write removed.
 
 ```
 senso org update [options]
@@ -122,11 +122,11 @@ senso org update [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "name": "Acme", "slug": "acme", "logo_url": "https://acme.com/logo.png", "websites": [{"url": "https://acme.com"}], "locations": [{"country_code": "US", "region_name": "California"}] }. Every field is optional. "websites" and "locations" REPLACE the existing list rather than adding to it — include every entry you want to keep, or pass [] to clear the list. A website entry takes only "url"; sending the "org_website_id" from 'org get' is rejected. Send "logo_url": "" to clear the logo. |  |
+| `--data <json>` | JSON object with any of: "name" (1-255), "slug" (1-255, unique across Senso), "logo_url" ("" clears it), "websites" ([{"url":"https://acme.com"}], the FULL list; [] clears it; an entry takes only url), "locations" ([{"country_code":"US","region_name":"California"}], the FULL list; country_code is exactly 2 letters). Unknown keys exit 2 before any request. |  |
 
 ### senso org set-industry
 
-Set the industry your organization belongs to, chosen from the public catalog (`senso industries list`). This can be done ONCE: afterwards the call is rejected and changing it is not self-serve. It is what `senso industries import-prompts` and `senso generate industry-draft` work from, and where an org with no models or locations of its own inherits them on activation. Nothing else happens — no prompts are created and no runs start.
+Point the organization at an industry from the public catalog. This can be done ONCE: a second call is refused and changing it afterwards is not self-serve. The industry is what `senso industries import-prompts` and `senso generate industry-draft` work from, and where an org with no models or locations of its own inherits them on activation. Nothing else happens — no prompts are created and no runs start.
 
 ```
 senso org set-industry [options] <industryId>
@@ -134,7 +134,7 @@ senso org set-industry [options] <industryId>
 
 ### senso org set-runs
 
-Toggle the org-wide runs master switch. Pause every scheduled prompt run and content-generation run, or re-enable them.
+Flip the organization-wide runs master switch (the `enable_runs` field of `senso org get`). false pauses every scheduled prompt run and content-generation run; true resumes the schedule. Runs already in progress are not canceled.
 
 ```
 senso org set-runs [options]
@@ -142,11 +142,11 @@ senso org set-runs [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--enabled <bool>` | Set to true or false |  |
+| `--enabled <bool>` | true or false. Maps to the API field enable_runs |  |
 
 ## senso users
 
-Manage users within the organization. Add, update roles, remove users, or set the active organization for a user.
+Memberships of the organization your API key belongs to. Three ids appear here: user_id (the person — what every <userId> argument takes), org_user_id (the membership row, informational only) and role_id (a per-organization role UUID from `senso roles list`). This group returns ids only; for emails and names use `senso members list`. Which command to add someone with: `invite` for a brand-new person, `invite-existing` when they already have a Senso account and you know the email, `add` when you already hold their user_id.
 
 ```
 senso users [options] [command]
@@ -154,7 +154,7 @@ senso users [options] [command]
 
 ### senso users list
 
-List all users in the organization. Returns user IDs, roles, and membership status.
+List memberships of the organization, one row per user: user_id, role_id and whether this organization is the user's active one. Ids only — for emails and names use `senso members list`.
 
 ```
 senso users list [options]
@@ -162,12 +162,12 @@ senso users list [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--limit <n>` | Maximum number of users to return |  |
-| `--offset <n>` | Number of users to skip (for pagination) |  |
+| `--limit <n>` | Rows per page, integer >= 1 (the API defaults to 10) |  |
+| `--offset <n>` | Rows to skip, integer >= 0 (default 0) |  |
 
 ### senso users add
 
-Add an existing platform user to the organization. Requires user_id and role_id.
+Add a person who already has a Senso account to the organization, by user_id. Use `senso users invite-existing` when you only know the email, and `senso users invite` when the person has no Senso account yet.
 
 ```
 senso users add [options]
@@ -175,11 +175,11 @@ senso users add [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "user_id": "uuid", "role_id": "uuid", "is_current": false } |  |
+| `--data <json>` | JSON: { "user_id": "<uuid>", "role_id": "<uuid>", "is_current": false }. user_id comes from `senso members list`; role_id from `senso roles list` and must be a role of THIS organization. is_current is optional and is forced true when the person has no active organization yet. |  |
 
 ### senso users get
 
-Get a user's details including their role and membership status in the organization.
+Read one membership: the person's role_id in this organization and whether this organization is their active one. Ids only — for email and name use `senso members list`.
 
 ```
 senso users get [options] <userId>
@@ -187,7 +187,7 @@ senso users get [options] <userId>
 
 ### senso users update
 
-Update a user's role in the organization. Requires role_id in the JSON body.
+Change a member's role in this organization, and optionally whether this organization is their active one. role_id is required on every call, even when only is_current is changing.
 
 ```
 senso users update [options] <userId>
@@ -195,11 +195,11 @@ senso users update [options] <userId>
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "role_id": "uuid", "is_current": true } |  |
+| `--data <json>` | JSON: { "role_id": "<uuid>", "is_current": true }. role_id is required by the API on every update and must be a role of THIS organization (`senso roles list`); is_current is optional. |  |
 
 ### senso users remove
 
-Remove a user from the organization. This does not delete the platform user account.
+Remove a member from this organization. Their Senso account and their memberships in other organizations are untouched.
 
 ```
 senso users remove [options] <userId>
@@ -207,7 +207,7 @@ senso users remove [options] <userId>
 
 ### senso users set-current
 
-Set this organization as the current (active) organization for a user.
+Make this organization the member's active (current) organization: the one the Senso dashboard opens for them. Only one organization is current per user. Same effect as is_current in `senso users update`, without having to send a role_id.
 
 ```
 senso users set-current [options] <userId>
@@ -215,7 +215,7 @@ senso users set-current [options] <userId>
 
 ### senso users invite
 
-Invite a brand-new user by email. Creates the user (in Clerk and Senso) and adds them to the organization with the given role. Use `roles list` to find a role_id. If the email already belongs to a Senso user, use `users invite-existing` instead.
+Create a Senso account for a person (in Clerk and Senso) and add them to this organization with a role. An account that already exists for the email is reused. This command does not send an invitation email.
 
 ```
 senso users invite [options]
@@ -223,15 +223,15 @@ senso users invite [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--email <email>` | User's email address |  |
-| `--given-name <name>` | First name |  |
-| `--family-name <name>` | Last name |  |
-| `--role-id <uuid>` | Role to assign — resolve with `senso roles list` |  |
-| `--is-current` | Make this org the new user's current org |  |
+| `--email <email>` | The person's email address |  |
+| `--given-name <name>` | First name, 1-255 characters (API field given_name) |  |
+| `--family-name <name>` | Last name, 1-255 characters (API field family_name) |  |
+| `--role-id <uuid>` | A role of THIS organization — resolve the name with `senso roles list` |  |
+| `--is-current` | Make this organization the person's active organization |  |
 
 ### senso users invite-existing
 
-Add an existing Senso user to the organization by email. Returns 404 if no user with that email exists — use `users invite` for brand-new users.
+Add a person who already has a Senso account to this organization, by email. Answers 404 when no account has that email — use `senso users invite` to create one.
 
 ```
 senso users invite-existing [options]
@@ -239,13 +239,13 @@ senso users invite-existing [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--email <email>` | Email of an existing Senso user |  |
-| `--role-id <uuid>` | Role to assign — resolve with `senso roles list` |  |
-| `--is-current` | Make this org the user's current org |  |
+| `--email <email>` | Email of an existing Senso account |  |
+| `--role-id <uuid>` | A role of THIS organization — resolve the name with `senso roles list` |  |
+| `--is-current` | Make this organization the person's active organization |  |
 
 ## senso api-keys
 
-Manage org-scoped API keys. Create, rotate, revoke, or list API keys used to authenticate with the Senso API.
+Inspect the API keys of the organization your key belongs to. Every command takes the key's id (a UUID from `api-keys list`), never the secret. Creating, renaming, revoking, deleting a key and changing its knowledge-base scope require a signed-in dashboard user — the API answers 403 to any API key — so over the CLI this group is effectively read-only: `list` → `get` → `kb-permissions-get`.
 
 ```
 senso api-keys [options] [command]
@@ -253,7 +253,7 @@ senso api-keys [options] [command]
 
 ### senso api-keys list
 
-List all API keys for the organization. Shows name, expiry, revocation status, and last usage.
+One page of the organization's API keys. Secrets are never returned. Revoked keys (revoked_at set) and expired keys (expires_at in the past) are included.
 
 ```
 senso api-keys list [options]
@@ -261,12 +261,12 @@ senso api-keys list [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--limit <n>` | Maximum number of keys to return |  |
-| `--offset <n>` | Number of keys to skip (for pagination) |  |
+| `--limit <n>` | Rows per page, integer >= 1 (the API defaults to 10) |  |
+| `--offset <n>` | Rows to skip, integer >= 0 (default 0) |  |
 
 ### senso api-keys create
 
-Create a new API key. The key value is returned only once — store it securely.
+Create an API key. The secret is in the `key` field of the payload and is returned exactly once — the API never shows it again, and no other command can retrieve it.
 
 ```
 senso api-keys create [options]
@@ -274,11 +274,11 @@ senso api-keys create [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "name": "my-key", "expires_at": "2025-12-31T00:00:00Z" } |  |
+| `--data <json>` | JSON: { "name": "ci-deploy", "expires_at": "2026-12-31T00:00:00Z" }. name is required (1-255 characters); expires_at is optional ISO 8601 — omit it for a key that never expires. |  |
 
 ### senso api-keys get
 
-Get details for a specific API key including name, expiry, and last used timestamp.
+Read one API key of the organization. The secret is never returned.
 
 ```
 senso api-keys get [options] <keyId>
@@ -286,7 +286,7 @@ senso api-keys get [options] <keyId>
 
 ### senso api-keys update
 
-Update an API key's name or expiry date.
+Rename an API key or change its expiry. The API requires `name` on every update, so an expires_at-only change is not possible.
 
 ```
 senso api-keys update [options] <keyId>
@@ -294,7 +294,7 @@ senso api-keys update [options] <keyId>
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "name": "new-name", "expires_at": "2026-06-01T00:00:00Z" } |  |
+| `--data <json>` | JSON: { "name": "new-name", "expires_at": "2027-01-01T00:00:00Z" }. name is required by the API even when only the expiry is changing; expires_at is optional ISO 8601. |  |
 
 ### senso api-keys delete
 
@@ -306,7 +306,7 @@ senso api-keys delete [options] <keyId>
 
 ### senso api-keys revoke
 
-Revoke an API key. The key remains visible but can no longer be used for authentication.
+Revoke an API key. The key stays listed, with revoked_at set, and no longer authenticates.
 
 ```
 senso api-keys revoke [options] <keyId>
@@ -314,7 +314,7 @@ senso api-keys revoke [options] <keyId>
 
 ### senso api-keys kb-permissions-get
 
-Get the knowledge base node permission grants configured for an API key.
+List the knowledge base folder grants that restrict a key. A scoped key can only read and search within the folders listed; an unscoped key has full organization access.
 
 ```
 senso api-keys kb-permissions-get [options] <keyId>
@@ -322,7 +322,7 @@ senso api-keys kb-permissions-get [options] <keyId>
 
 ### senso api-keys kb-permissions-set
 
-Set KB node permission grants for an API key. Replaces any existing grants. Each grant requires a node_id (UUID) and role (viewer|editor|owner|admin).
+Set the knowledge base folder grants for an API key. REPLACES the existing grants: the list you send becomes the whole scope. At least one grant is required — to clear the scope use `senso api-keys kb-permissions-delete`.
 
 ```
 senso api-keys kb-permissions-set [options] <keyId>
@@ -330,11 +330,11 @@ senso api-keys kb-permissions-set [options] <keyId>
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "grants": [{ "node_id": "<uuid>", "role": "viewer" }] } |  |
+| `--data <json>` | JSON: { "grants": [{ "node_id": "<kb_node_id>", "role": "viewer" }] }. node_id is a folder from `senso kb my-files`; role is one of viewer, editor, owner (`admin` is the org-admin bypass and is not grantable). At least one grant. |  |
 
 ### senso api-keys kb-permissions-delete
 
-Remove all KB node permission grants from an API key, restoring full org-level access.
+Remove every knowledge base folder grant from an API key, restoring full organization access for that key.
 
 ```
 senso api-keys kb-permissions-delete [options] <keyId>
@@ -350,9 +350,9 @@ senso search [options] [command] <query>
 
 | Option | Description | Default |
 |---|---|---|
-| `--max-results <n>` | Maximum number of results (max: 20) | `5` |
-| `--content-ids <ids...>` | Restrict search to specific content item IDs (space-separated UUIDs) |  |
-| `--require-scoped-ids` | Only return results from the specified --content-ids (omit to allow fallback to all content) |  |
+| `--max-results <n>` | How many results to return. Integer 1-20; out of range exits 2, nothing is clamped | `5` |
+| `--content-ids <ids...>` | Restrict the search to these content items. Space-separated content_id UUIDs from a previous result — NOT kb_node_ids |  |
+| `--require-scoped-ids` | Fail rather than fall back to the whole knowledge base. Requires --content-ids |  |
 | `--no-gap-signals` | Keep this search out of the organization's gap report (sends X-Senso-Signals: off). Use it for probes, tests and monitors — a real question that finds nothing should be left eligible. The search still runs, costs credits and is recorded. Set SENSO_GAP_SIGNALS=off to do this for every search. |  |
 
 ### senso search context
@@ -365,9 +365,9 @@ senso search context [options] <query>
 
 | Option | Description | Default |
 |---|---|---|
-| `--max-results <n>` | Maximum results (max: 20) | `5` |
-| `--content-ids <ids...>` | Restrict search to specific content item IDs (space-separated UUIDs) |  |
-| `--require-scoped-ids` | Only return results from the specified --content-ids |  |
+| `--max-results <n>` | How many results to return. Integer 1-20; out of range exits 2, nothing is clamped | `5` |
+| `--content-ids <ids...>` | Restrict the search to these content items. Space-separated content_id UUIDs from a previous result — NOT kb_node_ids |  |
+| `--require-scoped-ids` | Fail rather than fall back to the whole knowledge base. Requires --content-ids |  |
 | `--no-gap-signals` | Keep this search out of the organization's gap report (sends X-Senso-Signals: off). Use it for probes, tests and monitors — a real question that finds nothing should be left eligible. The search still runs, costs credits and is recorded. Set SENSO_GAP_SIGNALS=off to do this for every search. |  |
 
 ### senso search content
@@ -380,14 +380,14 @@ senso search content [options] <query>
 
 | Option | Description | Default |
 |---|---|---|
-| `--max-results <n>` | Maximum results (max: 20) | `5` |
-| `--content-ids <ids...>` | Restrict search to specific content item IDs (space-separated UUIDs) |  |
-| `--require-scoped-ids` | Only return results from the specified --content-ids |  |
+| `--max-results <n>` | How many results to return. Integer 1-20; out of range exits 2, nothing is clamped | `5` |
+| `--content-ids <ids...>` | Restrict the search to these content items. Space-separated content_id UUIDs from a previous result — NOT kb_node_ids |  |
+| `--require-scoped-ids` | Fail rather than fall back to the whole knowledge base. Requires --content-ids |  |
 | `--no-gap-signals` | Keep this search out of the organization's gap report (sends X-Senso-Signals: off). Use it for probes, tests and monitors — a real question that finds nothing should be left eligible. The search still runs, costs credits and is recorded. Set SENSO_GAP_SIGNALS=off to do this for every search. |  |
 
 ### senso search full
 
-Alias for the default search — returns AI answer plus matching chunks. Equivalent to 'senso search <query>'.
+Alias for the default search — returns AI answer plus matching chunks. Equivalent to 'senso search <query>', and renders identically.
 
 ```
 senso search full [options] <query>
@@ -395,9 +395,9 @@ senso search full [options] <query>
 
 | Option | Description | Default |
 |---|---|---|
-| `--max-results <n>` | Maximum results (max: 20) | `5` |
-| `--content-ids <ids...>` | Restrict search to specific content item IDs (space-separated UUIDs) |  |
-| `--require-scoped-ids` | Only return results from the specified --content-ids |  |
+| `--max-results <n>` | How many results to return. Integer 1-20; out of range exits 2, nothing is clamped | `5` |
+| `--content-ids <ids...>` | Restrict the search to these content items. Space-separated content_id UUIDs from a previous result — NOT kb_node_ids |  |
+| `--require-scoped-ids` | Fail rather than fall back to the whole knowledge base. Requires --content-ids |  |
 | `--no-gap-signals` | Keep this search out of the organization's gap report (sends X-Senso-Signals: off). Use it for probes, tests and monitors — a real question that finds nothing should be left eligible. The search still runs, costs credits and is recorded. Set SENSO_GAP_SIGNALS=off to do this for every search. |  |
 
 ### senso search stream
@@ -410,14 +410,14 @@ senso search stream [options] <query>
 
 | Option | Description | Default |
 |---|---|---|
-| `--max-results <n>` | Maximum results (max: 20) | `5` |
-| `--content-ids <ids...>` | Restrict search to specific content item IDs (space-separated UUIDs) |  |
-| `--require-scoped-ids` | Only return results from the specified --content-ids |  |
+| `--max-results <n>` | How many results to return. Integer 1-20; out of range exits 2, nothing is clamped | `5` |
+| `--content-ids <ids...>` | Restrict the search to these content items. Space-separated content_id UUIDs from a previous result — NOT kb_node_ids |  |
+| `--require-scoped-ids` | Fail rather than fall back to the whole knowledge base. Requires --content-ids |  |
 | `--no-gap-signals` | Keep this search out of the organization's gap report (sends X-Senso-Signals: off). Use it for probes, tests and monitors — a real question that finds nothing should be left eligible. The search still runs, costs credits and is recorded. Set SENSO_GAP_SIGNALS=off to do this for every search. |  |
 
 ## senso ingest
 
-Ingest files into the knowledge base. Upload documents (PDF, TXT, DOCX, etc.) to be parsed, chunked, and embedded for semantic search.
+Ingest files into the knowledge base. Upload documents (PDF, TXT, DOCX, etc.) to be parsed, chunked, and embedded for semantic search. Ingestion is asynchronous: the id to keep is kb_node_id, and `senso kb get <kb_node_id>` says when the file is searchable.
 
 ```
 senso ingest [options] [command]
@@ -425,7 +425,7 @@ senso ingest [options] [command]
 
 ### senso ingest upload
 
-Upload files to the knowledge base. Accepts local file paths (up to 10). Files are hashed, uploaded to S3, then parsed and embedded by a background worker. Poll 'senso kb get <kb-node-id>' until content.processing_status is 'complete' before searching the uploaded content.
+Upload files to the knowledge base. Accepts local file paths (up to 10). Files are hashed, uploaded to S3, then parsed and embedded by a background worker. Poll 'senso kb get <kb_node_id>' — the kb_node_id printed for each accepted file — until content.processing_status is 'complete' before searching the uploaded content.
 
 ```
 senso ingest upload [options] <files...>
@@ -433,14 +433,14 @@ senso ingest upload [options] <files...>
 
 | Option | Description | Default |
 |---|---|---|
-| `--folder-id <id>` | Destination folder ID (skip interactive prompt) |  |
+| `--folder-id <id>` | Destination folder, as its kb_node_id (from `senso kb my-files`). Without it: the interactive picker on a terminal, the organization's root folder otherwise |  |
 
 ### senso ingest reprocess
 
-Re-ingest an existing document with a new file version. Provide the KB node ID (kb_node_id) and the path to the replacement file.
+Re-ingest an existing document with a new file version. The node keeps its kb_node_id and content_id; a new version and a new ingestion run are created.
 
 ```
-senso ingest reprocess [options] <nodeId> <file>
+senso ingest reprocess [options] <kb_node_id> <file>
 ```
 
 ## senso website-import
@@ -473,7 +473,7 @@ senso website-import status [options]
 
 ## senso content
 
-Manage content items in the knowledge base. List, inspect, delete, unpublish, and manage the verification workflow and ownership of content.
+Inspect and manage GENERATED content — items created by `senso engine draft` and `senso engine publish` — through review, publication and ownership. Knowledge base documents are not managed here: use `senso kb`. Ids: content_id from `senso content verification` (items[].content_id), version_id from `senso content versions` (reject and restore take that one), publish_record_id from `senso content verification` (items[].destinations[].publish_record_id). Most commands need the GEO product; `content list` and `content tags` do not.
 
 ```
 senso content [options] [command]
@@ -481,7 +481,7 @@ senso content [options] [command]
 
 ### senso content list
 
-List top-level files and folders in the knowledge base. Use 'kb my-files' for the same result with richer KB node output.
+List top-level knowledge base files and folders. Deprecated: this returns KB NODES, so each id is a kb_node_id and `senso content get` rejects it. Prefer `senso kb my-files`, which returns the same rows with every field.
 
 ```
 senso content list [options]
@@ -489,12 +489,12 @@ senso content list [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--limit <n>` | Items per page | `10` |
+| `--limit <n>` | Items per page. The API caps this at 50 | `10` |
 | `--offset <n>` | Pagination offset | `0` |
 
 ### senso content get
 
-Get a content item by ID. Returns the full content detail including versions, metadata, and publish status.
+Read one GENERATED content item: its current version's title, summary, rendered text, editorial status and tags. This endpoint serves generated content ONLY — a knowledge base document is refused, even though its id is a valid content_id. Read those with `senso kb get <kb_node_id>` (metadata) or `senso kb content <kb_node_id>` (text). It does NOT return the version history (`senso content versions`) or publish records (`senso content verification`).
 
 ```
 senso content get [options] <id>
@@ -502,7 +502,7 @@ senso content get [options] <id>
 
 ### senso content delete
 
-Delete a content item from the knowledge base and any external publish destinations. This cannot be undone.
+Permanently delete one GENERATED content item and remove it from every external destination. This cannot be undone, and it is not atomic: the destinations are cleared first, so a failure there leaves the local item in place. Knowledge base documents are refused — delete those with `senso kb delete <kb_node_id>`.
 
 ```
 senso content delete [options] <id>
@@ -510,7 +510,7 @@ senso content delete [options] <id>
 
 ### senso content unpublish
 
-Unpublish a content item. Without --publish-record-ids, removes the content from every destination it's live on and sets its status back to draft. With --publish-record-ids, only the specified publish records are retracted — use this to unpublish from a subset of destinations while leaving the rest live. The content status only flips back to draft once no publish records remain live.
+Retract a published content item. With no flags it removes the content from EVERY destination it is live on, and the version returns to draft once no live publish record remains. With --publish-record-ids only those destinations are retracted and the rest stay live. Only generated content — content created by `senso engine publish` — can be unpublished.
 
 ```
 senso content unpublish [options] <id>
@@ -518,11 +518,11 @@ senso content unpublish [options] <id>
 
 | Option | Description | Default |
 |---|---|---|
-| `--publish-record-ids <ids...>` | Restrict unpublish to specific publish_record UUIDs. Use 'content get <id>' to find publish record IDs for a content item. |  |
+| `--publish-record-ids <ids...>` | Restrict the unpublish to these publish_record_id UUIDs, from `senso content verification --status published` (items[].destinations[].publish_record_id). Every value must be a UUID: the API reads a list it cannot parse as no list at all and would then unpublish everywhere |  |
 
 ### senso content verification
 
-List content items in the verification workflow. Filter by editorial status (draft, review, rejected, published) to manage the review pipeline.
+List generated content in the review pipeline with its editorial status, owners, tags, per-destination publish records and citation metrics. This is where content_id, version_id and publish_record_id all come from.
 
 ```
 senso content verification [options]
@@ -530,15 +530,17 @@ senso content verification [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--limit <n>` | Maximum items to return |  |
-| `--offset <n>` | Number of items to skip (for pagination) |  |
-| `--search <query>` | Filter by title |  |
-| `--status <status>` | Filter by status: all, draft, review, rejected, published |  |
-| `--substatus <substatus>` | Narrow further (only valid with --status published): pending_draft |  |
+| `--limit <n>` | Rows per page, 1-100. The API silently returns 10 for anything else |  |
+| `--offset <n>` | Rows to skip |  |
+| `--search <query>` | Substring match on the title |  |
+| `--status <status>` | Filter by editorial status: all \| draft \| review \| rejected \| published. NOTE: the API treats `review` as an alias for `draft` — the two return the same rows |  |
+| `--substatus <substatus>` | Narrow one status further: pending_draft (requires --status published) \| unpublished (requires --status draft) |  |
+| `--tag-ids <ids>` | Comma-separated tag UUIDs, from `senso tags list` |  |
+| `--sort <sort>` | Order the queue: citation_rate_desc \| citation_rate_asc \| raw_citations_desc \| raw_citations_asc |  |
 
 ### senso content verification-counts
 
-Get counts of content by editorial status (draft, published, rejected, pending published-draft) plus per-destination published-domain summaries. A lightweight alternative to paging through 'content verification'.
+Count generated content by editorial status, plus a per-publisher rollup of published items and how often they are cited. One cheap call instead of paging through `content verification`. Requires the GEO product.
 
 ```
 senso content verification-counts [options]
@@ -546,7 +548,7 @@ senso content verification-counts [options]
 
 ### senso content verification-velocity
 
-Get publish-to-citation velocity for all published content: how many live pages have ever been cited, the average days from publish to first citation, and the same broken down per publisher. Requires the GEO product.
+How long published content takes to earn its first AI citation, for the whole organization and per publisher. All-time: there is no date window. Requires the GEO product.
 
 ```
 senso content verification-velocity [options]
@@ -554,7 +556,7 @@ senso content verification-velocity [options]
 
 ### senso content provenance
 
-Audit the provenance of one published URL: how its knowledge base sources were ingested, the retrieved chunks and model context, the accepted generation attempt, the editing history, and every publish record. Each stage reports what stored evidence proves and what is missing rather than guessing. --url must match a live publish record's URL exactly — 'publish-records list' is where those URLs come from. Requires the GEO product.
+Audit one live published URL end to end: how its knowledge base sources were ingested, the retrieved chunks and model context, the accepted generation attempt, the editing history, and every publish record. Each stage reports what the stored evidence proves and what is missing rather than guessing. Requires the GEO product.
 
 ```
 senso content provenance [options]
@@ -562,11 +564,11 @@ senso content provenance [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--url <url>` | The live published URL to audit, matched exactly |  |
+| `--url <url>` | The live published URL to audit, matched EXACTLY against a publish record's external_url — scheme, case and a trailing slash all matter. Real URLs come from `senso content verification --status published` (items[].destinations[].external_url) |  |
 
 ### senso content citation-details
 
-Get citation detail for one published content item: a pooled summary, per-destination metrics, and a daily trend, over an optional date window and model/location filter. Content IDs come from 'content list' or 'content verification'. Requires the GEO product.
+Citation performance for one PUBLISHED content item: a pooled summary across its live destinations, the same metrics per destination, and a daily trend. Requires the GEO product.
 
 ```
 senso content citation-details [options] <id>
@@ -574,14 +576,14 @@ senso content citation-details [options] <id>
 
 | Option | Description | Default |
 |---|---|---|
-| `--start-date <YYYY-MM-DD>` | Inclusive start of the window |  |
+| `--start-date <YYYY-MM-DD>` | Inclusive start of the window. Omit both dates for all time |  |
 | `--end-date <YYYY-MM-DD>` | Inclusive end of the window; not before --start-date |  |
-| `--models <list>` | Comma-separated models to filter by (e.g. chatgpt,perplexity). Omit for all. |  |
-| `--locations <list>` | Comma-separated locations to filter by. Omit for all. |  |
+| `--models <list>` | Comma-separated models to filter by. Currently: gpt-4.1, chatgpt, perplexity, aioverview, gemini, linkup, claude-sonnet-4-6, grok, google_ai_overviews, claude, gpt. Omit for all |  |
+| `--locations <list>` | Comma-separated locations to filter by. There is no allow-list: an unrecognized name returns an empty result rather than an error |  |
 
 ### senso content citation-prompts
 
-List the prompt/model rows whose question runs cite one of a published content item's live URLs, with the mention-rate and share-of-voice lift against runs that cite none of them. Use it to see which prompts a published page is actually winning. Content IDs come from 'content list'. Requires the GEO product.
+Which prompts a published page is winning: every prompt/model pair whose question runs cite one of this content's live URLs, with the mention-rate and share-of-voice LIFT against runs of the same prompt that cite none of them. Requires the GEO product.
 
 ```
 senso content citation-prompts [options] <id>
@@ -589,15 +591,15 @@ senso content citation-prompts [options] <id>
 
 | Option | Description | Default |
 |---|---|---|
-| `--start-date <YYYY-MM-DD>` | Inclusive start of the window |  |
+| `--start-date <YYYY-MM-DD>` | Inclusive start of the window. Omit both dates for all time |  |
 | `--end-date <YYYY-MM-DD>` | Inclusive end of the window; not before --start-date |  |
-| `--models <list>` | Comma-separated models to filter by (e.g. chatgpt,perplexity). Omit for all. |  |
-| `--locations <list>` | Comma-separated locations to filter by. Omit for all. |  |
-| `--destinations <list>` | Comma-separated publisher slugs to restrict to. Unknown slugs are ignored. |  |
+| `--models <list>` | Comma-separated models to filter by. Currently: gpt-4.1, chatgpt, perplexity, aioverview, gemini, linkup, claude-sonnet-4-6, grok, google_ai_overviews, claude, gpt. Omit for all |  |
+| `--locations <list>` | Comma-separated locations to filter by. No allow-list: an unknown name narrows to nothing silently |  |
+| `--destinations <list>` | Comma-separated publisher slugs to restrict to. The API IGNORES a slug it does not recognize, so a typo widens the result instead of failing |  |
 
 ### senso content record-edits
 
-Record Builder edit-telemetry events for a content item in bulk, and return how many were inserted versus skipped as duplicates. An event repeating a client_event_id already seen by the organization is skipped. Events are processed in order, so an invalid one fails the request with the earlier events already recorded. Requires the GEO product.
+Record Builder edit-telemetry events for one content item in bulk, and return how many were inserted versus skipped as duplicates. Events are written ONE AT A TIME with no transaction: if one is rejected the request fails with the earlier events already recorded, and the API does not report how many that was. Give every event a client_event_id — an event repeating one already seen is skipped — so that retrying the whole batch is safe. Requires the GEO product.
 
 ```
 senso content record-edits [options] <id>
@@ -605,11 +607,11 @@ senso content record-edits [options] <id>
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "events": [{ "event_type": "ai_patch_accepted", "edit_source": "ai", "client_event_id": "<uuid>" }] } |  |
+| `--data <json>` | JSON: { "events": [{ "event_type": "<ai_patch_requested \| ai_patch_proposed \| ai_patch_accepted \| ai_patch_rejected \| ai_patch_failed \| manual_edit_session_closed \| draft_saved \| published>", "edit_source": "<manual \| ai \| system>", "client_event_id": "<uuid>", "session_id": "<uuid>", "content_version_id": "<uuid>", "generation_run_id": "<uuid>", "payload": {}, "meta_data": {}, "client_created_at": "<RFC3339>" }] } |  |
 
 ### senso content versions
 
-List the version history for a content item, newest first. The current version is flagged with is_current.
+List the full revision history of one content item, newest first. Every version is returned — there is no paging. This is where version_id values come from: `content reject` and `content restore` take a version_id, not a content_id.
 
 ```
 senso content versions [options] <id>
@@ -617,7 +619,7 @@ senso content versions [options] <id>
 
 ### senso content reject
 
-Reject a content version in the verification workflow. Optionally provide a reason for the rejection.
+Reject one content VERSION in the review workflow: its editorial status becomes `rejected` and the reason is recorded against it. Rejecting does NOT take a live page down — use `senso content unpublish` for that. Undo it with `senso content restore`.
 
 ```
 senso content reject [options] <versionId>
@@ -625,11 +627,11 @@ senso content reject [options] <versionId>
 
 | Option | Description | Default |
 |---|---|---|
-| `--reason <text>` | Reason for rejection |  |
+| `--reason <text>` | Why it was rejected. Strongly recommended: this is the only record of the decision, and it surfaces as items[].rejection.reason on `senso content verification --status rejected` |  |
 
 ### senso content restore
 
-Restore a rejected content version back to draft status for further editing.
+Set one content VERSION back to draft so it can be edited and published again. Normally used to undo `senso content reject`. The API does not check the version's current status: restoring a PUBLISHED version marks it draft but leaves its publish records live, so the page stays up while the record says draft. Take a live page down with `senso content unpublish <content_id>`.
 
 ```
 senso content restore [options] <versionId>
@@ -637,7 +639,7 @@ senso content restore [options] <versionId>
 
 ### senso content owners
 
-List the owners assigned to a content item. Owners are responsible for reviewing and approving content.
+List the organization members assigned as owners of one content item. Owners are metadata: they are recorded here and surfaced as items[].owners on `senso content verification`, and nothing in the CLI enforces their approval.
 
 ```
 senso content owners [options] <id>
@@ -645,7 +647,7 @@ senso content owners [options] <id>
 
 ### senso content set-owners
 
-Replace all owners of a content item with a new set of user IDs.
+Replace the owner list of one content item. This is a REPLACE, not an add: any owner not named in --user-ids is removed. To drop one owner without listing all the others, use `senso content remove-owner`.
 
 ```
 senso content set-owners [options] <id>
@@ -653,11 +655,11 @@ senso content set-owners [options] <id>
 
 | Option | Description | Default |
 |---|---|---|
-| `--user-ids <ids...>` | User IDs to set as owners |  |
+| `--user-ids <ids...>` | One or more user_id UUIDs, from `senso members list`. Each must already be a member of this organization |  |
 
 ### senso content remove-owner
 
-Remove a single owner from a content item.
+Remove one owner from one content item. Idempotent: removing someone who is not an owner succeeds.
 
 ```
 senso content remove-owner [options] <id> <userId>
@@ -665,7 +667,7 @@ senso content remove-owner [options] <id> <userId>
 
 ### senso content tags
 
-Manage tags attached to a content item (both KB-ingested and generated). Content is auto-tagged on creation (KB uploads get tagged once ingestion finishes, raw content is tagged on create) — use these commands to override, add, or remove tags afterwards. Tag names are resolved against the org's tag library; unknown names are created automatically.
+Manage the tags attached to one content item. Unlike the rest of `senso content`, these four commands accept BOTH knowledge-base and generated content_id values, and they need neither the GEO product nor a permission scope. Content is auto-tagged when it is created (KB uploads once ingestion finishes, raw content on create); these override that afterwards. Tag names are resolved against the organization's tag library and unknown names are created. Note the flag shapes differ: `set` takes the comma-separated lists --names / --ids, while `add` and `remove` take a single --name / --id.
 
 ```
 senso content tags [options] [command]
@@ -673,7 +675,7 @@ senso content tags [options] [command]
 
 ### senso content tags list
 
-List tags attached to a content item.
+List the tags attached to one content item. Works on knowledge-base documents and generated content alike.
 
 ```
 senso content tags list [options] <id>
@@ -681,7 +683,7 @@ senso content tags list [options] <id>
 
 ### senso content tags set
 
-Replace the content item's full tag collection. Provide --names (comma-separated) and/or --ids (comma-separated UUIDs). Unknown names are created.
+REPLACE the whole tag collection of one content item: any tag not named in --names or --ids is detached. To empty the collection pass --clear; a bare `set` with no flags is refused rather than silently removing every tag, which is what the API does with an empty body.
 
 ```
 senso content tags set [options] <id>
@@ -689,12 +691,13 @@ senso content tags set [options] <id>
 
 | Option | Description | Default |
 |---|---|---|
-| `--names <list>` | Comma-separated tag names (created if missing) |  |
-| `--ids <list>` | Comma-separated existing tag UUIDs |  |
+| `--names <list>` | Comma-separated tag names. Names not in the tag library are created |  |
+| `--ids <list>` | Comma-separated existing tag UUIDs, from `senso tags list` |  |
+| `--clear` | Detach every tag. Mutually exclusive with --names and --ids |  |
 
 ### senso content tags add
 
-Attach a single tag by --name (created if missing) or --id.
+Attach ONE tag to a content item. Idempotent: attaching a tag that is already attached succeeds. Works on knowledge-base documents and generated content alike.
 
 ```
 senso content tags add [options] <id>
@@ -702,12 +705,12 @@ senso content tags add [options] <id>
 
 | Option | Description | Default |
 |---|---|---|
-| `--name <name>` | Tag name (created if missing) |  |
-| `--id <tagId>` | Existing tag UUID |  |
+| `--name <name>` | Tag name. Created in the organization's tag library if it is new |  |
+| `--id <tagId>` | Existing tag UUID, from `senso tags list` |  |
 
 ### senso content tags remove
 
-Detach a single tag by --name or --id. Idempotent.
+Detach ONE tag from a content item. This is a silent no-op when the tag is not attached and — with --name — when no tag of that name exists in the organization at all, so a typo reports success. Check the result with `senso content tags list <id>`.
 
 ```
 senso content tags remove [options] <id>
@@ -715,12 +718,12 @@ senso content tags remove [options] <id>
 
 | Option | Description | Default |
 |---|---|---|
-| `--name <name>` | Tag name to detach |  |
-| `--id <tagId>` | Existing tag UUID to detach |  |
+| `--name <name>` | Tag name to detach, sent as the `name` query parameter |  |
+| `--id <tagId>` | Existing tag UUID to detach, from `senso tags list` |  |
 
 ## senso ctas
 
-Manage call-to-action (CTA) templates — the card attached to a published content-engine page — and choose which one each content item carries. One template can be the organization default; content items either inherit it, pin a specific template, or publish with no CTA. Requires the GEO product.
+Call-to-action templates: the card attached to a published content-engine page, and which one each content item carries. One template can be the organization default; each item inherits it (default), pins one (template), or carries none. Requires the GEO product.
 
 ```
 senso ctas [options] [command]
@@ -728,7 +731,7 @@ senso ctas [options] [command]
 
 ### senso ctas list
 
-List every CTA template in the organization, the default first and the rest oldest first. This is where a cta_id comes from for 'ctas update', 'ctas delete', 'ctas set-default' and 'ctas set-for-content'. The full payload also carries default_cta, the template currently set as the organization default.
+List the organization's CTA templates, the default first and the rest oldest first. This is where a cta_id comes from for `ctas update`, `ctas delete`, `ctas set-default` and `ctas set-for-content`.
 
 ```
 senso ctas list [options]
@@ -736,7 +739,7 @@ senso ctas list [options]
 
 ### senso ctas create
 
-Create a CTA template and return it, including its new cta_id. 'title', 'button_label' and 'target_url' are required; 'image_url' is typically one returned by 'ctas upload-url'. Pass "is_default": true to make it the organization default in the same call, replacing any previous default.
+Create a CTA template and return it with its new cta_id. With "is_default": true it becomes the organization default in the same call, replacing any previous default — and the live pages that inherit the default are updated.
 
 ```
 senso ctas create [options]
@@ -744,11 +747,11 @@ senso ctas create [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "title": "Start an application", "description": "Book a short consultation.", "button_label": "Apply now", "target_url": "https://example.com/apply", "eyebrow": "Get started", "image_url": "https://...", "agent_text": "...", "is_default": false } |  |
+| `--data <json>` | JSON: { "title": <=255, "button_label": <=120, "target_url": absolute URL, "description": <=2000, "eyebrow": <=120, "image_url": absolute URL, "image_position": {"x":0-1,"y":0-1}, "agent_text": <=2000, "is_default": bool } |  |
 
 ### senso ctas update
 
-Replace a CTA template's fields (PUT) and return it. The body is the full template — any optional field you omit is cleared, so read the current values with 'ctas list' first. "is_default": true promotes it to the organization default; false or omitted leaves the default flag as it is. Live pages carrying this template are updated to match, and the response reports how many.
+Replace a CTA template (PUT) and return it. The body is the WHOLE template: any optional key you omit is cleared, so read the current values with `senso ctas list` first. "is_default": true promotes it; false or omitted leaves the default flag as it is. Live pages carrying this template are updated to match.
 
 ```
 senso ctas update [options] <ctaId>
@@ -756,11 +759,11 @@ senso ctas update [options] <ctaId>
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "title": "Start an application", "button_label": "Apply today", "target_url": "https://example.com/apply" } |  |
+| `--data <json>` | JSON with the same keys and limits as `senso ctas create`. title, button_label and target_url are required on every call. |  |
 
 ### senso ctas delete
 
-Delete a CTA template. The organization default cannot be deleted — run 'ctas clear-default' or 'ctas set-default <ctaId>' first, or this exits 1 on a 409. Content items pinned to the deleted template fall back to the default; pages already live keep it until they are next published. Take the cta_id from 'ctas list'.
+Delete a CTA template. The organization default cannot be deleted: clear it with `senso ctas clear-default`, or make another template the default first. Content items pinned to the deleted template fall back to the default.
 
 ```
 senso ctas delete [options] <ctaId>
@@ -768,7 +771,7 @@ senso ctas delete [options] <ctaId>
 
 ### senso ctas set-default
 
-Make a CTA template the organization default, replacing any previous default, and return the template. Content items that inherit the default show it from the next publish; live pages inheriting it are updated, and the response reports how many carry the template. Take the cta_id from 'ctas list'.
+Make a template the organization default, replacing any previous default, and return it. Every content item on the `default` selection now resolves to this template: pages that are already live and inherit the default are updated immediately, and everything else picks it up at its next publish.
 
 ```
 senso ctas set-default [options] <ctaId>
@@ -776,7 +779,7 @@ senso ctas set-default [options] <ctaId>
 
 ### senso ctas clear-default
 
-Clear the organization default so that no template is the default. Live content items inheriting the default switch to no CTA and their pages drop the card; items that are not live keep 'default', which resolves to nothing until a default is set again. Succeeds even when no default was set.
+Make no template the organization default. Live content items that inherit the default switch to no CTA and their pages drop the card; items that are not live keep the `default` selection, which resolves to nothing until a default is set again. Succeeds even when no default was set.
 
 ```
 senso ctas clear-default [options]
@@ -784,7 +787,7 @@ senso ctas clear-default [options]
 
 ### senso ctas for-content
 
-Show which CTA a content item carries when it is published: 'default' (the organization default), 'template' (a pinned cta_id), or 'none'. The payload also carries the template the selection resolves to. Only content-engine content has a selection — anything else exits 4. Content IDs come from 'content list' or 'generated-content list'.
+Show which CTA a content item carries when it is published — default (the organization default), template (a pinned cta_id), or none — and the template that selection resolves to.
 
 ```
 senso ctas for-content [options] <contentId>
@@ -792,7 +795,7 @@ senso ctas for-content [options] <contentId>
 
 ### senso ctas set-for-content
 
-Set which CTA a content item carries when it is published, and return the resulting selection. --selection default inherits the organization default, template pins the one named by --cta-id, and none publishes without a CTA. This is a full replacement. If the item is already live, its page is updated to match. Content IDs come from 'content list'; cta_ids from 'ctas list'.
+Choose which CTA a content item carries when it is published, and return the stored selection. This replaces the previous selection, and if the item is already live its page is updated now.
 
 ```
 senso ctas set-for-content [options] <contentId>
@@ -800,12 +803,12 @@ senso ctas set-for-content [options] <contentId>
 
 | Option | Description | Default |
 |---|---|---|
-| `--selection <type>` | What to carry: default \| template \| none |  |
-| `--cta-id <ctaId>` | The template to pin. Required with --selection template only. |  |
+| `--selection <type>` | default (inherit the organization default) \| template (pin --cta-id) \| none (publish without a card) |  |
+| `--cta-id <uuid>` | The template to pin, from `senso ctas list`. Required with --selection template, and rejected otherwise. |  |
 
 ### senso ctas upload-url
 
-Get a short-lived pre-signed URL for a CTA image. Upload the bytes yourself with an HTTP PUT to 'upload_url', sending exactly the returned 'upload_headers', then pass the returned 'image_url' as a template's image_url in 'ctas create' or 'ctas update'. Exits 1 with a 503 when image storage is not configured for the deployment.
+Get a short-lived pre-signed URL for a CTA image. The CLI does not upload the file: PUT the bytes to upload_url yourself with exactly the returned upload_headers, then pass the returned image_url as a template's image_url in `ctas create` or `ctas update`.
 
 ```
 senso ctas upload-url [options]
@@ -813,13 +816,13 @@ senso ctas upload-url [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--filename <name>` | The file's name. Its extension, when it has one, must match --content-type. |  |
+| `--filename <name>` | The file's name, at most 255 characters. Its extension, when it has one, must match --content-type. |  |
 | `--content-type <type>` | The image media type: image/png \| image/jpeg \| image/webp \| image/gif |  |
-| `--size <bytes>` | The file size in bytes, at most 10485760 (10 MiB) |  |
+| `--size <bytes>` | The file size in bytes, 1 to 10485760 (10 MiB) |  |
 
 ## senso evals
 
-Judge text against your organization's ground truth. `kb_accuracy` verifies the factual claims a text makes about your brand against your knowledge base; `brand_alignment` grades it against your brand kit's writing rules. Every run records the claims it checked, the verdict and the evidence, so a score can be audited rather than trusted. Judge model spend is recorded on each run but is not billed against your credit balance.
+Judge text against your organization's ground truth. `kb_accuracy` verifies the factual claims a text makes about your brand against your knowledge base; `brand_alignment` grades it against your brand kit's writing rules. Every run records the claims it checked, the verdict and the evidence, so a score can be audited rather than trusted. Judge model spend is recorded on each run but is not billed against your credit balance. Typical loop: `evals evaluators` to see what can run, `evals text --wait` or `evals content --wait` to judge something, then `evals claims --run-id <id>` for the grain the score is built from.
 
 ```
 senso evals [options] [command]
@@ -835,7 +838,7 @@ senso evals evaluators [options]
 
 ### senso evals text
 
-Judge text you supply. Pass the text with --text, or --text-file to read it from a file. Returns straight away with a run handle to read later with `senso evals get`; add --wait to poll until the run finishes and print the finished run instead. A run that ends `failed` under --wait exits 1, so a caller that waited and got exit 0 can trust the score it was handed.
+Judge text you supply. Pass it with --text, or --text-file to read it from a file. Returns straight away with a run handle; add --wait to poll until the run finishes and print the finished run instead.
 
 ```
 senso evals text [options]
@@ -849,8 +852,8 @@ senso evals text [options]
 | `--label <text>` | Free-form tag stored on the run, for finding it later |  |
 | `--idempotency-key <key>` | Makes the trigger safe to retry — the same key returns the original run |  |
 | `--wait` | Poll until the run finishes instead of returning a handle straight away |  |
-| `--text <text>` | The text to judge |  |
-| `--text-file <path>` | Read the text to judge from a file |  |
+| `--text <text>` | The text to judge. Mutually exclusive with --text-file |  |
+| `--text-file <path>` | Read the text to judge from a file. Mutually exclusive with --text |  |
 | `--title <title>` | Optional title, stored with the run's subject (max 255 chars) |  |
 
 ### senso evals runs
@@ -894,11 +897,11 @@ senso evals claims [options]
 | `--subject-type <type>` | Filter by subject type, e.g. inline or content |  |
 | `--limit <n>` | Page size, 1-100 (default 25) |  |
 | `--offset <n>` | Number of items to skip (default 0) |  |
-| `--run-id <id>` | Only claims from this eval run |  |
+| `--run-id <id>` | Only claims from this eval run (an eval_run_id from `senso evals runs`) |  |
 
 ### senso evals content
 
-Judge a saved content item — a knowledge-base document or a generated article — by its content id. Its latest saved version is what gets judged, and only items whose latest version is raw text can be: an uploaded file or a crawled page stores a pointer rather than text of its own and is a 422. Add --wait to poll until the run finishes.
+Judge a saved content item by its content id. Its latest saved version is what gets judged. Add --wait to poll until the run finishes.
 
 ```
 senso evals content [options] <contentId>
@@ -1002,7 +1005,7 @@ senso gaps undo [options] <gapId> <resolutionId>
 
 ## senso generate
 
-AI content generation. Configure settings, generate content samples from prompts, or trigger full content engine runs.
+Content generation: read and change the engine's settings, generate one piece of content for a prompt, or start a full run and follow it. Requires the GEO product; `sample`, `run` and `industry-draft` consume credits.
 
 ```
 senso generate [options] [command]
@@ -1010,7 +1013,7 @@ senso generate [options] [command]
 
 ### senso generate settings
 
-Get content generation settings. Shows whether generation and auto-publish are enabled, the content schedule, and configured publishers.
+Show the organization's content generation settings: whether generation and auto-publish are on, the days scheduled runs happen, the default content type, and the destinations selected for generation.
 
 ```
 senso generate settings [options]
@@ -1018,7 +1021,7 @@ senso generate settings [options]
 
 ### senso generate update-settings
 
-Update content generation settings. Control auto-publish, generation toggle, and schedule (days of week 0-6).
+Change the organization's content generation settings. PATCH semantics: a key you omit is left unchanged, and "selected_content_type_id": null clears the selection. Returns the full settings object.
 
 ```
 senso generate update-settings [options]
@@ -1026,11 +1029,11 @@ senso generate update-settings [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON settings: { "enable_content_generation": bool, "content_auto_publish": bool, "content_schedule": [0-6], "selected_content_type_id": "<uuid>" } |  |
+| `--data <json>` | JSON with any of: enable_content_generation (bool), content_auto_publish (bool), content_schedule (array of 0-6, 0 = Sunday), selected_content_type_id (uuid or null) |  |
 
 ### senso generate sample
 
-Generate an ad hoc content sample for a specific prompt and content type. Submits an async job, waits for completion by default, then returns the generated markdown, SEO title, and publish results. Use 'prompts list' to find a prompt ID, and 'content-types list' to find a content-type ID.
+Generate one piece of content for a prompt and wait for it. Submits an async job, polls every 2 s for up to 180 s, and returns the generated draft. The draft IS saved (it comes back with a content_id); with --destination it is also published immediately. Consumes credits.
 
 ```
 senso generate sample [options]
@@ -1038,14 +1041,22 @@ senso generate sample [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--prompt-id <id>` | Prompt (geo question) ID to generate content for |  |
-| `--content-type-id <id>` | Content type ID that defines the output format (use 'content-types list' to find) |  |
-| `--destination <dest>` | Publisher slug to publish to immediately after generation. Omit to save as draft only. |  |
-| `--no-wait` | Return the accepted sample job immediately instead of polling for the generated content. |  |
+| `--prompt-id <uuid>` | The prompt to write for: a geo_question_id from `senso prompts list` |  |
+| `--content-type-id <uuid>` | The format to write in: a content_type_id from `senso content-types list` |  |
+| `--destination <slug>` | Publish right after generating. A destination SLUG from `senso destinations list` (citeables, codeables, cucopilot or a custom one) — not a publisher_id. Omit to keep a draft. |  |
+| `--no-wait` | Return the accepted job immediately. Poll it with `senso generate sample-status <sample_job_id>`. |  |
+
+### senso generate sample-status
+
+Read one sample generation job: its status, and its result once it has completed. This is what `generate sample --no-wait` hands back an id for.
+
+```
+senso generate sample-status [options] <sampleJobId>
+```
 
 ### senso generate run
 
-Trigger a content generation run. Processes all prompts (or a specific subset) through the content engine. Runs asynchronously — use 'generate runs-list' to monitor progress.
+Start a content generation run over every prompt, or the ones named. Returns immediately with a run_id; the run continues server-side. Consumes credits per prompt generated, and only one run can be active per organization.
 
 ```
 senso generate run [options]
@@ -1053,13 +1064,13 @@ senso generate run [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--prompt-ids <ids...>` | Optional list of prompt IDs to process (omit to run all) |  |
-| `--content-type-id <id>` | Override the org's default content type for this run |  |
-| `--publisher-ids <ids...>` | Restrict publishing to specific publisher IDs |  |
+| `--prompt-ids <ids...>` | Prompts to process: geo_question_id values from `senso prompts list`. Omit to process every prompt in the job context. |  |
+| `--content-type-id <uuid>` | Override the settings' selected_content_type_id for this run (from `senso content-types list`) |  |
+| `--publisher-ids <ids...>` | Publish only to these destinations: publisher_id values (not slugs) from `senso destinations list`. Omit to use every destination selected for generation. |  |
 
 ### senso generate job-context
 
-Get the full content generation job context — all prompts with queue status (create vs update), content state, and a summary of queue counts.
+Show what a full run would do: every prompt with whether it would create new content or update existing content, plus the counts. This is the set `senso generate run` processes when --prompt-ids is omitted.
 
 ```
 senso generate job-context [options]
@@ -1067,7 +1078,7 @@ senso generate job-context [options]
 
 ### senso generate runs-list
 
-List content generation runs for the org. Use --status to filter by run status, --active-only to show only in-progress runs.
+List the organization's content generation runs, newest first. Each run is one execution of `generate run` or of the schedule, with counts of its per-prompt items.
 
 ```
 senso generate runs-list [options]
@@ -1075,16 +1086,16 @@ senso generate runs-list [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--limit <n>` | Items per page | `20` |
-| `--offset <n>` | Pagination offset | `0` |
-| `--status <status>` | Filter by run status |  |
-| `--active-only` | Only return active (in-progress) runs |  |
-| `--start-date <date>` | Filter runs on or after this date (YYYY-MM-DD) |  |
-| `--end-date <date>` | Filter runs on or before this date (YYYY-MM-DD) |  |
+| `--limit <n>` | Runs per page, at least 1 | `20` |
+| `--offset <n>` | Runs to skip | `0` |
+| `--status <status>` | Only runs in this status: queued, running, completed, partial_failed, failed, dispatch_failed, blocked, skipped, stopped |  |
+| `--active-only` | Only queued and running runs (the API's `active` flag) |  |
+| `--start-date <date>` | Runs created on or after this date (YYYY-MM-DD or RFC 3339) |  |
+| `--end-date <date>` | Runs created on or before this date (YYYY-MM-DD or RFC 3339) |  |
 
 ### senso generate runs-get
 
-Get details for a specific content generation run.
+Show one content generation run: its status, item counts and timestamps. Poll this until the status is terminal.
 
 ```
 senso generate runs-get [options] <runId>
@@ -1092,7 +1103,7 @@ senso generate runs-get [options] <runId>
 
 ### senso generate runs-items
 
-List individual prompt items within a content generation run and their per-item status.
+List the per-prompt items of a run: which prompt each was, what happened to it, and the content_id it produced.
 
 ```
 senso generate runs-items [options] <runId>
@@ -1100,13 +1111,13 @@ senso generate runs-items [options] <runId>
 
 | Option | Description | Default |
 |---|---|---|
-| `--limit <n>` | Items per page | `100` |
-| `--offset <n>` | Pagination offset | `0` |
-| `--status <status>` | Filter by item status: pending, running, succeeded, failed, skipped, stopped |  |
+| `--limit <n>` | Items per page, at least 1 | `100` |
+| `--offset <n>` | Items to skip | `0` |
+| `--status <status>` | Only items in this status: pending, running, succeeded, failed, skipped, stopped |  |
 
 ### senso generate runs-logs
 
-List log entries for a content generation run.
+List the log lines a run emitted, oldest first. This is where the reason an item failed is written; run_item_id links a line to a row of `generate runs-items`.
 
 ```
 senso generate runs-logs [options] <runId>
@@ -1114,12 +1125,12 @@ senso generate runs-logs [options] <runId>
 
 | Option | Description | Default |
 |---|---|---|
-| `--limit <n>` | Items per page | `100` |
-| `--offset <n>` | Pagination offset | `0` |
+| `--limit <n>` | Lines per page, at least 1 | `100` |
+| `--offset <n>` | Lines to skip | `0` |
 
 ### senso generate industry-draft
 
-Draft a complete document from one of your industry's prompts in a single call. The prompt is resolved against your organization's industry, grounded in your knowledge base, and written in the requested content type with your brand kit and product lines applied. The result is NOT stored as content — it comes back as GitHub Flavored Markdown with footnote citations for you to review or store separately. Typically takes 10-30 seconds and consumes credits like an ad-hoc generation. Requires the GEO product.
+Draft a complete document from one of your industry's prompts in a single synchronous call, grounded in your knowledge base and written in the given content type. THE RESULT IS NOT STORED: it is returned and then forgotten — nothing appears in `senso generated-content` unless you save it yourself with `senso engine draft`. Consumes credits, and takes 10-30 seconds.
 
 ```
 senso generate industry-draft [options]
@@ -1127,16 +1138,16 @@ senso generate industry-draft [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--industry-prompt-id <id>` | An industry prompt id from `senso industries prompts` — NOT one of your own prompt ids |  |
-| `--content-type-id <id>` | A content type id from `senso content-types list`, giving the document its format |  |
-| `--product-line-ids <ids>` | Comma-separated product line ids (default: all, up to 100) |  |
-| `--audience <text>` | Who the document is for (max 500 chars) |  |
-| `--style-tone <text>` | Voice and tone guidance (max 500 chars) |  |
-| `--extra-instructions <text>` | Further instructions for the writer (max 4000 chars) |  |
+| `--industry-prompt-id <uuid>` | An industry prompt id from `senso industries prompts` — NOT a geo_question_id from `senso prompts list` |  |
+| `--content-type-id <uuid>` | A content type id from `senso content-types list`, giving the document its format |  |
+| `--product-line-ids <uuids>` | Comma-separated product line ids to ground on, 1 to 100. Omit for all of them. |  |
+| `--audience <text>` | Who the document is for (max 500 characters) |  |
+| `--style-tone <text>` | Voice and tone guidance (max 500 characters) |  |
+| `--extra-instructions <text>` | Further instructions for the writer (max 4000 characters) |  |
 
 ## senso engine
 
-Publish or draft content through the content engine. Used to push AI-generated content to external destinations (citeables by default) or save it as a draft for review.
+Create, update and publish content through the content engine. Requires the GEO product and update:content. BOTH commands create a NEW content item when --data has no content_id, and update that item when it does — omitting content_id while iterating on a draft silently produces duplicates. Ids: geo_question_id (optional) from `senso questions list`, content_id from `senso generated-content list --status drafts`, publisher_ids from `senso destinations list`. Workflow: questions list → engine draft → generated-content get → engine publish → content verification.
 
 ```
 senso engine [options] [command]
@@ -1144,7 +1155,7 @@ senso engine [options] [command]
 
 ### senso engine publish
 
-Publish content to external destinations via the content engine. Requires geo_question_id, raw_markdown, and seo_title. By default publishes to every destination currently selected for generation (citeables is the default for most orgs — see 'senso destinations list'). Pass --publisher-ids to restrict publishing to a specific subset, or include 'publisher_ids' inside --data. To record content as already published externally rather than pushing it to destinations, set mark_as_published (and optionally manual_published_at) in --data.
+Publish content to external destinations, or record content that was published somewhere else. Only raw_markdown and seo_title are required; geo_question_id is OPTIONAL despite what older help said. With content_id in --data this publishes a new version of that item; without it a brand-new item is created on every call. A publish that reaches the API but is refused by EVERY destination comes back as publish_status "failed" with editorial_status "draft" — this command exits 1 in that case and names each destination's error.
 
 ```
 senso engine publish [options]
@@ -1152,12 +1163,12 @@ senso engine publish [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "geo_question_id": "uuid", "raw_markdown": "...", "seo_title": "...", "summary": "...", "publisher_ids": ["<uuid>", ...], "mark_as_published": false, "manual_published_at": "2026-06-11T00:00:00Z" } |  |
-| `--publisher-ids <ids...>` | Restrict publishing to specific publisher IDs. Overrides any publisher_ids present in --data. Omit to publish to all configured destinations (citeables by default). |  |
+| `--data <json>` | JSON body. REQUIRED: raw_markdown (non-blank; may not contain a `[Missing approved evidence: ...]` placeholder), seo_title (non-blank). OPTIONAL: content_id (update this item instead of creating one), geo_question_id (the prompt this answers, from `senso questions list`), summary, publisher_ids (array of UUIDs; see --publisher-ids), mark_as_published (true records the content as already live elsewhere and first UNPUBLISHES every live destination for the item), manual_published_url (with mark_as_published: where it went live — WITHOUT it the item is published but UNTRACKED and can never be cited), manual_published_at (RFC 3339), generation_run_id, generation_receipt_id, builder_workspace_id and expected_workspace_version_id (Builder provenance; the last two must be sent together), ever_published (legacy, ignored by the server). Example: '{"content_id":"<uuid>","raw_markdown":"# ...","seo_title":"..."}' |  |
+| `--publisher-ids <ids...>` | Restrict publishing to these publisher UUIDs, from `senso destinations list`. Overrides any publisher_ids inside --data. Omit to publish to every destination selected for generation |  |
 
 ### senso engine draft
 
-Save content as a draft for review before publishing. Requires geo_question_id, raw_markdown, and seo_title. Drafts do not hit any destination until you run 'senso engine publish' on them.
+Save content as a draft. Nothing reaches any destination until `senso engine publish` runs on it. Only raw_markdown and seo_title are required; geo_question_id is OPTIONAL. With content_id in --data this saves a new VERSION of that item; without it a brand-new item is created on every call, which is how a generation loop ends up with duplicate drafts. Unlike publish, a draft MAY contain `[Missing approved evidence: ...]` placeholders — publishing it later will refuse them.
 
 ```
 senso engine draft [options]
@@ -1165,11 +1176,11 @@ senso engine draft [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "geo_question_id": "uuid", "raw_markdown": "...", "seo_title": "...", "summary": "..." } |  |
+| `--data <json>` | JSON body. REQUIRED: raw_markdown (non-blank), seo_title (non-blank). OPTIONAL: content_id (update this draft instead of creating a new item), geo_question_id (from `senso questions list`), summary, generation_run_id, generation_receipt_id, builder_workspace_id and expected_workspace_version_id (Builder provenance; the last two must be sent together). Example: '{"content_id":"<uuid>","raw_markdown":"# ...","seo_title":"..."}' |  |
 
 ## senso destinations
 
-Manage publish destinations. Destinations are where generated content gets published — shared domains (citeables, codeables, cucopilot) plus any custom citeables domains registered for your org. Most orgs publish to 'citeables' by default; additional destinations are opt-in.
+Where published content lands. Three shared destinations exist on the citeables system (citeables, codeables, cucopilot), and an organization can register its own citeables-system domain. `selected_for_generation: true` means generation and publishing use it by default.
 
 ```
 senso destinations [options] [command]
@@ -1177,7 +1188,7 @@ senso destinations [options] [command]
 
 ### senso destinations list
 
-List all destinations available to the organization. Includes shared destinations (citeables, codeables, cucopilot) and any custom domains you've added, with per-destination live article counts and last publish timestamps. 'selected_for_generation: true' means a destination is active in your generation pipeline.
+List every destination available to the organization: the shared citeables-system ones and any domain you registered, with how many pages are live on each and whether it is selected for generation.
 
 ```
 senso destinations list [options]
@@ -1185,7 +1196,7 @@ senso destinations list [options]
 
 ### senso destinations add
 
-Register a custom publish destination (a citeables-system domain owned by your org). The domain is registered synchronously with the citeables service and linked to the org. Today only citeables-type destinations (slugs: citeables, codeables, cucopilot) are supported — pass --type if you need to target one of the non-default systems; new destination types may be added in future releases.
+Register a domain you own as a publish destination on the citeables system, and select it for generation. The domain is registered with citeables synchronously. Calling it again for the same domain returns the destination that already exists. Needs update:org.
 
 ```
 senso destinations add [options]
@@ -1193,13 +1204,13 @@ senso destinations add [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--domain <domain>` | Custom domain to register (e.g. "content.example.com") |  |
-| `--name <name>` | Display name for the destination (e.g. "Example Citeables") |  |
-| `--type <type>` | Destination type. One of: citeables, codeables, cucopilot. Defaults to citeables. | `citeables` |
+| `--domain <hostname>` | A bare hostname you control, e.g. "content.example.com" — no scheme, no path. Its slug becomes content-example-com. |  |
+| `--name <name>` | Display name, e.g. "Example Citeables" |  |
+| `--type <type>` | Only citeables can be registered today. codeables and cucopilot are shared destinations' slugs, not types. | `citeables` |
 
 ### senso destinations remove
 
-Remove a destination from the org. --action controls what happens to live content: 'leave' keeps the articles live at the destination (org stops publishing to it but published records remain), 'unpublish' removes live articles from the destination and returns content to draft, 'delete' unpublishes AND hard-deletes the local content records. Shared destinations (citeables/codeables/cucopilot) can be removed from the org without affecting the underlying domain. --keep-domain preserves the custom domain registration on the citeables side (useful for SEO) when removing a custom destination.
+Stop publishing to a destination, choosing what happens to the pages already live there. Returns counts of what was done. Needs update:org.
 
 ```
 senso destinations remove [options] <publisherId>
@@ -1207,13 +1218,13 @@ senso destinations remove [options] <publisherId>
 
 | Option | Description | Default |
 |---|---|---|
-| `--action <action>` | One of: leave, unpublish, delete. See command description. |  |
-| `--also-remove-destination` | Also delete the publisher row (not just the org link). Only valid for custom destinations you own. |  |
-| `--keep-domain` | Keep the custom domain registered on citeables after removing (custom destinations only). |  |
+| `--action <action>` | Required. leave: pages stay live and the content returns to draft here. unpublish: pages are removed from the destination. delete: unpublish, then hard-delete the content records — irreversible. |  |
+| `--also-remove-destination` | Also delete the destination itself. Custom (scope: org) destinations only; a shared one can be unlinked but never deleted. |  |
+| `--keep-domain` | With --also-remove-destination on a custom citeables domain: keep the domain registered so its URLs keep resolving. |  |
 
 ## senso publish-records
 
-Inspect and retry publish records. A publish_record is the unit that tracks one content item's publication to one destination — published/live, pending, failed, unpublished, etc. When a publish fails for a single destination, retry it here without redoing the whole publish.
+Retry a publish that failed for ONE destination, without republishing the whole item. A publish_record is one content item published to one destination. There is no list command here — a publish_record_id comes from `senso content verification` (items[].destinations[].publish_record_id) or `senso content citation-details <content_id>` (destinations[].publish_record_id). States: live (reachable at external_url), pending (queued), publishing (the adapter is running), failed (THE ONLY RETRYABLE STATE), unpublishing, unpublished. The same id is what `senso content unpublish --publish-record-ids` takes.
 
 ```
 senso publish-records [options] [command]
@@ -1221,7 +1232,7 @@ senso publish-records [options] [command]
 
 ### senso publish-records retry
 
-Retry a failed publish record. Re-runs the publish for that specific content+destination pair and flips the record's state based on the new attempt. Only works on records currently in the 'failed' state.
+Re-run the publish for one content+destination pair that failed. Synchronous: the command returns once the destination has answered, and the record is already live or failed again by then. The adapter has a 15-second timeout server-side, so a slow destination can come back as a failure rather than a success. Only a record in the `failed` state can be retried; anything else is a conflict. Requires the GEO product and update:content.
 
 ```
 senso publish-records retry [options] <publishRecordId>
@@ -1229,7 +1240,7 @@ senso publish-records retry [options] <publishRecordId>
 
 ## senso brand-kit
 
-Manage the organization's brand kit guidelines that inform AI content generation about your brand voice, tone, and style. The guidelines object accepts a defined set of keys: brand_name, brand_domain, brand_description, voice_and_tone, author_persona, global_writing_rules (global_writing_rules is an array of strings, the rest are strings). Unknown keys, wrong types and nulls are rejected before the request is sent.
+One brand kit per organization: the brand facts and voice rules the AI writer follows when generating content. It is a singleton — there is no id to pass, the key identifies it, 'get' always succeeds, and the first 'set' creates it. The guidelines object accepts exactly these keys and nothing else: brand_name, brand_domain, brand_description, voice_and_tone, author_persona, global_writing_rules (global_writing_rules is an array of strings, the rest are strings). Unknown keys, wrong types and nulls are rejected before the request is sent, with the offending key named. 'senso website-import start' can fill the brand kit in from a website instead — it is gated on the same update:brand_kit permission for that reason. Requires the GEO product and read:brand_kit / update:brand_kit; viewers have no brand kit access.
 
 ```
 senso brand-kit [options] [command]
@@ -1237,7 +1248,7 @@ senso brand-kit [options] [command]
 
 ### senso brand-kit get
 
-Get the current brand kit guidelines. An organization that has never saved one gets an empty guidelines object rather than an error.
+Read the organization's brand kit guidelines. Always succeeds: an organization that has never saved one gets an empty guidelines object rather than a 404.
 
 ```
 senso brand-kit get [options]
@@ -1245,7 +1256,7 @@ senso brand-kit get [options]
 
 ### senso brand-kit set
 
-Replace the entire brand kit (PUT). All existing fields are overwritten — run 'brand-kit get' first to preserve fields you are not changing. For a safe partial update, use 'brand-kit patch'. This is also what creates the brand kit the first time.
+Replace the entire brand kit (PUT). Every field you do not send is REMOVED — run 'brand-kit get' first to keep what you are not changing, or use 'brand-kit patch' for a targeted update. This is also what creates the brand kit the first time.
 
 ```
 senso brand-kit set [options]
@@ -1253,11 +1264,11 @@ senso brand-kit set [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "guidelines": { "brand_name": "Acme", "brand_domain": "https://acme.com", "brand_description": "...", "voice_and_tone": "...", "author_persona": "...", "global_writing_rules": ["..."] } }. Every field is optional, but anything you omit is REMOVED — pass '{"guidelines":{}}' to clear the brand kit entirely. |  |
+| `--data <json>` | JSON: { "guidelines": { "brand_name": "Acme", "brand_domain": "https://acme.com", "brand_description": "...", "voice_and_tone": "...", "author_persona": "...", "global_writing_rules": ["..."] } }. Every field is optional, but anything you omit is REMOVED — pass '{"guidelines":{}}' to clear the brand kit entirely. A key beside "guidelines" is rejected here because the API would accept it with a 200 and silently drop it |  |
 
 ### senso brand-kit patch
 
-Partially update the brand kit (PATCH). Only the fields you provide are changed — existing fields are preserved. Preferred over 'set' for targeted updates. Note that global_writing_rules is replaced wholesale, not appended to, and no field can be removed this way — use 'set' for that.
+Partially update the brand kit (PATCH). Only the fields you provide are changed; the rest keep their current value. Preferred over 'set' for targeted updates. Two things it cannot do: append to global_writing_rules (sending it replaces the whole list — read the current one with 'brand-kit get' and send it back with the new entry), and remove a field (null is rejected; use 'brand-kit set' with the field omitted).
 
 ```
 senso brand-kit patch [options]
@@ -1265,11 +1276,11 @@ senso brand-kit patch [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "guidelines": { "voice_and_tone": "Warm and approachable" } }. At least one field is required; accepted fields are brand_name, brand_domain, brand_description, voice_and_tone, author_persona, global_writing_rules. |  |
+| `--data <json>` | JSON: { "guidelines": { "voice_and_tone": "Warm and approachable" } }. At least one field is required; accepted fields are brand_name, brand_domain, brand_description, voice_and_tone, author_persona, global_writing_rules (global_writing_rules is an array of strings, the rest are strings) |  |
 
 ## senso content-types
 
-Manage content type configurations. Content types define the output format and structure for AI-generated content (e.g. blog post, FAQ, landing page).
+Manage content types — the reusable output formats for AI-generated content (blog post, FAQ, landing page). Each has a name, unique in the organization, and a config. What defines the format is config.template, a freeform Markdown string: the API parses it into config.template_spec, one section per Markdown heading, and reads word budgets out of phrases in the text — (800-1200 words), target: 900 words, max 500 words, minimum 200 words. Those budgets are ENFORCED on generated output, so a number in a template is a hard constraint rather than a hint. config.template_spec is read-only in practice: whatever is sent is validated and then replaced with the parse of config.template. The stored config is canonicalized on every write, so it always carries all five keys. Workflow: list → create → get (to read the derived template_spec) → use the content_type_id with the generate commands.
 
 ```
 senso content-types [options] [command]
@@ -1277,7 +1288,7 @@ senso content-types [options] [command]
 
 ### senso content-types list
 
-List all content types configured for the organization.
+List the organization's content types, with their full config.
 
 ```
 senso content-types list [options]
@@ -1285,12 +1296,12 @@ senso content-types list [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--limit <n>` | Maximum number of content types to return (default: 50) |  |
-| `--offset <n>` | Number of items to skip (for pagination) |  |
+| `--limit <n>` | Rows per page (default: 50) |  |
+| `--offset <n>` | Rows to skip (default: 0) |  |
 
 ### senso content-types create
 
-Create a new content type. Requires a name and a config defining the output structure. config accepts a defined set of keys: template, template_spec, cta_text, cta_destination, writing_rules (array). Unknown keys are rejected.
+Create a content type: a name and a config whose `template` defines the output format.
 
 ```
 senso content-types create [options]
@@ -1298,11 +1309,11 @@ senso content-types create [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "name": "Blog Post", "config": { "template": "...", "cta_text": "...", "cta_destination": "...", "writing_rules": [] } } |  |
+| `--data <json>` | JSON: { "name": "Blog Post", "config": { "template": "## Introduction (100-150 words)\n...", "writing_rules": [], "cta_text": "...", "cta_destination": "https://..." } }. Accepted config keys: template, template_spec, cta_text, cta_destination, writing_rules — anything else is rejected. |  |
 
 ### senso content-types get
 
-Get a content type by ID, including its full configuration.
+Read one content type: the template that defines the output format, and the parsed spec derived from it.
 
 ```
 senso content-types get [options] <id>
@@ -1310,7 +1321,7 @@ senso content-types get [options] <id>
 
 ### senso content-types update
 
-Replace a content type's name and config (PUT). Both fields are required — run 'get <id>' first to preserve existing values. For single-field updates, use 'content-types patch <id>'.
+Replace a content type's name AND config (PUT). A full replacement twice over: a key left out of --data is cleared, and a key left out of config is cleared too. Run `content-types get <id>` first, or use `content-types patch <id>`.
 
 ```
 senso content-types update [options] <id>
@@ -1318,11 +1329,11 @@ senso content-types update [options] <id>
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "name": "Updated Name", "config": { "template": "...", "cta_text": "...", "cta_destination": "...", "writing_rules": [] } } |  |
+| `--data <json>` | JSON: { "name": "Updated Name", "config": { ... } }. Both required. Accepted config keys: template, template_spec, cta_text, cta_destination, writing_rules; keys omitted from config are CLEARED. |  |
 
 ### senso content-types patch
 
-Partially update a content type (PATCH). Only the fields you provide are changed — existing fields are preserved. Preferred over 'update' for targeted changes like updating just the template.
+Change part of a content type (PATCH). Keys that are not sent keep their current value. The merge is one level deep: sending writing_rules REPLACES the whole list.
 
 ```
 senso content-types patch [options] <id>
@@ -1330,11 +1341,11 @@ senso content-types patch [options] <id>
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "config": { "template": "Updated template instruction" } } |  |
+| `--data <json>` | JSON with at least one of "name" and "config", e.g. { "config": { "template": "Updated template instruction" } }. Accepted config keys: template, template_spec, cta_text, cta_destination, writing_rules. |  |
 
 ### senso content-types delete
 
-Delete a content type. This cannot be undone.
+Remove a content type. It disappears from `content-types list` immediately and there is no undelete from the CLI.
 
 ```
 senso content-types delete [options] <id>
@@ -1342,7 +1353,7 @@ senso content-types delete [options] <id>
 
 ## senso prompts
 
-Manage prompts (GEO questions). Each prompt is a question that drives both AI content generation (use with 'generate sample --prompt-id') and brand visibility monitoring — tracking how AI models mention your brand, products, and competitors.
+Manage prompts — the tracked GEO questions AI models are asked on your run schedule, which also seed content generation. Prompts and questions are the SAME records: `senso prompts` and `senso questions` read and write the same geo_questions rows, and prompt_id is the same UUID as geo_question_id. Use `prompts` for search, sorting, paging, run history and tags; use `questions` to change a question's funnel stage, to attach tags at creation, or to see the questions a network shares. Workflow: prompts create → prompts tags set → prompts list → (scheduled run) → prompts get. Creating a prompt does NOT run it — runs fire on the days set with `senso run-config set-schedule`. Requires the GEO product.
 
 ```
 senso prompts [options] [command]
@@ -1350,7 +1361,7 @@ senso prompts [options] [command]
 
 ### senso prompts list
 
-List all prompts in the organization. Use --search to filter by question text, --sort to order results.
+List the organization's prompts, newest first. --search is a case-insensitive substring of the question text only (not tags); --sort orders the page.
 
 ```
 senso prompts list [options]
@@ -1358,14 +1369,14 @@ senso prompts list [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--limit <n>` | Maximum prompts to return (max: 100) |  |
-| `--offset <n>` | Number of prompts to skip (for pagination) |  |
-| `--search <query>` | Filter prompts by question text |  |
-| `--sort <order>` | Sort order: created_desc, created_asc, text_asc, text_desc, type_asc, type_desc |  |
+| `--limit <n>` | Rows per page, 1-100 (default: 50) |  |
+| `--offset <n>` | Rows to skip, 0 or more (default: 0) |  |
+| `--search <query>` | Case-insensitive substring of the question text |  |
+| `--sort <order>` | Sort order: created_desc, created_asc, text_asc, text_desc, type_asc, type_desc (default: created_desc) |  |
 
 ### senso prompts create
 
-Create a new prompt. Type must be one of: decision, consideration, awareness, evaluation.
+Add a tracked prompt (a GEO question). Creating it does NOT run it — runs fire on the org's schedule.
 
 ```
 senso prompts create [options]
@@ -1373,11 +1384,11 @@ senso prompts create [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "question_text": "What are the best...", "type": "decision" } |  |
+| `--data <json>` | JSON: { "question_text": "What are the best...", "type": "decision" }. question_text is 1-500 characters; type is awareness \| consideration \| evaluation \| decision. |  |
 
 ### senso prompts get
 
-Get a prompt with its full run history. Includes all question runs with mentions, claims, citations, and competitor data.
+Read one prompt with its full run history: every time the AI models were asked this question, what they said, who they mentioned and what they cited.
 
 ```
 senso prompts get [options] <promptId>
@@ -1385,7 +1396,7 @@ senso prompts get [options] <promptId>
 
 ### senso prompts delete
 
-Delete a prompt and all its associated run history. This cannot be undone.
+Remove a prompt and hide its run history. The record is soft-deleted: it stops appearing in every prompt, question and analytics endpoint, and there is no undelete.
 
 ```
 senso prompts delete [options] <promptId>
@@ -1393,7 +1404,7 @@ senso prompts delete [options] <promptId>
 
 ### senso prompts tags
 
-Manage tags attached to a prompt. Prompts are auto-tagged on creation — use these commands to override, add, or remove tags afterwards. Tag names are resolved against the org's tag library; unknown names are created automatically.
+Manage the tags on a prompt. Prompts are auto-tagged in the background when created, so these commands correct or extend that. <promptId> is a prompt_id from `senso prompts list`; --id/--ids take tag ids from `senso tags list` or the `id` field of `prompts tags list`. A --name/--names that the organization does not have is CREATED, and a name that exists but is uncurated (machine-minted from a search query) is ADOPTED into the org's vocabulary — a change to the whole organization, not just this prompt. `set` replaces the whole set; `add` and `remove` change one tag.
 
 ```
 senso prompts tags [options] [command]
@@ -1401,7 +1412,7 @@ senso prompts tags [options] [command]
 
 ### senso prompts tags list
 
-List tags attached to a prompt.
+List the tags currently attached to a prompt.
 
 ```
 senso prompts tags list [options] <promptId>
@@ -1409,7 +1420,7 @@ senso prompts tags list [options] <promptId>
 
 ### senso prompts tags set
 
-Replace the prompt's full tag collection. Provide --names (comma-separated) and/or --ids (comma-separated UUIDs). Unknown names are created.
+REPLACE a prompt's tags with exactly the set named. Tags on the prompt that are not named are removed.
 
 ```
 senso prompts tags set [options] <promptId>
@@ -1417,12 +1428,13 @@ senso prompts tags set [options] <promptId>
 
 | Option | Description | Default |
 |---|---|---|
-| `--names <list>` | Comma-separated tag names (created if missing) |  |
-| `--ids <list>` | Comma-separated existing tag UUIDs |  |
+| `--names <list>` | Comma-separated tag names, created if the organization lacks them |  |
+| `--ids <list>` | Comma-separated existing tag UUIDs, from `senso tags list` |  |
+| `--clear` | Remove every tag from the prompt. Not combinable with --names or --ids. |  |
 
 ### senso prompts tags add
 
-Attach a single tag by --name (created if missing) or --id.
+Attach one tag to a prompt, leaving its other tags in place.
 
 ```
 senso prompts tags add [options] <promptId>
@@ -1430,12 +1442,12 @@ senso prompts tags add [options] <promptId>
 
 | Option | Description | Default |
 |---|---|---|
-| `--name <name>` | Tag name (created if missing) |  |
-| `--id <tagId>` | Existing tag UUID |  |
+| `--name <name>` | Tag name, created if the organization does not have it |  |
+| `--id <tagId>` | An existing tag UUID, from `senso tags list` |  |
 
 ### senso prompts tags remove
 
-Detach a single tag by --name or --id. Idempotent.
+Detach one tag from a prompt. The prompt's other tags are untouched and the tag itself stays in the organization's vocabulary.
 
 ```
 senso prompts tags remove [options] <promptId>
@@ -1444,11 +1456,11 @@ senso prompts tags remove [options] <promptId>
 | Option | Description | Default |
 |---|---|---|
 | `--name <name>` | Tag name to detach |  |
-| `--id <tagId>` | Existing tag UUID to detach |  |
+| `--id <tagId>` | Tag UUID to detach, from `senso prompts tags list <promptId>` |  |
 
 ## senso run-config
 
-Configure which AI models are used for question runs and on which days they run. Models include chatgpt, gemini, etc.
+Configure which AI models answer this organization's prompts, and on which days. Two model lists live here, and they are different vocabularies for the same models. Run models (use these) are bare names — chatgpt, perplexity, gemini, grok, google_ai_overviews, claude, gpt — read with `models`, written with `set-models`, discovered with `model-options`. Scheduler models (advanced) are registry ids of the form provider/model, such as anthropic/claude, read with `scheduler-models` and written with `set-scheduler-models`. They are linked in ONE direction: `set-models` also rewrites the scheduler opt-in, so the two stay consistent, while `set-scheduler-models` leaves the run-model list alone and the two reads can then disagree. Prefer `set-models`. Workflow: model-options → set-models → set-schedule → models / schedule to confirm. The read commands need the GEO product; the write commands need the update:org permission.
 
 ```
 senso run-config [options] [command]
@@ -1456,7 +1468,7 @@ senso run-config [options] [command]
 
 ### senso run-config models
 
-Get the AI models currently configured for question runs (e.g. chatgpt, gemini).
+The AI models currently configured to answer this organization's prompts. An empty list means no runs will be produced at all.
 
 ```
 senso run-config models [options]
@@ -1464,7 +1476,7 @@ senso run-config models [options]
 
 ### senso run-config set-models
 
-Replace the configured AI models for question runs. At least one model name is required.
+Replace the AI models that answer this organization's prompts. Any model not listed is removed. This also rewrites the scheduler opt-in (`run-config scheduler-models`) to match.
 
 ```
 senso run-config set-models [options]
@@ -1472,11 +1484,11 @@ senso run-config set-models [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "models": ["chatgpt", "gemini"] } |  |
+| `--data <json>` | JSON: { "models": ["chatgpt", "claude"] }. At least one name, from: chatgpt, perplexity, gemini, grok, google_ai_overviews, claude, gpt. The aliases aioverview, claude-sonnet-4-6, gpt-4.1 are accepted too. |  |
 
 ### senso run-config model-options
 
-List the model names 'run-config set-models' accepts, each with a display label. The options are global rather than per-org — read them before writing, so an unsupported name does not cost a round trip.
+The model names `run-config set-models` accepts, with their display labels. Global rather than per-organization: read them before writing, so an unsupported name does not cost a round trip.
 
 ```
 senso run-config model-options [options]
@@ -1484,15 +1496,23 @@ senso run-config model-options [options]
 
 ### senso run-config scheduler-models
 
-Get the models the scheduler runs for the organization, as provider/model pairs with their execution mode. This is a separate set from 'run-config models' — though writing run models also replaces it.
+The registry models this organization is opted into for scheduled runs. `run-config set-models` rewrites this list to match the run models, so normally the two agree.
 
 ```
 senso run-config scheduler-models [options]
 ```
 
+### senso run-config scheduler-model-options
+
+Every registry model the scheduler can run, which is the catalog `run-config set-scheduler-models` validates against. Use it to discover a provider/model id rather than sending one and reading it back off the rejection.
+
+```
+senso run-config scheduler-model-options [options]
+```
+
 ### senso run-config set-scheduler-models
 
-Replace the organization's scheduler model opt-in. Each entry is a 'provider/model' identifier such as anthropic/claude. The supported set is configurable, so do not assume it: an unsupported entry exits 1 and the error lists every accepted value.
+Replace the registry models the scheduler runs for this organization. Advanced: for the usual case use `run-config set-models`, which sets both lists. This does NOT update the run-model list, so afterwards `run-config models` and `run-config scheduler-models` can disagree.
 
 ```
 senso run-config set-scheduler-models [options]
@@ -1500,11 +1520,11 @@ senso run-config set-scheduler-models [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "models": ["anthropic/claude", "openai/gpt"] } |  |
+| `--data <json>` | JSON: { "models": ["anthropic/claude", "brightdata/chatgpt"] }. Each entry is provider/model; the bare names `set-models` takes are rejected here. Seeded catalog: brightdata/chatgpt, brightdata/grok, brightdata/perplexity, brightdata/gemini, brightdata_serp/google_ai_overviews, anthropic/claude, openai/gpt. |  |
 
 ### senso run-config schedule
 
-Get the days of the week when question runs are triggered (0=Sunday, 1=Monday, ..., 6=Saturday).
+The days of the week on which this organization's prompts are run.
 
 ```
 senso run-config schedule [options]
@@ -1512,7 +1532,7 @@ senso run-config schedule [options]
 
 ### senso run-config set-schedule
 
-Set which days of the week question runs are triggered. Values must be 0-6 (Sunday-Saturday).
+Set which days of the week this organization's prompts are run. REPLACES the whole schedule: days that are not listed are removed.
 
 ```
 senso run-config set-schedule [options]
@@ -1520,11 +1540,11 @@ senso run-config set-schedule [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "schedule": [1, 3, 5] } |  |
+| `--data <json>` | JSON: { "schedule": [1, 3, 5] } — whole numbers 0-6, 0 = Sunday. At least one day: the API cannot store an empty schedule, so runs cannot be turned off here. |  |
 
 ## senso skills
 
-Install and manage Senso agent skills. Skills teach AI coding agents (Claude Code, Cursor, Codex, etc.) how to use Senso automatically.
+Install and manage the official Senso skills for AI coding agents (Claude Code, Cursor, Codex, Copilot, Gemini, Cline). A skill is a folder of instructions the agent reads before it calls this CLI. Local: nothing is sent to the Senso API.
 
 ```
 senso skills [options] [command]
@@ -1532,7 +1552,7 @@ senso skills [options] [command]
 
 ### senso skills install
 
-Install Senso agent skills. Use --all for every official skill, or pass individual short names (search, ingest, content-gen, brand-setup, kb-organize, review-publish, onboarding).
+Install official Senso skills into this directory's agent skill folders. With no names, or with --all, installs every official skill.
 
 ```
 senso skills install [options] [names...]
@@ -1540,13 +1560,13 @@ senso skills install [options] [names...]
 
 | Option | Description | Default |
 |---|---|---|
-| `--all` | Install every official Senso skill |  |
-| `--agent <name>` | Target a specific agent: claude, cursor, codex, copilot, gemini, cline |  |
-| `--global` | Install globally instead of project-level |  |
+| `--all` | Install every official Senso skill (same as giving no names) |  |
+| `--agent <name>` | Install for one agent only: claude, cursor, codex, copilot, gemini, cline. Default: every agent shipables detects here. |  |
+| `--global` | Install into your home directory, for every project |  |
 
 ### senso skills list
 
-List installed Senso skills.
+List the skills installed for this directory, or for your home directory with --global.
 
 ```
 senso skills list [options]
@@ -1554,11 +1574,11 @@ senso skills list [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--global` | List globally installed skills |  |
+| `--global` | List the home-directory (all projects) scope instead |  |
 
 ### senso skills list-available
 
-Show every official Senso skill available for install.
+Show every official Senso skill that `senso skills install` can install. Static and offline: no key, no network, no subprocess.
 
 ```
 senso skills list-available [options]
@@ -1566,7 +1586,7 @@ senso skills list-available [options]
 
 ### senso skills remove
 
-Remove an installed Senso skill. Use the short name (e.g., search, ingest, content-gen).
+Remove one installed Senso skill from this directory, or from your home directory with --global.
 
 ```
 senso skills remove [options] <name>
@@ -1574,11 +1594,11 @@ senso skills remove [options] <name>
 
 | Option | Description | Default |
 |---|---|---|
-| `--global` | Remove from global install |  |
+| `--global` | Remove from the home-directory scope |  |
 
 ## senso members
 
-View the organization member directory. Lists all users who belong to the organization with their names and emails.
+Read-only directory of the organization's members, with email, name, role name and groups. The same people as `senso users`, with the human-readable fields: use the user_id from here with `senso users get/update/remove/set-current`.
 
 ```
 senso members [options] [command]
@@ -1586,7 +1606,7 @@ senso members [options] [command]
 
 ### senso members list
 
-List all organization members. Use --search to filter by name or email, --sort to order results.
+One page of the organization's members with email, name, role and groups. Read-only — to change a membership use `senso users`.
 
 ```
 senso members list [options]
@@ -1594,14 +1614,14 @@ senso members list [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--limit <n>` | Maximum members to return (max: 1000) |  |
-| `--offset <n>` | Number of members to skip (for pagination) |  |
-| `--search <query>` | Filter by name or email |  |
-| `--sort <order>` | Sort order: name_asc, name_desc, email_asc, email_desc, created_asc, created_desc |  |
+| `--limit <n>` | Rows per page, integer 1-1000 (default 50) |  |
+| `--offset <n>` | Rows to skip, integer >= 0 (default 0) |  |
+| `--search <query>` | Case-insensitive substring match on name or email |  |
+| `--sort <order>` | One of: name_asc, name_desc, email_asc, email_desc, created_asc, created_desc (default name_asc) |  |
 
 ## senso credits
 
-View your organization's credit balance. Credits are consumed by AI content generation and search operations.
+The credit balance of the organization this API key belongs to. Credits are spent by AI content generation (`senso generate`) and by search (`senso search`); a 402 from any command in this CLI means this balance, or the organization's spend limit, is exhausted. `senso credits` on its own is the same as `senso credits balance`.
 
 ```
 senso credits [options] [command]
@@ -1609,7 +1629,7 @@ senso credits [options] [command]
 
 ### senso credits balance
 
-Get the current credit balance for the organization. Returns available credits and any spend limit configured.
+Get the organization's credit position: what has been spent, what is left, and whether a spend limit caps it.
 
 ```
 senso credits balance [options]
@@ -1617,7 +1637,7 @@ senso credits balance [options]
 
 ## senso questions
 
-Manage org-scoped geo questions. These are lightweight CRUD questions distinct from prompts (which include full run history).
+Manage the organization's geo questions. These are the SAME records as `senso prompts`: both groups read and write the same geo_questions rows behind the same GEO product gate, and geo_question_id is the same UUID as prompt_id. Use this group for what only it does — change a question's funnel stage (`questions patch`), attach tags while creating (`questions create`), and list the questions a network shares (`questions list --type network`). Use `senso prompts` for search, sorting, paging, run history and tag management. Two meanings of "type" live here: `--type` on `questions list` is the SCOPE (organization | network), while `type` inside --data is the FUNNEL STAGE (awareness | consideration | evaluation | decision) and is also the `type` field in the output. `questions delete` removes the question AND its run history, exactly as `prompts delete` does.
 
 ```
 senso questions [options] [command]
@@ -1625,7 +1645,7 @@ senso questions [options] [command]
 
 ### senso questions list
 
-List geo questions for the org.
+List every question in the organization, or every question its network shares. Not paginated: all rows come back in one response. `senso prompts list` is the paged, searchable, sortable view of the same records.
 
 ```
 senso questions list [options]
@@ -1633,11 +1653,11 @@ senso questions list [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--type <type>` | Filter by question type: organization \| network | `organization` |
+| `--type <scope>` | Which questions to list — organization (yours) or network (shared with you). This is the scope, not the funnel stage. | `organization` |
 
 ### senso questions create
 
-Create a new geo question. Type must be one of: decision, consideration, awareness, evaluation.
+Create a question, optionally with tags. Same record as `senso prompts create`; this variant takes tag_ids at creation and is stricter about the stage spelling.
 
 ```
 senso questions create [options]
@@ -1645,11 +1665,11 @@ senso questions create [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "question_text": "...", "type": "decision", "tag_ids": [] } |  |
+| `--data <json>` | JSON: { "question_text": "...", "type": "decision", "tag_ids": ["<uuid>"] }. question_text is 1-255 characters; type is exactly one of awareness, consideration, evaluation, decision. |  |
 
 ### senso questions patch
 
-Partially update a question. Supports updating tag associations and/or the funnel stage (type). At least one of tag_ids or type must be provided.
+Change a question's funnel stage and/or its tags. This is the only command that can change the stage — the `prompts` group has no update.
 
 ```
 senso questions patch [options] <questionId>
@@ -1657,11 +1677,11 @@ senso questions patch [options] <questionId>
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "tag_ids": ["<uuid>", ...], "type": "decision\|consideration\|awareness\|evaluation" } — pass tag_ids: null to clear all tags |  |
+| `--data <json>` | JSON with at least one of: { "type": "awareness\|consideration\|evaluation\|decision" } and { "tag_ids": ["<uuid>"] }. tag_ids REPLACES the question's tags; pass [] to remove them all. tag_ids: null does NOT clear them — the API reads null as "field not supplied" and rejects the request. |  |
 
 ### senso questions delete
 
-Delete a geo question.
+Remove a question and hide its run history. Identical in effect to `senso prompts delete`: the record is soft-deleted, disappears from every question, prompt and analytics endpoint, and cannot be restored from the CLI.
 
 ```
 senso questions delete [options] <questionId>
@@ -1669,7 +1689,7 @@ senso questions delete [options] <questionId>
 
 ## senso kb
 
-Manage the knowledge base. Browse nodes, upload files, create folders, create raw content, and manage the KB tree.
+The organization's knowledge base: a tree of folders and documents that Senso search and generation read from. Every command here takes a kb_node_id unless it says otherwise; the content_id that appears in payloads addresses the stored document and is what `senso content` takes. Documents are ingested asynchronously — a node exists before its content is searchable, so poll `kb get <id>` until content.processing_status is complete. Workflow: my-files → upload or create-raw → get (poll) → tags set → senso search.
 
 ```
 senso kb [options] [command]
@@ -1677,7 +1697,7 @@ senso kb [options] [command]
 
 ### senso kb root
 
-Get the root KB node for the org.
+Get the organization's root folder node.
 
 ```
 senso kb root [options]
@@ -1685,7 +1705,7 @@ senso kb root [options]
 
 ### senso kb stats
 
-Get how many documents and folders the knowledge base holds, as total_files and total_folders (the root folder is not counted). A cheap way to check the size of the KB without paging through 'kb my-files'.
+Count the documents and folders in the knowledge base.
 
 ```
 senso kb stats [options]
@@ -1693,7 +1713,7 @@ senso kb stats [options]
 
 ### senso kb my-files
 
-List top-level files and folders in the knowledge base.
+List the top level of the knowledge base — files and folders under the root.
 
 ```
 senso kb my-files [options]
@@ -1708,11 +1728,11 @@ senso kb my-files [options]
 | `--role <role>` | Only nodes where the caller holds this role: editor \| viewer. Ignored for org-admin keys, which already reach everything |  |
 | `--sort-by <field>` | Sort by: name \| updated_at \| created_at \| type \| status \| role |  |
 | `--sort-order <dir>` | Sort direction: asc \| desc |  |
-| `--tag-ids <ids>` | Comma-separated tag IDs; only nodes carrying at least one of them |  |
+| `--tag-ids <ids>` | Comma-separated tag UUIDs from `senso tags list`; only nodes carrying at least one of them |  |
 
 ### senso kb find
 
-Search KB nodes by name.
+Search the knowledge base for nodes whose NAME matches a query.
 
 ```
 senso kb find [options]
@@ -1720,7 +1740,7 @@ senso kb find [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--query <q>` | Name search query |  |
+| `--query <q>` | Substring to match against node names |  |
 | `--limit <n>` | Items per page, 1-50 (the API caps higher values at 50) | `20` |
 | `--offset <n>` | Pagination offset | `0` |
 | `--type <type>` | Only nodes of this type: folder \| content |  |
@@ -1728,11 +1748,11 @@ senso kb find [options]
 | `--role <role>` | Only nodes where the caller holds this role: editor \| viewer. Ignored for org-admin keys, which already reach everything |  |
 | `--sort-by <field>` | Sort by: name \| updated_at \| created_at \| type \| status \| role |  |
 | `--sort-order <dir>` | Sort direction: asc \| desc |  |
-| `--tag-ids <ids>` | Comma-separated tag IDs; only nodes carrying at least one of them |  |
+| `--tag-ids <ids>` | Comma-separated tag UUIDs from `senso tags list`; only nodes carrying at least one of them |  |
 
 ### senso kb sync-status
 
-Report whether queued move and delete operations are still propagating across the org's knowledge base. This is not an ingestion signal — to check whether a newly added document is queryable, run 'kb get <id>' and read content.processing_status.
+Report whether queued move and delete operations are still propagating.
 
 ```
 senso kb sync-status [options]
@@ -1740,7 +1760,7 @@ senso kb sync-status [options]
 
 ### senso kb get
 
-Get a KB node by ID.
+Read one knowledge base node, with its ingestion state and tags.
 
 ```
 senso kb get [options] <id>
@@ -1748,7 +1768,7 @@ senso kb get [options] <id>
 
 ### senso kb children
 
-List children of a KB folder node.
+List the direct children of a folder — one level deep.
 
 ```
 senso kb children [options] <id>
@@ -1763,11 +1783,11 @@ senso kb children [options] <id>
 | `--role <role>` | Only nodes where the caller holds this role: editor \| viewer. Ignored for org-admin keys, which already reach everything |  |
 | `--sort-by <field>` | Sort by: name \| updated_at \| created_at \| type \| status \| role |  |
 | `--sort-order <dir>` | Sort direction: asc \| desc |  |
-| `--tag-ids <ids>` | Comma-separated tag IDs; only nodes carrying at least one of them |  |
+| `--tag-ids <ids>` | Comma-separated tag UUIDs from `senso tags list`; only nodes carrying at least one of them |  |
 
 ### senso kb ancestors
 
-Get the ancestor chain (breadcrumb) for a KB node.
+Get the breadcrumb path to a node, ordered root first.
 
 ```
 senso kb ancestors [options] <id>
@@ -1775,7 +1795,7 @@ senso kb ancestors [options] <id>
 
 ### senso kb get-content
 
-Get the content detail for a KB content node.
+Read the stored document behind a content node, including its text.
 
 ```
 senso kb get-content [options] <id>
@@ -1783,11 +1803,11 @@ senso kb get-content [options] <id>
 
 | Option | Description | Default |
 |---|---|---|
-| `--rev <n>` | Retrieve a specific stored version of this content, by version number |  |
+| `--rev <n>` | Read a specific stored version, by version number (an integer >= 1). The current one is content.version_num from `senso kb get` |  |
 
 ### senso kb download-url
 
-Get a presigned S3 download URL for a KB file node.
+Get a presigned S3 URL for the file stored behind a node.
 
 ```
 senso kb download-url [options] <id>
@@ -1795,11 +1815,11 @@ senso kb download-url [options] <id>
 
 | Option | Description | Default |
 |---|---|---|
-| `--rev <n>` | Download a specific stored version of this file, by version number |  |
+| `--rev <n>` | Download a specific stored version, by version number (an integer >= 1) |  |
 
 ### senso kb create-folder
 
-Create a new folder in the knowledge base.
+Create a folder in the knowledge base.
 
 ```
 senso kb create-folder [options]
@@ -1807,12 +1827,12 @@ senso kb create-folder [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--name <name>` | Folder name |  |
-| `--parent-id <id>` | Parent folder node ID (omit to create at root) |  |
+| `--name <name>` | Folder name, 1-255 characters |  |
+| `--parent-id <id>` | kb_node_id of the folder to create it in; omit to create under the organization root |  |
 
 ### senso kb rename
 
-Rename a KB node.
+Rename a node in the tree. The document's stored title is unchanged.
 
 ```
 senso kb rename [options] <id>
@@ -1820,11 +1840,11 @@ senso kb rename [options] <id>
 
 | Option | Description | Default |
 |---|---|---|
-| `--name <name>` | New name |  |
+| `--name <name>` | The new name, 1-255 characters |  |
 
 ### senso kb move
 
-Move a KB node to a different parent folder.
+Move a node to a different folder. A folder moves with its whole subtree.
 
 ```
 senso kb move [options] <id>
@@ -1832,11 +1852,11 @@ senso kb move [options] <id>
 
 | Option | Description | Default |
 |---|---|---|
-| `--parent-id <parentId>` | Target parent folder node ID |  |
+| `--parent-id <parentId>` | kb_node_id of the DESTINATION folder |  |
 
 ### senso kb delete
 
-Delete a KB node.
+Delete one node. A FOLDER IS DELETED WITH ITS ENTIRE SUBTREE.
 
 ```
 senso kb delete [options] <id>
@@ -1844,7 +1864,7 @@ senso kb delete [options] <id>
 
 ### senso kb bulk-delete
 
-Delete up to 100 KB nodes in one call. Folders take their whole subtree with them. The batch is all-or-nothing: if any node is missing, not permitted, a root, or still ingesting, nothing is deleted. Node IDs come from 'kb my-files', 'kb children' or 'kb find'. This cannot be undone.
+Delete up to 100 nodes in one all-or-nothing call.
 
 ```
 senso kb bulk-delete [options] <nodeIds...>
@@ -1852,7 +1872,7 @@ senso kb bulk-delete [options] <nodeIds...>
 
 ### senso kb create-raw
 
-Create a raw (text/markdown) content item in the knowledge base. Senso auto-tags the document in the background once ingestion finishes; use 'kb tags set' to override those tags afterwards.
+Create a text or markdown document in the knowledge base.
 
 ```
 senso kb create-raw [options]
@@ -1860,11 +1880,11 @@ senso kb create-raw [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "text": "# Hello", "title": "My doc", "summary": "...", "kb_folder_node_id": "<uuid>" }. Only "text" is required. Tags cannot be set on creation — the API ignores "tag_ids" here without reporting it. |  |
+| `--data <json>` | JSON: { "text": "# Hello", "title": "My doc", "summary": "...", "kb_folder_node_id": "<uuid>" }. Only "text" is required; "tag_ids" is accepted and ignored by the API |  |
 
 ### senso kb update-raw
 
-Fully replace the text content of a raw KB node (creates a new version). Re-ingestion re-runs auto-tagging, which may add tags of its own after this call.
+Replace a raw document's title, summary and text, creating a new version.
 
 ```
 senso kb update-raw [options] <id>
@@ -1872,11 +1892,11 @@ senso kb update-raw [options] <id>
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "title": "Title", "text": "# Updated content", "summary": "...", "tag_ids": ["<uuid>"] }. "title" and "text" are both required. "tag_ids" REPLACES the whole tag set — omit it to keep the current tags, pass [] to clear them. Every ID must already exist in the org, or the entire update is rejected. |  |
+| `--data <json>` | JSON: { "title": "Title", "text": "# Updated content", "summary": "...", "tag_ids": ["<uuid>"] }. "title" and "text" are both required. Omitting "summary" CLEARS it. "tag_ids" REPLACES the whole tag set — omit it to keep the current tags, pass [] to clear them |  |
 
 ### senso kb patch-raw
 
-Partially update the text content of a raw KB node. Re-ingestion re-runs auto-tagging, which may add tags of its own after this call.
+Change some of a raw document's fields and leave the rest alone.
 
 ```
 senso kb patch-raw [options] <id>
@@ -1884,11 +1904,11 @@ senso kb patch-raw [options] <id>
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "title": "New title", "text": "Updated text", "summary": "...", "tag_ids": ["<uuid>"] }. Supply at least one of title/summary/text — "tag_ids" on its own is rejected. "tag_ids" REPLACES the whole tag set — omit it to keep the current tags, pass [] to clear them. |  |
+| `--data <json>` | JSON: { "title": "New title", "text": "Updated text", "summary": "...", "tag_ids": ["<uuid>"] }. At least one of title/summary/text — "tag_ids" on its own is rejected. "tag_ids" REPLACES the whole tag set |  |
 
 ### senso kb upload
 
-Upload files to the knowledge base (up to 10). Files are hashed, uploaded to S3, then parsed and embedded by a background worker. Poll 'senso kb get <kb-node-id>' until content.processing_status is 'complete' before searching the uploaded content.
+Upload up to 10 local files to the knowledge base.
 
 ```
 senso kb upload [options] <files...>
@@ -1896,11 +1916,11 @@ senso kb upload [options] <files...>
 
 | Option | Description | Default |
 |---|---|---|
-| `--folder-id <id>` | Parent folder node ID to place files in (omit for root) |  |
+| `--folder-id <id>` | kb_node_id of the folder to upload into; omit for the organization root |  |
 
 ### senso kb update-file
 
-Replace the file on an existing KB file node with a new version.
+Replace the file behind an existing node with a new version.
 
 ```
 senso kb update-file [options] <id> <file>
@@ -1908,7 +1928,7 @@ senso kb update-file [options] <id> <file>
 
 ### senso kb tags
 
-Manage tags attached to a KB node. KB content is auto-tagged on creation (raw content on create, uploaded files once ingestion finishes) — use these commands to override, add, or remove tags afterwards. Tags can only be applied to content nodes, not folders. Names are resolved against the org's tag library; unknown names are created.
+Tags on a knowledge base document. <id> is a kb_node_id; the ids in --ids/--id are tag ids, the `id` field of `senso tags list`; a --name that the organization's tag library does not have is CREATED there. Only CONTENT nodes can be tagged — a folder is rejected. Senso auto-tags content after ingestion, so tags set while processing_status is pending or processing may be added to afterwards. Workflow: tags list → tags set or tags add → tags list.
 
 ```
 senso kb tags [options] [command]
@@ -1916,7 +1936,7 @@ senso kb tags [options] [command]
 
 ### senso kb tags list
 
-List tags attached to a KB node.
+List the tags on a knowledge base node.
 
 ```
 senso kb tags list [options] <id>
@@ -1924,7 +1944,7 @@ senso kb tags list [options] <id>
 
 ### senso kb tags set
 
-Replace the KB node's full tag collection. Provide --names (comma-separated) and/or --ids. Unknown names are created.
+Replace a document's entire tag set.
 
 ```
 senso kb tags set [options] <id>
@@ -1932,12 +1952,13 @@ senso kb tags set [options] <id>
 
 | Option | Description | Default |
 |---|---|---|
-| `--names <list>` | Comma-separated tag names (created if missing) |  |
-| `--ids <list>` | Comma-separated existing tag UUIDs |  |
+| `--names <list>` | Comma-separated tag names (created in the org's library if missing) |  |
+| `--ids <list>` | Comma-separated existing tag UUIDs from `senso tags list` |  |
+| `--clear` | Remove every tag. Required to clear — passing no flags is an error |  |
 
 ### senso kb tags add
 
-Attach a single tag by --name (created if missing) or --id.
+Attach ONE tag, keeping the tags the document already has.
 
 ```
 senso kb tags add [options] <id>
@@ -1945,12 +1966,12 @@ senso kb tags add [options] <id>
 
 | Option | Description | Default |
 |---|---|---|
-| `--name <name>` | Tag name (created if missing) |  |
-| `--id <tagId>` | Existing tag UUID |  |
+| `--name <name>` | Tag name (created in the org's library if missing) |  |
+| `--id <tagId>` | Existing tag UUID from `senso tags list` |  |
 
 ### senso kb tags remove
 
-Detach a single tag by --name or --id. Idempotent.
+Detach ONE tag. The tag itself stays in the organization's library.
 
 ```
 senso kb tags remove [options] <id>
@@ -1959,11 +1980,11 @@ senso kb tags remove [options] <id>
 | Option | Description | Default |
 |---|---|---|
 | `--name <name>` | Tag name to detach |  |
-| `--id <tagId>` | Existing tag UUID to detach |  |
+| `--id <tagId>` | Tag UUID to detach, from `senso kb tags list` |  |
 
 ### senso kb permissions
 
-Manage who can see and edit a knowledge base node. A grant gives one user or group viewer or editor access to a node; owner is assigned by the platform and cannot be granted here. Node IDs come from 'kb my-files', 'kb children' or 'kb find'.
+Who can see and change a knowledge base node. Grants INHERIT down the tree: a grant on a folder reaches everything inside it, and `kb get` reports the resolved answer as effective_role. viewer reads; editor also renames, moves, deletes, re-uploads and tags; owner is assigned by the platform and cannot be granted here. Three ids are in play: <id> is a kb_node_id, --grantee-id is a user_id or group_id, and <permissionId> is the grant's own `id` from `kb permissions list`. An org-admin key bypasses grants entirely, so an empty list does not mean nobody has access.
 
 ```
 senso kb permissions [options] [command]
@@ -1971,7 +1992,7 @@ senso kb permissions [options] [command]
 
 ### senso kb permissions list
 
-List the access grants on a KB node — who holds what role, with the grantee's name and (for users) email. Group grants you cannot see are omitted. This is where the permission ID for 'kb permissions update' and 'kb permissions remove' comes from.
+List the access grants on a node — who holds what role.
 
 ```
 senso kb permissions list [options] <id>
@@ -1979,7 +2000,7 @@ senso kb permissions list [options] <id>
 
 ### senso kb permissions add
 
-Grant a user or group viewer or editor access to a KB node, and return the new grant with its ID. Use 'kb permissions update' to change the role of a grant that already exists. User IDs come from 'users list'; group IDs from 'permissions groups'.
+Grant one user or group viewer or editor access to a node.
 
 ```
 senso kb permissions add [options] <id>
@@ -1988,12 +2009,12 @@ senso kb permissions add [options] <id>
 | Option | Description | Default |
 |---|---|---|
 | `--grantee-type <type>` | Who the grant is for: user \| group |  |
-| `--grantee-id <id>` | The user ID or group ID to grant access to |  |
+| `--grantee-id <id>` | user_id from `senso users list`, or group_id from `senso permissions groups` |  |
 | `--role <role>` | Access level to grant: viewer \| editor |  |
 
 ### senso kb permissions update
 
-Change an existing grant's role to viewer or editor. You cannot change your own grant. The permission ID comes from 'kb permissions list <id>'.
+Change an existing grant's role.
 
 ```
 senso kb permissions update [options] <id> <permissionId>
@@ -2005,7 +2026,7 @@ senso kb permissions update [options] <id> <permissionId>
 
 ### senso kb permissions remove
 
-Revoke an access grant on a KB node. You cannot revoke your own grant. The permission ID comes from 'kb permissions list <id>'.
+Revoke one access grant on a node.
 
 ```
 senso kb permissions remove [options] <id> <permissionId>
@@ -2013,7 +2034,7 @@ senso kb permissions remove [options] <id> <permissionId>
 
 ## senso permissions
 
-View available role permissions for the organization.
+The catalog of permission keys (action:resource, e.g. update:org) that a dashboard user role can hold. The same list for every organization, and read-only. NOT what your API key may do: an organization API key is not subject to these keys — its only restriction is its knowledge base scope, from `senso api-keys kb-permissions-get`.
 
 ```
 senso permissions [options] [command]
@@ -2021,7 +2042,7 @@ senso permissions [options] [command]
 
 ### senso permissions list
 
-List all available permission keys with their names, descriptions, and categories. Useful for building role management UIs.
+List every permission key a role can hold, with the category it belongs to. Reference data: the same for every organization.
 
 ```
 senso permissions list [options]
@@ -2029,7 +2050,15 @@ senso permissions list [options]
 
 ## senso tags
 
-Manage the organization's tag library. Tags are labels attached to prompts, KB nodes, and content items to group them for filtering or metric rollups. Senso auto-tags prompts, KB content, and search queries on creation, so the tag library grows automatically — most workflows skip these commands and rely on attach-by-name on the resource commands, which also creates tags on demand.
+Manage the organization's tag library — the shared vocabulary that prompts, KB nodes and content items are labeled with. A tag is org-scoped: renaming or deleting one here changes every resource it was applied to, immediately.
+
+Most workflows never need this group. `senso kb tags attach`, `senso content tags attach` and `senso prompts tags attach` all create a tag by name when it does not exist, so the library grows on its own. Senso also auto-tags prompts, KB content and search queries; those machine-minted tags arrive with curated=false and are hidden from `tags list` unless you pass --include-uncurated.
+
+Id spaces: a tag id is the `id` field of `senso tags list`, passed as --id/--ids/--tag-ids on the resource tag commands. A kb_node_id, content_id or prompt_id is the <id> ARGUMENT of those commands, and the two are never interchangeable.
+
+Typical workflow: tags list --counts → attach by name on the resource → tags list --include-uncurated to review what auto-tagging minted → tags update to fold a variant into the canonical name → tags delete to retire one everywhere.
+
+See also: senso kb tags, senso content tags, senso prompts tags, senso auto-tag
 
 ```
 senso tags [options] [command]
@@ -2037,7 +2066,7 @@ senso tags [options] [command]
 
 ### senso tags list
 
-List all tags for the organization. Pass --counts to include per-tag usage counts.
+List the organization's tag library. Returns every tag — this endpoint is not paginated.
 
 ```
 senso tags list [options]
@@ -2045,11 +2074,12 @@ senso tags list [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--counts` | Include prompt/content usage counts |  |
+| `--counts` | Include the seven usage counts. Maps to `counts=true` |  |
+| `--include-uncurated` | Also return machine-minted tags (curated=false). Maps to `include_uncurated=true` |  |
 
 ### senso tags create
 
-Create a new tag. Tag names are unique per org (case-insensitive).
+Create a tag with no attachments. You rarely need this: `senso kb tags attach`, `senso content tags attach` and `senso prompts tags attach` create a tag by name when it does not exist.
 
 ```
 senso tags create [options]
@@ -2057,11 +2087,11 @@ senso tags create [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--name <name>` | Tag name |  |
+| `--name <name>` | Tag name. 1-255 characters, unique per org (case-insensitive) |  |
 
 ### senso tags get
 
-Get a tag by ID, including usage counts.
+Read one tag with its full usage counts. Unlike `tags list`, counts are always included here.
 
 ```
 senso tags get [options] <id>
@@ -2069,7 +2099,7 @@ senso tags get [options] <id>
 
 ### senso tags update
 
-Rename a tag. Existing attachments on prompts, content, and KB nodes are preserved.
+Rename a tag. It keeps its id and every attachment, so the new name appears immediately on every prompt, content item, KB node and search turn it is on. There is no merge: renaming onto an existing name is a conflict, not a fold.
 
 ```
 senso tags update [options] <id>
@@ -2077,11 +2107,11 @@ senso tags update [options] <id>
 
 | Option | Description | Default |
 |---|---|---|
-| `--name <name>` | New tag name |  |
+| `--name <name>` | The new name. 1-255 characters, unique per org (case-insensitive) |  |
 
 ### senso tags delete
 
-Delete a tag and detach it from every prompt, content item, and KB node it was applied to. This cannot be undone.
+Delete a tag and detach it from every prompt, content item, KB node and search turn it was applied to. The resources are untouched — only the label goes. This cannot be undone, and recreating the tag does not restore the attachments.
 
 ```
 senso tags delete [options] <id>
@@ -2089,7 +2119,17 @@ senso tags delete [options] <id>
 
 ## senso product-lines
 
-Manage product lines — flexible org-scoped product/service definitions. Each product line has a name and an arbitrary JSON 'details' blob carried by downstream generation and evaluation pipelines.
+Manage product lines — the organization's product and service definitions. A product line is a name plus an open-ended JSON `details` object.
+
+`details` is not inert metadata. Every scalar leaf of `details` is flattened into the generation evidence inventory as an APPROVED evidence item (keyed `details.<path>`; arrays become `details.skus[0]`). The generator may assert those values as fact, so only put things in `details` you are willing to see published.
+
+Requires the GEO product, plus read:product_line to read and update:product_line to write (admin and collaborator; viewers have no product line access). A 403 here is usually a plan limitation, not a bad key.
+
+Id space: a product_line_id is the `product_line_id` field of `senso product-lines list`. It is what get/update/patch/delete take, and what `senso generate --product-line-ids` takes.
+
+Typical workflow: product-lines list → product-lines create → product-lines patch to correct one field → senso generate --product-line-ids <product_line_id>.
+
+See also: senso generate, senso brand-kit get, senso content-types list
 
 ```
 senso product-lines [options] [command]
@@ -2097,7 +2137,7 @@ senso product-lines [options] [command]
 
 ### senso product-lines list
 
-List all product lines for the organization.
+List the organization's product lines. Each item carries its full `details` blob; the table view omits it, so use `product-lines get <id>` or --output json to read it.
 
 ```
 senso product-lines list [options]
@@ -2105,12 +2145,12 @@ senso product-lines list [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--limit <n>` | Maximum items to return (default: 50) |  |
-| `--offset <n>` | Number of items to skip (for pagination) |  |
+| `--limit <n>` | Rows per page. Integer >= 1. Default 50. Maps to `limit` |  |
+| `--offset <n>` | Rows to skip. Integer >= 0. Default 0. Maps to `offset` |  |
 
 ### senso product-lines create
 
-Create a new product line. 'details' is an open-ended JSON object — put whatever structured metadata (SKUs, URLs, positioning, pricing tiers) your workflows need.
+Create a product line. Every scalar leaf of `details` is flattened into the generation evidence inventory as an APPROVED evidence item (keyed `details.<path>`; arrays become `details.skus[0]`). The generator may assert those values as fact, so only put things in `details` you are willing to see published.
 
 ```
 senso product-lines create [options]
@@ -2122,7 +2162,7 @@ senso product-lines create [options]
 
 ### senso product-lines get
 
-Get a product line by ID.
+Read one product line, including its full `details` object. This is the command to use when you need to see `details` — `product-lines list` omits it from the table view.
 
 ```
 senso product-lines get [options] <id>
@@ -2130,7 +2170,7 @@ senso product-lines get [options] <id>
 
 ### senso product-lines update
 
-Replace a product line's name and details (PUT). Both fields are required — run 'get <id>' first to preserve existing values. For single-field updates, use 'product-lines patch <id>'.
+REPLACE a product line's name and details (PUT). Whatever you do not send is gone: the API treats an absent `details` as {}, which removes every evidence field generation was drawing from this product line. Read the current value first, or use `product-lines patch <id>` to change one field.
 
 ```
 senso product-lines update [options] <id>
@@ -2142,7 +2182,7 @@ senso product-lines update [options] <id>
 
 ### senso product-lines patch
 
-Partially update a product line (PATCH). Only the fields you provide are changed — existing fields are preserved.
+Change a product line's name, its details, or both (PATCH). Top-level fields you omit are left alone — but `details` is REPLACED, not merged: sending {"details":{"price_usd":129}} makes that the entire blob and drops every other key. To change one key, read the current blob and send it back whole.
 
 ```
 senso product-lines patch [options] <id>
@@ -2150,11 +2190,11 @@ senso product-lines patch [options] <id>
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "details": { "price": 99 } } |  |
+| `--data <json>` | JSON: at least one of { "name": "...", "details": { ... } } |  |
 
 ### senso product-lines delete
 
-Delete a product line. This cannot be undone.
+Delete a product line. This cannot be undone, and there is no soft delete. Anything still holding the id stops resolving — a saved `senso generate --product-line-ids <id>`, and any Builder workspace or agent session whose selection includes it — and generation simply loses the evidence this product line was contributing.
 
 ```
 senso product-lines delete [options] <id>
@@ -2162,7 +2202,7 @@ senso product-lines delete [options] <id>
 
 ## senso roles
 
-Inspect the roles defined for your organization. Each organization has its own per-org role_ids — resolve a role name to its UUID here before passing role_id to `users invite`, `users add`, or `users update`.
+The roles of the organization your key belongs to. role_ids are PER ORGANIZATION: resolve a name (admin, collaborator, viewer, or a custom role) to its UUID here before passing --role-id to `senso users invite` or role_id to `senso users add` and `senso users update`. Read-only — roles are created and edited in the Senso dashboard.
 
 ```
 senso roles [options] [command]
@@ -2170,7 +2210,7 @@ senso roles [options] [command]
 
 ### senso roles list
 
-List every role for the current organization, including the built-in admin/collaborator/viewer roles and any custom roles.
+List every role of this organization — the built-in admin, collaborator and viewer, plus any custom roles — with the role_id that `senso users` commands take.
 
 ```
 senso roles list [options]
@@ -2178,7 +2218,17 @@ senso roles list [options]
 
 ## senso competitors
 
-Manage the curated list of competitor brands your organization tracks. Tracked competitors feed downstream share-of-voice analytics and inform content-generation prompts.
+Manage the organization's curated competitor list. Tracked competitors are what share-of-voice analytics measure you against, and they are fed into content-generation prompts as the brands to position against.
+
+An organization may track at most 50 competitors. Adding past that limit fails, and the API reports the refusal as a 500 rather than a 409.
+
+Reading the list needs no permission; every mutation — add, batch-add, suggest, update, delete — requires update:org.
+
+Id space: a competitor id is the `id` field of `senso competitors list`, and it is the <competitorId> argument of update and delete.
+
+Typical workflow: competitors suggest → filter out already_tracked → competitors batch-add → competitors list.
+
+See also: senso analytics, senso tracked-sources
 
 ```
 senso competitors [options] [command]
@@ -2186,7 +2236,7 @@ senso competitors [options] [command]
 
 ### senso competitors list
 
-List every tracked competitor for the current organization.
+List every competitor the organization tracks. The list is complete — there is no paging — and an org may hold at most 50. Unlike the rest of this group, reading needs no special permission.
 
 ```
 senso competitors list [options]
@@ -2194,7 +2244,7 @@ senso competitors list [options]
 
 ### senso competitors add
 
-Add a single tracked competitor.
+Add one competitor, recorded with source="manual". Names are unique per organization, case-insensitively: adding an existing name is a conflict, not an update. An organization may track at most 50. Requires update:org.
 
 ```
 senso competitors add [options]
@@ -2202,12 +2252,12 @@ senso competitors add [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--name <name>` | Competitor brand name |  |
-| `--url <url>` | Competitor website URL |  |
+| `--name <name>` | Competitor brand name. 1-255 characters after trimming |  |
+| `--url <url>` | Competitor website. An absolute URL WITH a scheme (https://acme.example.com), at most 2048 characters |  |
 
 ### senso competitors batch-add
 
-Add up to 50 tracked competitors in one call. Designed for accepting AI-generated suggestions returned by `competitors suggest`.
+Accept a set of competitors in one call, preserving the provenance fields `competitors suggest` returns. Two different limits of 50 apply: at most 50 ITEMS per request, and at most 50 competitors per ORGANIZATION. If the org has room for fewer than you send, the API keeps the first that fit and discards the rest without saying so — this command reports which in warnings. A name already tracked is not re-created; the existing row is returned instead.
 
 ```
 senso competitors batch-add [options]
@@ -2219,7 +2269,7 @@ senso competitors batch-add [options]
 
 ### senso competitors suggest
 
-Get AI-generated competitor suggestions seeded from your org's website and recent prompt-run results. Pipe accepted suggestions into `competitors batch-add`.
+Ask the model for competitor candidates and return them WITHOUT tracking any of them; accepting is a separate call. This costs model tokens, is limited to 5 calls per rolling hour per organization, and a successful result is cached for 10 minutes — a repeat inside that window returns the same suggestions with cached=true. Requires update:org, even though it changes nothing.
 
 ```
 senso competitors suggest [options]
@@ -2227,7 +2277,7 @@ senso competitors suggest [options]
 
 ### senso competitors update
 
-Update a tracked competitor's name or URL.
+REPLACE a tracked competitor's name and URL. This is a PUT and the API cannot express "leave the URL alone": a request without a URL deletes the stored one, so this command requires either --url or --clear-url. Provenance is preserved — source, rationale and confidence keep whatever they were set to and cannot be changed here. Requires update:org.
 
 ```
 senso competitors update [options] <competitorId>
@@ -2235,12 +2285,13 @@ senso competitors update [options] <competitorId>
 
 | Option | Description | Default |
 |---|---|---|
-| `--name <name>` | Competitor brand name |  |
-| `--url <url>` | Competitor website URL |  |
+| `--name <name>` | Competitor brand name. 1-255 characters after trimming |  |
+| `--url <url>` | The website to store. Absolute URL with a scheme, at most 2048 characters |  |
+| `--clear-url` | Delete the stored URL, which is what the API does with a request that omits it |  |
 
 ### senso competitors delete
 
-Remove a tracked competitor.
+Remove a competitor from the tracked list. The row is soft-deleted: it disappears from `competitors list` and from the analytics that read the list, and it frees a slot against the 50-competitor per-organization cap. Requires update:org.
 
 ```
 senso competitors delete [options] <competitorId>
@@ -2248,7 +2299,23 @@ senso competitors delete [options] <competitorId>
 
 ## senso tracked-sources
 
-Manage citation-classification rules that tier each cited URL as Owned (primary), Tracked, or External (secondary). Tracked sources drive share-of-voice and citation analytics. Rules created from published content are read-only.
+Manage the rules that classify every URL an AI answer cites into one of three tiers. The tier is what share-of-voice and citation analytics count.
+
+  primary    UI label "Owned"    — your own properties.
+  tracked    UI label "Tracked"  — third parties you watch. Only this tier carries a --category.
+  secondary  UI label "External" — everything else, and the default for a citation that matches no rule.
+
+When two rules match one URL the more specific match type wins (exact_url > path_prefix > host > domain); between two rules of the same match type the higher --priority wins.
+
+Every rule carries a source_origin: manual and onboarding rules are fully editable and deletable; a published rule — created automatically when content was published to a URL — accepts only an active toggle and cannot be deleted.
+
+Changing any rule queues a rollup recalculation that restates citation history. It runs for minutes, so analytics lag a rule change. Reads need no permission; every mutation needs update:org.
+
+Id space: a tracked source id is the `id` field of `senso tracked-sources list`, and it is the <sourceId> argument of update and delete.
+
+Typical workflow: tracked-sources list --search <domain> → tracked-sources add → tracked-sources update <sourceId> --no-active to retire a rule → senso analytics once the recalc lands.
+
+See also: senso analytics, senso competitors, senso publish-records
 
 ```
 senso tracked-sources [options] [command]
@@ -2256,15 +2323,21 @@ senso tracked-sources [options] [command]
 
 ### senso tracked-sources list
 
-List every tracked source rule for the current organization.
+List the organization's citation-classification rules. This list grows on its own — publishing content creates a `published` rule per live URL — so it is paged, 50 at a time by default. Page or search rather than assuming what you see is everything. Reading needs no permission.
 
 ```
 senso tracked-sources list [options]
 ```
 
+| Option | Description | Default |
+|---|---|---|
+| `--limit <n>` | Rows per page. Integer 1-100. Default 50. Maps to `limit` |  |
+| `--offset <n>` | Rows to skip. Integer >= 0. Default 0. Maps to `offset` |  |
+| `--search <term>` | Substring filter on the pattern, normalized the same way patterns are stored, so "https://www.senso.ai/" matches the row stored as "senso.ai". Maps to `search` |  |
+
 ### senso tracked-sources add
 
-Add a tracked source rule. New rules are always created active.
+Create a citation-classification rule. New rules are always active and always get source_origin="manual". The pattern is NORMALIZED before storage — "https://WWW.Senso.ai/" is stored as "senso.ai" — and that stored form is what `list` shows. Requires update:org.
 
 ```
 senso tracked-sources add [options]
@@ -2272,16 +2345,16 @@ senso tracked-sources add [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--pattern <pattern>` | Value to match cited URLs against, interpreted per --match-type |  |
+| `--pattern <pattern>` | Value to match cited URLs against, interpreted per --match-type. At most 2048 characters |  |
 | `--match-type <type>` | Match strategy: domain \| host \| path_prefix \| exact_url |  |
 | `--tier <tier>` | Classification tier: primary (Owned) \| tracked \| secondary (External) |  |
-| `--category <category>` | Optional sub-category (only meaningful for the 'tracked' tier): affiliated_domain \| published_content \| social \| press |  |
-| `--label <label>` | Optional human-readable label |  |
-| `--priority <n>` | Optional ordering priority (integer) |  |
+| `--category <category>` | Sub-category, and ONLY for --tier tracked — the API discards it for any other tier: affiliated_domain \| published_content \| social \| press |  |
+| `--label <label>` | Optional human-readable label, at most 255 characters |  |
+| `--priority <n>` | Optional integer, default 0. Breaks ties between rules of the SAME match type; higher wins |  |
 
 ### senso tracked-sources update
 
-Replace a tracked source rule (PUT). Pattern, match type, and tier are required. Published rules are read-only.
+REPLACE a citation-classification rule (PUT). What happens depends on the rule's source_origin: a manual or onboarding rule takes every field, while a published rule accepts ONLY --active/--no-active — the API takes a new pattern, match type or tier, answers 200, and silently keeps the old values, so this command reports that as a failure rather than letting it look like a write. Omission is not uniform: --label and --category are CLEARED when you omit them, while --priority and the active flag are KEPT. Requires update:org.
 
 ```
 senso tracked-sources update [options] <sourceId>
@@ -2289,18 +2362,18 @@ senso tracked-sources update [options] <sourceId>
 
 | Option | Description | Default |
 |---|---|---|
-| `--pattern <pattern>` | Value to match cited URLs against, interpreted per --match-type |  |
+| `--pattern <pattern>` | Value to match cited URLs against, interpreted per --match-type. Normalized before storage |  |
 | `--match-type <type>` | Match strategy: domain \| host \| path_prefix \| exact_url |  |
 | `--tier <tier>` | Classification tier: primary (Owned) \| tracked \| secondary (External) |  |
-| `--category <category>` | Optional sub-category (only meaningful for the 'tracked' tier): affiliated_domain \| published_content \| social \| press |  |
-| `--label <label>` | Optional human-readable label |  |
-| `--priority <n>` | Optional ordering priority (integer) |  |
+| `--category <category>` | Sub-category, tracked tier only. OMITTING IT CLEARS THE STORED CATEGORY: affiliated_domain \| published_content \| social \| press |  |
+| `--label <label>` | Human-readable label. OMITTING IT CLEARS THE STORED LABEL |  |
+| `--priority <n>` | Ordering priority (integer). Omitting it keeps the current value |  |
 | `--active` | Mark the rule active |  |
-| `--no-active` | Mark the rule inactive |  |
+| `--no-active` | Mark the rule inactive, so it stops classifying |  |
 
 ### senso tracked-sources delete
 
-Remove a tracked source rule.
+Delete a citation-classification rule. A rule with source_origin="published" CANNOT be deleted — the publishing pipeline maintains it and would recreate it — so deactivate it instead with `tracked-sources update <sourceId> --pattern <its pattern> --match-type <its match_type> --tier <its tier> --no-active`. Citations that only this rule matched fall back to the External (secondary) tier. Requires update:org.
 
 ```
 senso tracked-sources delete [options] <sourceId>
@@ -2308,7 +2381,7 @@ senso tracked-sources delete [options] <sourceId>
 
 ## senso generated-content
 
-Browse AI-generated content (GEO). List published or draft generated items, or fetch a single item with its rendered body. Requires the GEO product and read:content permission.
+Browse content produced by the content engine (`senso engine draft` and `senso engine publish`). Requires the GEO product and read:content. This is a lighter view of the rows `senso content verification` returns: use that one for owners, tags, per-destination publish records and citation metrics, and this one for id, title, question text and editorial status — or for the rendered body, which only `generated-content get` returns. The content_id here is the SAME id used by `senso content get`, `senso content versions`, `senso content unpublish` and `senso engine publish --data '{"content_id": …}'`. Workflow: engine draft → generated-content list --status drafts → generated-content get → engine publish → generated-content list --status published.
 
 ```
 senso generated-content [options] [command]
@@ -2316,7 +2389,7 @@ senso generated-content [options] [command]
 
 ### senso generated-content list
 
-List generated content. Use --status to switch between published and draft items.
+List content produced by the content engine, newest first. --status selects the API PATH, not a filter: `drafts` means the item's CURRENT version is a draft, so an item that was published and then edited appears there — which is why these counts can disagree with `senso content verification-counts`.
 
 ```
 senso generated-content list [options]
@@ -2324,14 +2397,14 @@ senso generated-content list [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--status <status>` | Which items to list: published \| drafts | `published` |
-| `--limit <n>` | Items per page (max 100) | `10` |
-| `--offset <n>` | Pagination offset | `0` |
-| `--search <query>` | Filter by title |  |
+| `--status <status>` | Which listing to read: published \| drafts | `published` |
+| `--limit <n>` | Rows per page, 1-100. The API silently returns 10 rows for anything outside that, so the CLI rejects it | `10` |
+| `--offset <n>` | Rows to skip | `0` |
+| `--search <query>` | Substring match on the title |  |
 
 ### senso generated-content get
 
-Get a single generated content item including its question text and rendered body.
+Read one generated content item: the prompt it answers and its rendered markdown body. This serves GENERATED content only — a knowledge base document is refused even though its id is a valid content_id; read those with `senso kb get <kb_node_id>`. `senso content get <id>` returns the same item with tags and upload provenance but WITHOUT question_text; this one returns question_text and the body.
 
 ```
 senso generated-content get [options] <id>
@@ -2339,7 +2412,7 @@ senso generated-content get [options] <id>
 
 ## senso analytics
 
-GEO analytics for your organization — brand visibility, share of voice, and citations across the AI models you monitor. Every payload ships raw counts alongside the rates, and a rate is null (shown as “—”) when its denominator is zero, never a silent 0%. Run 'senso analytics glossary' for the canonical definition and denominator of every metric.
+GEO analytics for your organization — brand visibility, share of voice, and citations across the AI models you monitor. Every payload ships raw counts alongside the rates, and a rate is null (shown as “—”) when its denominator is zero, never a silent 0%. Run 'senso analytics glossary' for the canonical definition and denominator of every metric. Requires the GEO product and the read:prompt permission: a 403 here is usually an entitlement, which no role change fixes. Dates are YYYY-MM-DD (the 'senso evals' group takes RFC 3339 instants under the same flag names) and a window may span at most 365 days. `analytics prompt <promptId>` takes an ORG prompt id — the prompt_id field of 'senso analytics prompts' or 'senso prompts list' — never an industry prompt id from 'senso industries prompts'. Typical order: filters → summary → prompts --order asc → prompt <id> → answers.
 
 ```
 senso analytics [options] [command]
@@ -2356,8 +2429,8 @@ senso analytics summary [options]
 | Option | Description | Default |
 |---|---|---|
 | `--from <date>` | Window start, YYYY-MM-DD (default: 30 days ending at the most recent day with data) |  |
-| `--to <date>` | Window end, YYYY-MM-DD (max window: 365 days) |  |
-| `--models <list>` | Comma-separated model filter — see 'senso analytics filters' |  |
+| `--to <date>` | Window end, YYYY-MM-DD, inclusive (max window: 365 days) |  |
+| `--models <list>` | Comma-separated model ids: gpt-4.1, chatgpt, perplexity, aioverview, gemini, linkup, claude-sonnet-4-6, grok — 'senso analytics filters' lists the ones with data |  |
 | `--location <list>` | Comma-separated location filter, case-sensitive (e.g. US, US/California) |  |
 | `--prompt-type <type>` | Funnel stage: awareness \| consideration \| evaluation \| decision |  |
 | `--tag <tag>` | Restrict to prompts carrying this tag |  |
@@ -2373,12 +2446,12 @@ senso analytics mentions [options]
 | Option | Description | Default |
 |---|---|---|
 | `--from <date>` | Window start, YYYY-MM-DD (default: 30 days ending at the most recent day with data) |  |
-| `--to <date>` | Window end, YYYY-MM-DD (max window: 365 days) |  |
-| `--models <list>` | Comma-separated model filter — see 'senso analytics filters' |  |
+| `--to <date>` | Window end, YYYY-MM-DD, inclusive (max window: 365 days) |  |
+| `--models <list>` | Comma-separated model ids: gpt-4.1, chatgpt, perplexity, aioverview, gemini, linkup, claude-sonnet-4-6, grok — 'senso analytics filters' lists the ones with data |  |
 | `--location <list>` | Comma-separated location filter, case-sensitive (e.g. US, US/California) |  |
 | `--prompt-type <type>` | Funnel stage: awareness \| consideration \| evaluation \| decision |  |
 | `--tag <tag>` | Restrict to prompts carrying this tag |  |
-| `--group-by <bucket>` | Time bucket: day \| week (default: day) |  |
+| `--group-by <bucket>` | Time bucket: day \| week (default: day). Weeks are ISO weeks starting Monday, so the first and last may be partial |  |
 
 ### senso analytics citations
 
@@ -2391,12 +2464,12 @@ senso analytics citations [options]
 | Option | Description | Default |
 |---|---|---|
 | `--from <date>` | Window start, YYYY-MM-DD (default: 30 days ending at the most recent day with data) |  |
-| `--to <date>` | Window end, YYYY-MM-DD (max window: 365 days) |  |
-| `--models <list>` | Comma-separated model filter — see 'senso analytics filters' |  |
+| `--to <date>` | Window end, YYYY-MM-DD, inclusive (max window: 365 days) |  |
+| `--models <list>` | Comma-separated model ids: gpt-4.1, chatgpt, perplexity, aioverview, gemini, linkup, claude-sonnet-4-6, grok — 'senso analytics filters' lists the ones with data |  |
 | `--location <list>` | Comma-separated location filter, case-sensitive (e.g. US, US/California) |  |
 | `--prompt-type <type>` | Funnel stage: awareness \| consideration \| evaluation \| decision |  |
 | `--tag <tag>` | Restrict to prompts carrying this tag |  |
-| `--group-by <bucket>` | Time bucket: day \| week (default: day) |  |
+| `--group-by <bucket>` | Time bucket: day \| week (default: day). Weeks are ISO weeks starting Monday, so the first and last may be partial |  |
 
 ### senso analytics domains
 
@@ -2409,8 +2482,8 @@ senso analytics domains [options]
 | Option | Description | Default |
 |---|---|---|
 | `--from <date>` | Window start, YYYY-MM-DD (default: 30 days ending at the most recent day with data) |  |
-| `--to <date>` | Window end, YYYY-MM-DD (max window: 365 days) |  |
-| `--models <list>` | Comma-separated model filter — see 'senso analytics filters' |  |
+| `--to <date>` | Window end, YYYY-MM-DD, inclusive (max window: 365 days) |  |
+| `--models <list>` | Comma-separated model ids: gpt-4.1, chatgpt, perplexity, aioverview, gemini, linkup, claude-sonnet-4-6, grok — 'senso analytics filters' lists the ones with data |  |
 | `--location <list>` | Comma-separated location filter, case-sensitive (e.g. US, US/California) |  |
 | `--prompt-type <type>` | Funnel stage: awareness \| consideration \| evaluation \| decision |  |
 | `--tier <tier>` | Filter by tier: primary \| tracked \| secondary |  |
@@ -2430,13 +2503,13 @@ senso analytics pages [options]
 | Option | Description | Default |
 |---|---|---|
 | `--from <date>` | Window start, YYYY-MM-DD (default: 30 days ending at the most recent day with data) |  |
-| `--to <date>` | Window end, YYYY-MM-DD (max window: 365 days) |  |
-| `--models <list>` | Comma-separated model filter — see 'senso analytics filters' |  |
+| `--to <date>` | Window end, YYYY-MM-DD, inclusive (max window: 365 days) |  |
+| `--models <list>` | Comma-separated model ids: gpt-4.1, chatgpt, perplexity, aioverview, gemini, linkup, claude-sonnet-4-6, grok — 'senso analytics filters' lists the ones with data |  |
 | `--location <list>` | Comma-separated location filter, case-sensitive (e.g. US, US/California) |  |
 | `--prompt-type <type>` | Funnel stage: awareness \| consideration \| evaluation \| decision |  |
 | `--tier <tier>` | Filter by tier: primary \| tracked \| secondary |  |
-| `--domain <domain>` | Restrict to one exact domain |  |
-| `--domain-contains <text>` | Substring filter on the domain |  |
+| `--domain <domain>` | Restrict to one exact domain (exact match, not a substring) |  |
+| `--domain-contains <text>` | Substring filter on the domain; combines with --domain |  |
 | `--url-contains <text>` | Substring filter on the URL |  |
 | `--sort <field>` | Sort by: citations \| coverage (default: citations) |  |
 | `--limit <n>` | Maximum rows to return (default: 50, max: 100) |  |
@@ -2453,8 +2526,8 @@ senso analytics prompts [options]
 | Option | Description | Default |
 |---|---|---|
 | `--from <date>` | Window start, YYYY-MM-DD (default: 30 days ending at the most recent day with data) |  |
-| `--to <date>` | Window end, YYYY-MM-DD (max window: 365 days) |  |
-| `--models <list>` | Comma-separated model filter — see 'senso analytics filters' |  |
+| `--to <date>` | Window end, YYYY-MM-DD, inclusive (max window: 365 days) |  |
+| `--models <list>` | Comma-separated model ids: gpt-4.1, chatgpt, perplexity, aioverview, gemini, linkup, claude-sonnet-4-6, grok — 'senso analytics filters' lists the ones with data |  |
 | `--location <list>` | Comma-separated location filter, case-sensitive (e.g. US, US/California) |  |
 | `--prompt-type <type>` | Funnel stage: awareness \| consideration \| evaluation \| decision |  |
 | `--tag <tag>` | Restrict to prompts carrying this tag |  |
@@ -2474,9 +2547,9 @@ senso analytics prompt [options] <promptId>
 
 | Option | Description | Default |
 |---|---|---|
-| `--from <date>` | Window start, YYYY-MM-DD |  |
-| `--to <date>` | Window end, YYYY-MM-DD |  |
-| `--models <list>` | Comma-separated model filter |  |
+| `--from <date>` | Window start, YYYY-MM-DD (default: 30 days ending at the most recent day with data) |  |
+| `--to <date>` | Window end, YYYY-MM-DD, inclusive (max window: 365 days) |  |
+| `--models <list>` | Comma-separated model ids: gpt-4.1, chatgpt, perplexity, aioverview, gemini, linkup, claude-sonnet-4-6, grok — 'senso analytics filters' lists the ones with data |  |
 | `--location <list>` | Comma-separated location filter, case-sensitive |  |
 | `--no-include-answers` | Omit the latest answer bodies (included by default) |  |
 
@@ -2492,7 +2565,7 @@ senso analytics answers [options]
 |---|---|---|
 | `--from <date>` | Answers collected on or after this date, YYYY-MM-DD (hides rows, never reveals older answers) |  |
 | `--to <date>` | Answers collected on or before this date, YYYY-MM-DD (hides rows, never reveals older answers) |  |
-| `--models <list>` | Comma-separated model filter |  |
+| `--models <list>` | Comma-separated model ids: gpt-4.1, chatgpt, perplexity, aioverview, gemini, linkup, claude-sonnet-4-6, grok — 'senso analytics filters' lists the ones with data |  |
 | `--location <list>` | Comma-separated location filter, case-sensitive |  |
 | `--prompt-type <type>` | Funnel stage: awareness \| consideration \| evaluation \| decision |  |
 | `--tag <tag>` | Restrict to prompts carrying this tag |  |
@@ -2512,7 +2585,7 @@ senso analytics glossary [options]
 
 ### senso analytics filters
 
-The models, locations, prompt types, tags and tracked competitors that actually have data for this org, plus the span of rollup days available — so you never guess a model spelling or query an empty window.
+The models, locations, prompt types, tags and tracked competitors that actually have data for this org, plus the span of rollup days available — so you never guess a model spelling or query an empty window. This is the discovery command every --models flag in the group points at.
 
 ```
 senso analytics filters [options]
@@ -2520,7 +2593,7 @@ senso analytics filters [options]
 
 ## senso history-imports
 
-Track the run-history import jobs started by `senso industries import-prompts`. A `completed` import may still have copied nothing — read `prompts_count` and `historic_runs_imported` rather than the status on its own.
+Read-only view of the run-history import jobs that back-fill this organization's prompts with the history already collected for its industry. Nothing here starts or cancels a job — the only thing that starts one is `senso industries import-prompts`. A `completed` import may still have copied NOTHING, so read prompts_count and historic_runs_imported rather than the status on its own, and remember that `failed` is not terminal: failed jobs are retried and can return to running. Both commands require the GEO product. Workflow: industries import-prompts → history-imports get <import_id> (until completed with runs > 0) → senso analytics.
 
 ```
 senso history-imports [options] [command]
@@ -2536,7 +2609,7 @@ senso history-imports list [options]
 
 ### senso history-imports get
 
-Get one history-import job, as returned in `history_import.import_id` by `senso industries import-prompts`.
+Get one run-history import job. This is the command to poll after `senso industries import-prompts` — and status alone is not the answer: a completed job may have copied nothing, and a failed one may still be retried.
 
 ```
 senso history-imports get [options] <importId>
@@ -2544,7 +2617,7 @@ senso history-imports get [options] <importId>
 
 ## senso industries
 
-Browse the public industry catalog and the competitive intelligence Senso collects for it — brand leaderboards, domain citations and the prompts each industry runs. Works with the organization key stored by `senso login`. The <industry> argument accepts a UUID or a name (e.g. "Airlines (Canada)"). Reads accept any industry in the catalog; only `import-prompts` is restricted to your own.
+Browse the public industry catalog and the competitive intelligence Senso collects for it — brand leaderboards, domain citations and the prompts each industry runs. Works with the organization key stored by `senso login`; `senso partner` is the same data under a partner key. Three id spaces meet here: industry_id (from `industries list`), an INDUSTRY prompt id (the `id` of `industries prompts`, which is not a geo_question_id), and brand_id (from `industries brands`). Every <industry> takes a UUID or a name (e.g. "Airlines (Canada)"), and a name takes the first search match. Every command except `list` requires the GEO product. Workflow: list → org set-industry (once) → prompts → import-prompts → history-imports get → brands.
 
 ```
 senso industries [options] [command]
@@ -2552,7 +2625,7 @@ senso industries [options] [command]
 
 ### senso industries list
 
-List the public industry catalog — the industries any organization can browse, with the prompt, model and location counts that show how much coverage each one has.
+List the public industry catalog — every industry any organization may browse and choose as its own, with the counts that say whether it has anything worth importing.
 
 ```
 senso industries list [options]
@@ -2560,15 +2633,15 @@ senso industries list [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--search <q>` | Case-insensitive substring match against name or slug |  |
+| `--search <q>` | Case-insensitive substring match against name and slug |  |
 | `--limit <n>` | Page size, 1-100 (default 50) |  |
-| `--offset <n>` | Number of industries to skip (default 0) |  |
-| `--sort <order>` | Sort order: name_asc, name_desc, created_asc, created_desc (default name_asc) |  |
-| `--live` | Only industries actively running — at least one model enabled and one active prompt |  |
+| `--offset <n>` | Industries to skip (default 0) |  |
+| `--sort <order>` | Sort order: name_asc \| name_desc \| created_asc \| created_desc (default name_asc) |  |
+| `--live` | Only industries that can actually run: at least one opted-in model AND at least one active prompt |  |
 
 ### senso industries prompts
 
-List the prompts an industry runs. These are the industry's own prompts, not your organization's (`senso prompts list`) — their ids are what `industries import-prompts` and `senso generate industry-draft` accept.
+List the prompts an industry runs — the questions Senso asks the AI models on the industry's behalf. Their ids are what `industries import-prompts` and `senso generate industry-draft` accept.
 
 ```
 senso industries prompts [options] <industry>
@@ -2577,11 +2650,11 @@ senso industries prompts [options] <industry>
 | Option | Description | Default |
 |---|---|---|
 | `--limit <n>` | Page size, 1-100 (default 50) |  |
-| `--offset <n>` | Number of prompts to skip (default 0) |  |
+| `--offset <n>` | Prompts to skip (default 0) |  |
 
 ### senso industries brands
 
-Brand leaderboard for an industry — who the AI answers named over the window, ranked by mentions, with average position, sentiment, most-cited domain and trends. Figures are counts, not rates: divide by the `totals` block to get shares. Ranks are global, so a later page still shows real ranks.
+Brand leaderboard for an industry — every brand the AI answers named over the window, ranked by mentions. The figures are raw COUNTS: divide by the `totals` block to get shares. Ranks are global, so --offset 100 still shows ranks 101 and up.
 
 ```
 senso industries brands [options] <industry>
@@ -2589,19 +2662,19 @@ senso industries brands [options] <industry>
 
 | Option | Description | Default |
 |---|---|---|
-| `--from <date>` | Start of the window, YYYY-MM-DD (default: 30 days ago) |  |
-| `--to <date>` | End of the window, YYYY-MM-DD (default: today) |  |
-| `--models <list>` | Comma-separated model filter |  |
-| `--location <code>` | 2-letter location code (e.g. US) |  |
+| `--from <date>` | Start of the window, YYYY-MM-DD and inclusive (default: 30 days ago). NOT an RFC 3339 instant — `senso evals` takes those |  |
+| `--to <date>` | End of the window, YYYY-MM-DD and inclusive (default: today, UTC). The span may not exceed 90 days |  |
+| `--models <list>` | Comma-separated model ids to keep: gpt-4.1, chatgpt, perplexity, aioverview, gemini, linkup, claude-sonnet-4-6, grok. Omit for every model. `senso analytics filters --output json \| jq -r '.data.models[].id'` lists the ids that have data. |  |
+| `--location <code>` | 2-letter country code, e.g. US. Omit for every location the industry runs in |  |
 | `--limit <n>` | Page size, 1-100 (default 100) |  |
-| `--offset <n>` | Number of brands to skip (default 0) |  |
-| `--no-canonicalize` | Do not merge spelling variants — raw per-spelling rows |  |
-| `--rollup <mode>` | Set to `parent` to fold sub-brands into their parent company |  |
-| `--entity-type <list>` | Comma-separated types to keep: brand, regulator, publisher, government, generic_term, product_model, forum_social |  |
+| `--offset <n>` | Brands to skip (default 0) |  |
+| `--no-canonicalize` | Do not merge spelling variants — one row per spelling. Turns off --rollup, which needs canonicalization |  |
+| `--rollup <mode>` | Set to `parent` to fold sub-brands into their parent company (Gemini into Google). Ignored with --no-canonicalize |  |
+| `--entity-type <list>` | Comma-separated types to keep: brand, regulator, publisher, government, generic_term, product_model, forum_social. Applied before paging, so total reflects it |  |
 
 ### senso industries brand
 
-Everything about one brand in an industry, merged across its spelling variants. Matching is fuzzy, so a brand that was never named comes back as `mentioned: false` rather than a 404. For repeat calls, take the `brand_id` from the result and use `brand-by-id`, which skips the fuzzy match.
+Everything about one brand in an industry, with its spelling variants merged before any metric is computed. The match is FUZZY: read resolved.matched_on and resolved.match_confidence before trusting the numbers. A brand that was never named comes back as mentioned=false and exits 0 — an answer, not an error.
 
 ```
 senso industries brand [options] <industry> <brandName>
@@ -2609,14 +2682,14 @@ senso industries brand [options] <industry> <brandName>
 
 | Option | Description | Default |
 |---|---|---|
-| `--from <date>` | Start of the window, YYYY-MM-DD (default: 30 days ago) |  |
-| `--to <date>` | End of the window, YYYY-MM-DD (default: today) |  |
-| `--models <list>` | Comma-separated model filter |  |
-| `--location <code>` | 2-letter location code (e.g. US) |  |
+| `--from <date>` | Start of the window, YYYY-MM-DD and inclusive (default: 30 days ago). NOT an RFC 3339 instant — `senso evals` takes those |  |
+| `--to <date>` | End of the window, YYYY-MM-DD and inclusive (default: today, UTC). The span may not exceed 90 days |  |
+| `--models <list>` | Comma-separated model ids to keep: gpt-4.1, chatgpt, perplexity, aioverview, gemini, linkup, claude-sonnet-4-6, grok. Omit for every model. `senso analytics filters --output json \| jq -r '.data.models[].id'` lists the ids that have data. |  |
+| `--location <code>` | 2-letter country code, e.g. US. Omit for every location the industry runs in |  |
 
 ### senso industries brand-by-id
 
-Look up a brand in an industry by its stable `brand_id`, as returned by `industries brands` or `industries brand`. Same payload as `brand`, without the fuzzy name match.
+The repeatable form of `industries brand`: the same payload addressed by the stable brand_id, with no fuzzy match and no registry write.
 
 ```
 senso industries brand-by-id [options] <industry> <brandId>
@@ -2624,14 +2697,14 @@ senso industries brand-by-id [options] <industry> <brandId>
 
 | Option | Description | Default |
 |---|---|---|
-| `--from <date>` | Start of the window, YYYY-MM-DD (default: 30 days ago) |  |
-| `--to <date>` | End of the window, YYYY-MM-DD (default: today) |  |
-| `--models <list>` | Comma-separated model filter |  |
-| `--location <code>` | 2-letter location code (e.g. US) |  |
+| `--from <date>` | Start of the window, YYYY-MM-DD and inclusive (default: 30 days ago). NOT an RFC 3339 instant — `senso evals` takes those |  |
+| `--to <date>` | End of the window, YYYY-MM-DD and inclusive (default: today, UTC). The span may not exceed 90 days |  |
+| `--models <list>` | Comma-separated model ids to keep: gpt-4.1, chatgpt, perplexity, aioverview, gemini, linkup, claude-sonnet-4-6, grok. Omit for every model. `senso analytics filters --output json \| jq -r '.data.models[].id'` lists the ids that have data. |  |
+| `--location <code>` | 2-letter country code, e.g. US. Omit for every location the industry runs in |  |
 
 ### senso industries domain
 
-How often a domain was cited in an industry's answers over the window. A domain that was never cited comes back as `cited: false` rather than a 404. Pass `--url` to look up a full URL instead; the <domain> argument is still required, because the API needs it in the path.
+How often one domain — or one URL — was cited in an industry's AI answers over the window, and which brands were named alongside it. A domain that was never cited comes back as cited=false and exits 0: an answer, not an error.
 
 ```
 senso industries domain [options] <industry> <domain>
@@ -2639,15 +2712,15 @@ senso industries domain [options] <industry> <domain>
 
 | Option | Description | Default |
 |---|---|---|
-| `--from <date>` | Start of the window, YYYY-MM-DD (default: 30 days ago) |  |
-| `--to <date>` | End of the window, YYYY-MM-DD (default: today) |  |
-| `--models <list>` | Comma-separated model filter |  |
-| `--location <code>` | 2-letter location code (e.g. US) |  |
-| `--url <url>` | Look up this full URL instead of the bare domain |  |
+| `--from <date>` | Start of the window, YYYY-MM-DD and inclusive (default: 30 days ago). NOT an RFC 3339 instant — `senso evals` takes those |  |
+| `--to <date>` | End of the window, YYYY-MM-DD and inclusive (default: today, UTC). The span may not exceed 90 days |  |
+| `--models <list>` | Comma-separated model ids to keep: gpt-4.1, chatgpt, perplexity, aioverview, gemini, linkup, claude-sonnet-4-6, grok. Omit for every model. `senso analytics filters --output json \| jq -r '.data.models[].id'` lists the ids that have data. |  |
+| `--location <code>` | 2-letter country code, e.g. US. Omit for every location the industry runs in |  |
+| `--url <url>` | Look up this full URL INSTEAD of <domain>. It replaces the argument entirely; <domain> is still required because the API path needs a segment, but its value is discarded |  |
 
 ### senso industries import-prompts
 
-Copy prompts from your organization's own industry into your organization, and start importing the run history already collected for them so their analytics open with data rather than an empty chart. Only your own industry is accepted — any other is a 403. Prompts you already hold are skipped, so re-running is safe. This ACTIVATES the organization and starts its scheduled runs, including for prompts already saved but not yet running. Follow the returned history_import.import_id with `senso history-imports get`. Requires the GEO product.
+Copy prompts from YOUR OWN industry into your organization and start importing the run history already collected for them. THIS ACTIVATES THE ORGANIZATION: scheduled runs start, for these prompts and for any prompt already saved but not yet running, and an organization with no models, schedule or locations of its own has defaults written for it. There is no dry run. Only your own industry is accepted — any other is a 403. Prompts whose text you already hold are skipped, so re-running is safe.
 
 ```
 senso industries import-prompts [options] <industry>
@@ -2655,11 +2728,11 @@ senso industries import-prompts [options] <industry>
 
 | Option | Description | Default |
 |---|---|---|
-| `--prompt-ids <ids>` | Comma-separated industry prompt ids, 1-100, no duplicates (from `senso industries prompts`) |  |
+| `--prompt-ids <ids>` | Comma-separated INDUSTRY prompt ids, 1-100, no duplicates — the `id` values of `senso industries prompts <industry>`, not geo_question_ids |  |
 
 ## senso partner
 
-Partner-network commands. REQUIRES A PARTNER API KEY: every command here reads a /partner/* endpoint, which rejects the organization key stored by `senso login`. For the same industry data under your own key, use `senso industries`; for metrics about your own organization, use `senso analytics`.
+Partner-network commands. REQUIRES A PARTNER API KEY: every command here reads a /partner/* endpoint, and the organization key stored by `senso login` gets HTTP 403 “Partner credentials required” from the partner auth middleware — the key is valid and its scope is wrong, so running `senso login` again will not help. Pass a partner key per command with `--api-key <partner-key>` or SENSO_API_KEY; the CLI never stores one. Under an organization key instead: `partner industries list` → `senso industries list`, `partner industries brand` → `senso industries brand`, `partner industries domain` → `senso industries domain`, and the brand leaderboard is `senso industries brands`, which has no partner equivalent here. `partner industries summary`, `partner industries prompt-metrics` and `partner glossary` have no organization-key equivalent. For metrics about your own organization, use `senso analytics`.
 
 ```
 senso partner [options] [command]
@@ -2667,7 +2740,7 @@ senso partner [options] [command]
 
 ### senso partner industries
 
-Industry-level competitive intelligence across a partner network — brand share-of-voice, domain citations, and per-prompt metrics. The <industry> argument accepts either a UUID or a name (e.g. "Automotive"). Requires a partner API key.
+Industry-level competitive intelligence for a partner — share-of-voice, domain citations and per-prompt metrics. Requires a partner API key. `list` returns the industries this partner OWNS plus the public ones it SUBSCRIBES to; the reads are gated only on the industry existing, so an industry_id obtained elsewhere also works even though `list` does not show it. The <industry> argument takes a UUID or a name (e.g. "Automotive"), and a name takes the first search match. There is no brand-leaderboard command here: that is `senso industries brands`, under an organization key.
 
 ```
 senso partner industries [options] [command]
@@ -2675,7 +2748,7 @@ senso partner industries [options] [command]
 
 ### senso partner industries list
 
-List industries visible to the partner. Use --search to filter by name.
+List the industries this partner key can act on: the industries the partner owns, plus the public industries it subscribes to.
 
 ```
 senso partner industries list [options]
@@ -2683,11 +2756,13 @@ senso partner industries list [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--search <q>` | Filter industries by name |  |
+| `--search <q>` | Case-insensitive filter by industry name |  |
+| `--limit <n>` | Page size, 1-100. The API defaults to 10 and silently ignores a value it cannot use, so pass this whenever you want more than 10 |  |
+| `--offset <n>` | Industries to skip (default 0) |  |
 
 ### senso partner industries summary
 
-One-call, slide-ready overview of an industry: brand counts, share-of-voice, and citation totals over a time window.
+One-call overview of an industry: how many answers were analyzed, the single most-mentioned brand, and the citation split between official brand domains and everything else.
 
 ```
 senso partner industries summary [options] <industry>
@@ -2695,14 +2770,14 @@ senso partner industries summary [options] <industry>
 
 | Option | Description | Default |
 |---|---|---|
-| `--from <date>` | Start date (YYYY-MM-DD) |  |
-| `--to <date>` | End date (YYYY-MM-DD) |  |
-| `--location <code>` | 2-letter location code (e.g. US) |  |
-| `--models <list>` | Comma-separated model filter |  |
+| `--from <date>` | Start of the window, YYYY-MM-DD and inclusive (default: 30 days ago). NOT an RFC 3339 instant — `senso evals` takes those |  |
+| `--to <date>` | End of the window, YYYY-MM-DD and inclusive (default: today, UTC). The span may not exceed 90 days |  |
+| `--models <list>` | Comma-separated model ids to keep: gpt-4.1, chatgpt, perplexity, aioverview, gemini, linkup, claude-sonnet-4-6, grok. Omit for every model. `senso analytics filters --output json \| jq -r '.data.models[].id'` lists the ids that have data. |  |
+| `--location <code>` | 2-letter country code, e.g. US. Omit for every location the industry runs in |  |
 
 ### senso partner industries brand
 
-Everything about one brand within an industry, merged across surface-form spellings. Returns mentioned=false when the brand is never named.
+Everything about one brand within an industry, with its spelling variants merged before any metric is computed. The match is FUZZY: read resolved.matched_on and resolved.match_confidence before trusting the numbers. A brand that was never named comes back as mentioned=false and exits 0 — an answer, not an error.
 
 ```
 senso partner industries brand [options] <industry> <brandName>
@@ -2710,29 +2785,30 @@ senso partner industries brand [options] <industry> <brandName>
 
 | Option | Description | Default |
 |---|---|---|
-| `--from <date>` | Start date (YYYY-MM-DD) |  |
-| `--to <date>` | End date (YYYY-MM-DD) |  |
-| `--location <code>` | 2-letter location code (e.g. US) |  |
-| `--models <list>` | Comma-separated model filter |  |
+| `--from <date>` | Start of the window, YYYY-MM-DD and inclusive (default: 30 days ago). NOT an RFC 3339 instant — `senso evals` takes those |  |
+| `--to <date>` | End of the window, YYYY-MM-DD and inclusive (default: today, UTC). The span may not exceed 90 days |  |
+| `--models <list>` | Comma-separated model ids to keep: gpt-4.1, chatgpt, perplexity, aioverview, gemini, linkup, claude-sonnet-4-6, grok. Omit for every model. `senso analytics filters --output json \| jq -r '.data.models[].id'` lists the ids that have data. |  |
+| `--location <code>` | 2-letter country code, e.g. US. Omit for every location the industry runs in |  |
 
 ### senso partner industries domain
 
-Direct domain/URL citation lookup within an industry. Returns cited=false when the domain is never cited.
+How often one domain — or one URL — was cited in an industry's AI answers over the window, and which brands were named alongside it. A domain that was never cited comes back as cited=false and exits 0.
 
 ```
-senso partner industries domain [options] <industry> <domainOrUrl>
+senso partner industries domain [options] <industry> <domain>
 ```
 
 | Option | Description | Default |
 |---|---|---|
-| `--from <date>` | Start date (YYYY-MM-DD) |  |
-| `--to <date>` | End date (YYYY-MM-DD) |  |
-| `--location <code>` | 2-letter location code (e.g. US) |  |
-| `--models <list>` | Comma-separated model filter |  |
+| `--from <date>` | Start of the window, YYYY-MM-DD and inclusive (default: 30 days ago). NOT an RFC 3339 instant — `senso evals` takes those |  |
+| `--to <date>` | End of the window, YYYY-MM-DD and inclusive (default: today, UTC). The span may not exceed 90 days |  |
+| `--models <list>` | Comma-separated model ids to keep: gpt-4.1, chatgpt, perplexity, aioverview, gemini, linkup, claude-sonnet-4-6, grok. Omit for every model. `senso analytics filters --output json \| jq -r '.data.models[].id'` lists the ids that have data. |  |
+| `--location <code>` | 2-letter country code, e.g. US. Omit for every location the industry runs in |  |
+| `--url <url>` | Look up this full URL INSTEAD of <domain>. It replaces the argument entirely; <domain> is still required because the API path needs a segment, but its value is discarded |  |
 
 ### senso partner industries prompt-metrics
 
-Pure-industry per-prompt metrics (no single-org overlay) — how each tracked prompt performs across the industry.
+Per-prompt metrics across a whole industry, with no single-organization overlay: for each tracked prompt, how every model answered it and the brands most named in those answers.
 
 ```
 senso partner industries prompt-metrics [options] <industry>
@@ -2740,16 +2816,16 @@ senso partner industries prompt-metrics [options] <industry>
 
 | Option | Description | Default |
 |---|---|---|
-| `--from <date>` | Start date (YYYY-MM-DD) |  |
-| `--to <date>` | End date (YYYY-MM-DD) |  |
-| `--location <code>` | 2-letter location code (e.g. US) |  |
-| `--models <list>` | Comma-separated model filter |  |
-| `--limit <n>` | Maximum prompts to return |  |
-| `--offset <n>` | Number of prompts to skip (for pagination) |  |
+| `--from <date>` | Start of the window, YYYY-MM-DD and inclusive (default: 30 days ago). NOT an RFC 3339 instant — `senso evals` takes those |  |
+| `--to <date>` | End of the window, YYYY-MM-DD and inclusive (default: today, UTC). The span may not exceed 90 days |  |
+| `--models <list>` | Comma-separated model ids to keep: gpt-4.1, chatgpt, perplexity, aioverview, gemini, linkup, claude-sonnet-4-6, grok. Omit for every model. `senso analytics filters --output json \| jq -r '.data.models[].id'` lists the ids that have data. |  |
+| `--location <code>` | 2-letter country code, e.g. US. Omit for every location the industry runs in |  |
+| `--limit <n>` | Page size, 1-100 (the API defaults to 100) |  |
+| `--offset <n>` | Prompts to skip (default 0) |  |
 
 ### senso partner glossary
 
-Canonical metric glossary — the citable definition of every competitive-intelligence metric returned by these endpoints.
+The canonical, citable definition of every competitive-intelligence metric these endpoints return — what it measures, what it divides by, and the way it is most often misread. Static content: it does not depend on your data.
 
 ```
 senso partner glossary [options]
@@ -2757,7 +2833,7 @@ senso partner glossary [options]
 
 ## senso update
 
-Update CLI to the latest version
+Update this CLI to the newest @senso-ai/cli published on npm. Local: asks the npm registry, then runs `npm install -g`. Nothing is sent to the Senso API.
 
 ```
 senso update [options]
@@ -2765,7 +2841,7 @@ senso update [options]
 
 ## senso uninstall
 
-Remove this CLI, the Senso agent skills it installed, and the stored API key. Asks first unless --yes is passed.
+Remove everything this CLI put on the machine: the Senso agent skills, the stored API key, then the npm package itself — in that order, so a failure leaves you the CLI to retry with. Local: nothing is sent to the Senso API. Asks for confirmation on a terminal; without one, --yes is required.
 
 ```
 senso uninstall [options]
@@ -2773,8 +2849,8 @@ senso uninstall [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `-y, --yes` | Skip the confirmation prompt (required when there is no terminal) |  |
-| `--dry-run` | Report what would be removed without removing anything |  |
-| `--keep-skills` | Leave the installed agent skills alone |  |
-| `--keep-config` | Leave the stored API key and organization info alone |  |
+| `-y, --yes` | Confirm without a prompt. REQUIRED when there is no terminal (CI, an agent): without it the command exits 2 rather than waiting on a keypress that never comes |  |
+| `--dry-run` | Print the plan as a payload and remove nothing. Needs no --yes |  |
+| `--keep-skills` | Leave the installed agent skills alone (step 1 is skipped) |  |
+| `--keep-config` | Leave the stored API key and organization info alone (step 2 is skipped) |  |
 

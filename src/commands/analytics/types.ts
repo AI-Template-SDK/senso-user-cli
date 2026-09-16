@@ -167,6 +167,13 @@ export interface PromptPerformanceItem {
   run_count: number;
   answered_count: number;
   mentioned_count: number;
+  // The SoV numerator and its two denominators, per prompt. Present in
+  // dto.PromptPerformanceItem and previously missing from this mirror, which
+  // made an honest fixture fail to typecheck.
+  mention_total: number;
+  tracked_mention_total: number;
+  brand_mention_total: number;
+  rank_sum: number;
   cited_run_count: number;
   primary_cited_run_count: number;
   sentiment: SentimentCounts;

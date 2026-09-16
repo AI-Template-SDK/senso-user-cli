@@ -21,11 +21,15 @@
 import { describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import { server } from "../setup.js";
-import { apiUrl, runCli } from "../helpers.js";
+import { apiUrl, envelope, runCli } from "../helpers.js";
+
+/** dto.WebsiteImportRunResponse. run_id is a uuid.UUID, not a slug. */
+const RUN_ID = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
 
 const RUN = {
-  run_id: "run-1",
+  run_id: RUN_ID,
   status: "running",
+  started_at: "2026-09-13T10:00:05Z",
   source_url: "https://acme.example",
   pages_fetched: 0,
   pages_ingested: 0,
@@ -132,7 +136,19 @@ describe("senso website-import start, on success", () => {
 
     expect(res.exitCode).toBe(0);
     expect(calls()).toBe(3);
-    expect(JSON.parse(res.stdout)).toMatchObject({ run_id: "run-1", status: "completed" });
+    expect(res.data()).toMatchObject({ run_id: RUN_ID, status: "completed" });
+  });
+
+  it("points a JSON caller at what the finished import produced", async () => {
+    serveTrigger(RUN);
+    serveStatusSequence([{ current: null, latest_completed: DONE }]);
+
+    const res = await runCli(["website-import", "start", "--output", "json"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(envelope(res).next).toContainEqual(
+      expect.objectContaining({ command: "senso brand-kit get" }),
+    );
   });
 
   it("treats a skipped brand kit as a success, not a failure", async () => {
@@ -162,7 +178,12 @@ describe("senso website-import start, on success", () => {
 
     expect(res.exitCode).toBe(0);
     expect(calls()).toBe(0);
-    expect(JSON.parse(res.stdout)).toMatchObject({ run_id: "run-1", status: "running" });
+    expect(res.data()).toMatchObject({ run_id: RUN_ID, status: "running" });
+    // The CLI returned before the work finished, so the poll command travels in
+    // the envelope — stderr is silent under --output json.
+    expect(envelope(res).next).toContainEqual(
+      expect.objectContaining({ command: "senso website-import status" }),
+    );
   });
 });
 
@@ -173,7 +194,7 @@ describe("senso website-import status", () => {
     const res = await runCli(["website-import", "status", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(JSON.parse(res.stdout)).toMatchObject({
+    expect(res.data()).toMatchObject({
       latest_completed: { status: "failed", error_code: "HOMEPAGE_FETCH_FAILED" },
     });
   });

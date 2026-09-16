@@ -57,11 +57,43 @@ or an empty file, never a sentence you have to strip.
 
 **Formats.** Every command takes `--output`:
 
-| Format  | For                | Notes                                           |
-| ------- | ------------------ | ----------------------------------------------- |
-| `json`  | scripts and agents | The API payload, unmodified. Implies `--quiet`. |
-| `table` | reading a list     | Aligned columns; long cells truncated.          |
-| `plain` | reading one thing  | Complete and untruncated. The default.          |
+| Format  | For                | Notes                                                       |
+| ------- | ------------------ | ----------------------------------------------------------- |
+| `json`  | scripts and agents | One envelope; `data` is the API payload. Implies `--quiet`. |
+| `table` | reading a list     | Aligned columns; long cells truncated.                      |
+| `plain` | reading one thing  | Complete and untruncated. The default.                      |
+
+**One envelope, every time.** `--output json` writes this to stdout:
+
+```json
+{
+  "ok": true,
+  "command": "kb my-files",
+  "data": { "nodes": [], "total": 120, "limit": 50, "offset": 0 },
+  "page": {
+    "offset": 0,
+    "limit": 50,
+    "returned": 50,
+    "total": 120,
+    "has_more": true,
+    "next": "senso kb my-files --status complete --offset 50"
+  },
+  "next": [
+    { "why": "Read one node, including its ingestion state", "command": "senso kb get <id>" }
+  ],
+  "warnings": ["2 files were skipped as duplicates"]
+}
+```
+
+`data` is the API's own shape, unmodified — never renamed, never reshaped.
+`page`, `next` and `warnings` appear only when they apply.
+
+`next` is the part worth knowing about. `--output json` implies `--quiet`, so
+anything the CLI writes to stderr is invisible to the caller that asked for
+JSON. Every hint it has — what to poll, how to undo, which command reads the
+thing it just created — is in `next`, with the real ids already substituted.
+`page.next` is likewise a complete command carrying the filters you passed, so
+paging does not silently change the query.
 
 **Exit codes.** Branch on these rather than on message text.
 
@@ -75,21 +107,36 @@ or an empty file, never a sentence you have to strip.
 | 5    | Network failure or timeout     | Retry                |
 
 **Errors are structured too.** Under `--output json`, a failure writes JSON to
-stderr and leaves stdout empty:
+stderr and leaves stdout empty — including the usage errors Commander raises,
+such as an unknown flag or a group invoked with no subcommand:
 
 ```json
 {
+  "ok": false,
+  "command": "kb my-files",
   "error": {
-    "code": "unauthorized",
-    "message": "Authentication failed: the API key was rejected.",
-    "status": 401,
-    "hint": "Run `senso login` to store a new key, or check SENSO_API_KEY."
+    "code": "usage",
+    "message": "Invalid --status: \"done\".",
+    "field": "--status",
+    "received": "done",
+    "allowed": ["pending", "processing", "complete", "failed"],
+    "hint": "Documents still ingesting: senso kb my-files --status processing",
+    "request": { "method": "GET", "path": "/org/kb/nodes" }
   }
 }
 ```
 
 `error.code` is stable. Messages may be reworded; codes are part of the
-interface.
+interface. `field`, `received` and `allowed` are what let a caller correct its
+own command line without parsing a sentence; `details` carries whatever
+machine-readable remainder the API sent, such as `existing_content_id` on an
+upload conflict.
+
+**Errors name the thing that failed.** A 404 reads "KB node 3f2a… not found in
+organization acme" with a hint naming the command that lists them, because this
+API has five UUID id spaces that are not interchangeable — `kb_node_id` for the
+knowledge base tree, `content_id` for a stored document, and version, publish
+record and gap ids beside them.
 
 **Environment.**
 
@@ -114,6 +161,8 @@ senso skills install --all
 
 **[Full command reference →](docs/reference/commands.md)** — every command,
 argument and flag, generated from the CLI itself.
+**[Output conventions →](docs/output-conventions.md)** — the contract every
+command follows, and what a command must do to meet it.
 
 | Group                                                                    | What it does                                                                    |
 | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------- |

@@ -282,8 +282,15 @@ export interface RunResult {
   configDir: string;
   /** The config file inside it. May not exist. */
   configFile: string;
-  /** stdout parsed as JSON. Throws with the raw text if it will not parse. */
+  /** stdout parsed as JSON. The whole envelope, including ok/command/page. */
   json: () => unknown;
+  /**
+   * The envelope's `data`: the payload, with the envelope shape asserted.
+   *
+   * Asserting the shape here rather than reaching for `.data` by hand is what
+   * stops a command that had been left emitting a bare payload from passing.
+   */
+  data: () => unknown;
 }
 
 const tempRoots: string[] = [];
@@ -403,6 +410,13 @@ export async function runSenso(args: string[], opts: RunOptions = {}): Promise<R
         signal,
         configDir,
         configFile: join(configDir, "config.json"),
+        data: (): unknown => {
+          const parsed = JSON.parse(stdoutText) as Record<string, unknown>;
+          if (parsed.ok !== true || typeof parsed.command !== "string" || !("data" in parsed)) {
+            throw new Error(`stdout was not a success envelope:\n${stdoutText || "(empty)"}`);
+          }
+          return parsed.data;
+        },
         json: (): unknown => {
           try {
             return JSON.parse(stdoutText);

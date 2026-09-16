@@ -31,7 +31,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runCli } from "../helpers.js";
+import { runCli, envelope } from "../helpers.js";
 import { UPDATE_CHECK_EXEMPT } from "../../src/program.js";
 import { getConfigDir, getConfigPath, readConfig, writeConfig } from "../../src/lib/config.js";
 
@@ -106,8 +106,12 @@ function shipablesCalls(): ChildCall[] {
   return child.state.calls.filter(({ args }) => args[0] !== "--version");
 }
 
-/** The exact npm command the CLI removes itself with. */
-const NPM_UNINSTALL = "npm uninstall -g @senso-ai/cli";
+/** What the CLI runs. The redirect is how npm's log is captured rather than
+ *  inherited, so stdout stays one JSON document under --output json. */
+const NPM_UNINSTALL_RUN = "npm uninstall -g @senso-ai/cli 2>&1";
+
+/** What a person is told to type. The redirect is ours, not theirs. */
+const NPM_UNINSTALL_BY_HAND = "npm uninstall -g @senso-ai/cli";
 
 /** A home directory for shipables' record, fresh per test. */
 let home: string;
@@ -282,7 +286,7 @@ describe("uninstall, when npm will not go", () => {
 
     expect(res.exitCode).toBe(1);
     expect(res.stderr).toContain("Removing the CLI failed");
-    expect(res.stderr).toContain(NPM_UNINSTALL);
+    expect(res.stderr).toContain(NPM_UNINSTALL_BY_HAND);
     // The earlier steps had already happened, and the message says so.
     expect(res.stderr).toContain("Skills and credentials were removed");
     expect(existsSync(getConfigPath())).toBe(false);
@@ -332,7 +336,9 @@ describe("uninstall --dry-run", () => {
     const res = await runCli(["uninstall", "--dry-run", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual({
+    expect(res.data()).toMatchObject({
+      action: "planned",
+      resource: "installation",
       dryRun: true,
       skills: [{ name: "search", package: "senso-ai/senso-search", scope: "global" }],
       config: { path: getConfigPath(), present: true, apiKeyInEnvironment: false },
@@ -387,7 +393,7 @@ describe("uninstall, in full", () => {
 
     expect(res.exitCode).toBe(0);
     expect(shipablesCalls()).toEqual([]);
-    expect(res.json()).toMatchObject({
+    expect(res.data()).toMatchObject({
       skills: {
         removed: [],
         skipped: [
@@ -434,8 +440,8 @@ describe("uninstall, in full", () => {
     await runCli(["uninstall", "--yes"]);
 
     expect(child.execSync).toHaveBeenCalledTimes(1);
-    expect(child.execSync.mock.calls[0]?.[0]).toBe(NPM_UNINSTALL);
-    expect(child.execSync.mock.calls[0]?.[1]).toMatchObject({ stdio: "inherit" });
+    expect(child.execSync.mock.calls[0]?.[0]).toBe(NPM_UNINSTALL_RUN);
+    expect(child.execSync.mock.calls[0]?.[1]).toMatchObject({ stdio: ["ignore", "pipe", "pipe"] });
     expect(configWasGoneAtNpm).toBe(true);
     expect(skillsWereGoneAtNpm).toBe(true);
   });
@@ -454,7 +460,9 @@ describe("uninstall, in full", () => {
     const res = await runCli(["uninstall", "--yes", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.json()).toEqual({
+    expect(res.data()).toMatchObject({
+      action: "removed",
+      resource: "installation",
       skills: {
         removed: [{ name: "search", package: "senso-ai/senso-search", scope: "global" }],
         skipped: [],
@@ -474,8 +482,11 @@ describe("uninstall, in full", () => {
     const res = await runCli(["uninstall", "--yes", "--output", "json"]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.stderr).toContain("SENSO_API_KEY is set");
-    expect(res.json()).toMatchObject({ config: { apiKeyInEnvironment: true } });
+    // Under --output json stderr is silent, so the notice travels in the
+    // envelope. A warning written only to stderr would reach nobody here.
+    const env = envelope<{ config: { apiKeyInEnvironment: boolean } }>(res);
+    expect(env.warnings?.join(" ")).toContain("SENSO_API_KEY");
+    expect(env.data).toMatchObject({ config: { apiKeyInEnvironment: true } });
   });
 });
 
@@ -487,7 +498,7 @@ describe("uninstall --keep-skills and --keep-config", () => {
 
     expect(res.exitCode).toBe(0);
     expect(child.state.calls).toEqual([]);
-    expect(res.json()).toMatchObject({ skills: { removed: [] }, cli: { removed: true } });
+    expect(res.data()).toMatchObject({ skills: { removed: [] }, cli: { removed: true } });
   });
 
   it("--keep-config leaves the stored key where it is", async () => {
@@ -496,7 +507,7 @@ describe("uninstall --keep-skills and --keep-config", () => {
     expect(res.exitCode).toBe(0);
     expect(existsSync(getConfigPath())).toBe(true);
     expect(readConfig().apiKey).toBe("tgr_stored");
-    expect(res.json()).toMatchObject({ config: { removed: false }, cli: { removed: true } });
+    expect(res.data()).toMatchObject({ config: { removed: false }, cli: { removed: true } });
   });
 });
 

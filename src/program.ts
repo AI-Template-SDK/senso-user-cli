@@ -12,7 +12,7 @@ import { Command } from "commander";
 import { version } from "./lib/version.js";
 import { miniBanner } from "./utils/branding.js";
 import { checkForUpdate } from "./utils/updater.js";
-import { EXIT, ExitSignal } from "./lib/errors.js";
+import { captureCommanderStderr, installExitOverride } from "./lib/commander-error.js";
 
 // Command registrations
 import { registerAuthCommands } from "./commands/auth.js";
@@ -89,12 +89,34 @@ Environment:
 
 Output:
   stdout carries the payload; diagnostics, progress and errors go to stderr.
-  With --output json, stdout is always parseable JSON and errors are JSON too.
+
+  --output json writes one envelope to stdout, every time:
+    { "ok": true, "command": "kb my-files", "data": <the API payload>,
+      "page": { "offset": 0, "returned": 50, "total": 120, "has_more": true,
+                "next": "senso kb my-files --offset 50" },
+      "next": [ { "why": "...", "command": "senso kb get <id>" } ],
+      "warnings": [ "..." ] }
+  page, next and warnings appear only when they apply. "data" is the API's own
+  shape, unmodified.
+
+  A failure writes to stderr and leaves stdout empty:
+    { "ok": false, "command": "kb get",
+      "error": { "code": "not_found", "message": "...", "status": 404,
+                 "field": "--status", "received": "nope", "allowed": [...],
+                 "hint": "...", "details": {...},
+                 "request": { "method": "GET", "path": "/org/kb/nodes/{id}" } } }
+  error.code is stable; messages may be reworded.
 
 Docs: https://docs.senso.ai`;
 
 export function createProgram(): Command {
   const program = new Command();
+
+  // Before any subcommand exists: Commander copies the output configuration
+  // into each command as it is created, and every usage failure in the tree
+  // has to be captured rather than printed so it can be re-reported in the
+  // caller's chosen format. See lib/commander-error.ts.
+  captureCommanderStderr(program);
 
   program
     .name("senso")
@@ -106,16 +128,6 @@ export function createProgram(): Command {
     .option("--quiet", "Suppress non-essential output")
     .option("--no-update-check", "Skip version check")
     .addHelpText("after", HELP_EPILOG)
-    // Commander exits 1 by default for a usage error. 2 is the long-standing
-    // convention for "you typed it wrong", and it is what lets a caller tell a
-    // bad flag from a rejected request. See lib/errors.ts.
-    //
-    // Thrown rather than exited so that src/cli.ts remains the only file that
-    // ends the process: `--help` and `--version` have already printed by the
-    // time this runs and must exit 0 silently, which is what ExitSignal means.
-    .exitOverride((err) => {
-      throw new ExitSignal(err.exitCode === 0 ? EXIT.OK : EXIT.USAGE);
-    })
     // preAction runs once per invocation, after Commander has parsed the global
     // options and resolved which command is running — which is why both of these
     // live here rather than in the bin entry. Commander exits on `--version` and
@@ -179,6 +191,13 @@ export function createProgram(): Command {
   registerPartnerCommands(program);
   registerUpdateCommand(program);
   registerUninstallCommand(program);
+
+  // Last, because it has to reach every command that was just registered.
+  // Commander exits 1 by default for a usage error; 2 is the long-standing
+  // convention for "you typed it wrong", and it is what lets a caller tell a
+  // bad flag from a rejected request. Thrown rather than exited so that
+  // src/cli.ts remains the only file that ends the process.
+  installExitOverride(program);
 
   return program;
 }

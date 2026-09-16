@@ -4,15 +4,17 @@
  * Everything else throws. lib/run-action.ts catches what a command throws,
  * reports it on stderr in the requested format, and sets `process.exitCode`;
  * this file exists to build the program, run it, and catch the failures that
- * happen outside an action — a bad global flag, or a bug.
+ * happen outside an action — a bad global flag, a mistyped command, or a bug.
  */
 
 import { createProgram } from "./program.js";
 import { ExitSignal } from "./lib/errors.js";
-import { reportError } from "./lib/run-action.js";
+import { reportError, requestedFormat } from "./lib/run-action.js";
+
+const program = createProgram();
 
 async function main(): Promise<void> {
-  await createProgram().parseAsync(process.argv);
+  await program.parseAsync(process.argv);
 }
 
 main().catch((err: unknown) => {
@@ -22,9 +24,12 @@ main().catch((err: unknown) => {
     process.exit(err.exitCode);
   }
 
-  // Nothing above this point has a resolved context, so report in the default
-  // format. An error thrown here is either a usage failure Commander re-threw
-  // or a genuine bug, and both want a plain sentence on stderr.
-  const cliError = reportError(err, { format: "plain", debug: process.env.SENSO_DEBUG === "1" });
+  // An error thrown here is either a usage failure Commander re-threw or a
+  // genuine bug. Both are reported through the same path as every other
+  // failure, in whichever format the caller asked for.
+  const cliError = reportError(err, {
+    format: requestedFormat(program, process.argv.slice(2)),
+    debug: process.env.SENSO_DEBUG === "1",
+  });
   process.exit(cliError.exitCode);
 });

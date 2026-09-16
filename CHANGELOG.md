@@ -9,6 +9,107 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
+### Changed — BREAKING
+
+- **`--output json` now writes one envelope instead of a bare payload.** Every
+  command emits `{ "ok": true, "command": "…", "data": <the API payload>,
+"page"?, "next"?, "warnings"? }`. `data` is the API's own shape, unmodified,
+  so every existing `jq` path moves under `.data` — `senso search … | jq -r
+.answer` becomes `jq -r .data.answer`. The seven official agent skills have
+  been updated in the same release.
+
+  The reason is `next`. `--output json` implies `--quiet`, so everything this
+  CLI wrote to stderr — what to poll, how to undo a decision, which command
+  reads the thing you just created, where you are in a list — was invisible to
+  the only audience that asked for JSON. `senso gaps get` computed an exact
+  list of next commands and threw it away. That guidance is now `next`, an
+  array of `{ why, command }` with the real ids already substituted, and
+  `page.next` is a complete next-page command carrying the filters you passed.
+
+- **The JSON error object gained fields and lost its silence.** A failure now
+  writes `{ "ok": false, "command": "…", "error": { code, message, status?,
+field?, received?, allowed?, hint?, details?, request? } }`. `error.code` is
+  unchanged and still stable; `validation` is new, for the API's own 400 and
+  422 field errors.
+
+- **Commander's usage errors honor `--output`.** An unknown option, a
+  misspelled command, a missing argument and a group invoked with no
+  subcommand are all reported through the error contract, in the requested
+  format, instead of printing a line of English whatever `--output` said. The
+  README promised this; it is now true.
+
+- **`senso credits` runs `credits balance`.** The bare group printed help and
+  exited 2, and four of the published agent skills instruct it verbatim.
+
+### Fixed
+
+- **`senso kb get`, `create-folder`, `rename` and `move` print the node again.**
+  Every node carries a `tags` array, and the renderer reads an array under a
+  known list key as the payload — so these four commands rendered the node's
+  tags and dropped its `kb_node_id`, `type` and the whole `content` block. On a
+  node with no tags, which is every node the moment it is created, `plain` and
+  `table` printed "No tags found." for a node that plainly existed, and
+  `kb create-folder` never showed the id it had just made. `--output json` was
+  unaffected throughout, which is why it went unnoticed.
+
+- **Errors name the thing that failed.** Every 404 used to read "Not found."
+  with the API's message discarded, across five UUID id spaces that are not
+  interchangeable. A request now carries what it addresses, so the message
+  reads "KB node 3f2a… not found in organization acme" with a hint naming the
+  command that lists them. The 409 body is kept too — `existing_content_id`,
+  which the ingest skill tells agents to read, used to be dropped on the floor.
+
+- **A deployment refusal is no longer answered with "retry shortly".** 501
+  "History imports are not available for this deployment" and 503 "Evals are
+  not enabled in this environment" pass through verbatim; retrying them can
+  never work.
+
+- **A 403 says which of four things is missing**: a permission, a product
+  entitlement, a knowledge base node grant, or a partner key. The old message
+  named only the first and was actively misleading for the other three.
+
+- **Columns that named fields the API never returns.** `tags list`,
+  `competitors list`, `tracked-sources list` and the three `tags` subgroups all
+  asked for `<thing>_id` where the DTO returns `id`, so the first column of
+  every row — the id you need for the next command — was blank. The test
+  fixtures had invented the CLI's spelling, so the suite stayed green;
+  `make api-fields` and a policy test now check column names against the API's
+  own DTOs, and `--output table` warns at runtime when a declared column is
+  absent from every row.
+
+- **`tags list --output table` no longer warns about columns it did not ask
+  for.** The count fields are returned only under `--counts`, so declaring them
+  unconditionally made every plain listing report that the API had withheld
+  `prompt_count` and `content_count` — a false alarm in front of a correct
+  table. The columns now follow the flag.
+
+- **`competitors batch-add` reports what the call did, from the API's own
+  counts.** The response carries `created_count`, `already_present_count`,
+  `skipped_over_cap_count` and `remaining_capacity`; the CLI was inferring
+  created-versus-already-tracked from each row's `created_at`, which made its
+  answer depend on the clock and read a row another command had inserted
+  seconds earlier as new. The timestamps remain as a fallback for a deployment
+  that does not send the counts, and a batch truncated at the 50-competitor
+  organization cap now says how many were discarded and how much room is left.
+
+- **Numeric flags are rejected rather than clamped.** `search --max-results
+999` silently searched with 20 and `--max-results abc` silently searched with 5. Both now exit 2 naming the flag, the value and the accepted range.
+
+- **`plain` no longer stringifies nested data.** A nested object renders as an
+  indented sub-block and an array of objects as numbered sub-blocks, so
+  `content.processing_status` — the whole point of `senso kb get` — is
+  readable instead of buried in a JSON string. A list that travels with a
+  scalar beside it (`sort_by`, `mode`, `window`) renders as a list rather than
+  one long line, and an empty list says "No gaps found." with a note about the
+  filter that hid them.
+
+### Added
+
+- **`docs/output-conventions.md`** — the contract every command follows, and
+  what a command must do to meet it.
+- **`make api-fields`** — regenerates `tests/policy/api-fields.json` from the
+  senso-api DTOs, which the column policy test checks against.
+
 ## [0.17.0] — 2026-09-15
 
 ### Added

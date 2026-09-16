@@ -12,7 +12,7 @@ NPM  := npm
 NPX  := npx --no-install
 
 .DEFAULT_GOAL := help
-.PHONY: help install lint format typecheck security unit e2e coverage build smoke all clean live reference
+.PHONY: help install lint format typecheck security unit e2e coverage build smoke all clean live reference api-fields skill-commands
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -101,6 +101,12 @@ compat: ## Pack the tarball and check the published CLI runs on this Node
 
 reference: ## Regenerate docs/reference/commands.md from the command tree
 	$(NPX) tsx scripts/gen-reference.ts
+
+api-fields: ## Refresh tests/policy/api-fields.json from the senso-api DTOs
+	node scripts/gen-api-fields.mjs
+
+skill-commands: ## Refresh tests/policy/skill-commands.json from the published agent skills
+	node scripts/gen-skill-commands.mjs
 
 all: lint typecheck security unit e2e build smoke ## The full local pipeline (what CI runs)
 	@echo ""

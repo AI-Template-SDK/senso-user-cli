@@ -13,7 +13,14 @@ import { apiRequest } from "../../lib/api-client.js";
 import { emit } from "../../lib/output.js";
 import { runAction, type Ctx } from "../../lib/run-action.js";
 import { parseEnumFlag } from "../../lib/enum-arg.js";
-import { addPagingOptions, addWindowOptions, windowParams, type WindowFilters } from "./filters.js";
+import { apiExits, describeCommand } from "../../lib/help.js";
+import {
+  addPagingOptions,
+  addWindowOptions,
+  pagingParams,
+  windowParams,
+  type WindowFilters,
+} from "./filters.js";
 import {
   count,
   emitContext,
@@ -21,6 +28,7 @@ import {
   position,
   qualityLine,
   rate,
+  requireBlocks,
   windowLine,
 } from "./render.js";
 import type { AnalyticsWindow, CitedDomainItem, DataQuality, Denominators } from "./types.js";
@@ -33,19 +41,46 @@ const SORT_VALUES = ["citations", "coverage"] as const;
 
 export function addDomainsCommand(analytics: Command, program: Command): void {
   // ── domains ──────────────────────────────────────────────────────────────
-  addPagingOptions(
-    addWindowOptions(
-      analytics
-        .command("domains")
-        .description(
-          "Every domain the models cited, ranked. Citation Coverage is this domain's cited answers ÷ D; Citation Share is its citation instances ÷ S. Tiers: primary (Owned) | tracked | secondary (External).",
-        ),
-      { tag: false },
-    )
-      .option("--tier <tier>", "Filter by tier: primary | tracked | secondary")
-      .option("--domain-contains <text>", "Substring filter on the domain")
-      .option("--sort <field>", "Sort by: citations | coverage (default: citations)"),
-    50,
+  describeCommand(
+    addPagingOptions(
+      addWindowOptions(
+        analytics
+          .command("domains")
+          .description(
+            "Every domain the models cited, ranked. Citation Coverage is this domain's cited answers ÷ D; Citation Share is its citation instances ÷ S. Tiers: primary (Owned) | tracked | secondary (External).",
+          ),
+        { tag: false },
+      )
+        .option("--tier <tier>", "Filter by tier: primary | tracked | secondary")
+        .option("--domain-contains <text>", "Substring filter on the domain")
+        .option("--sort <field>", "Sort by: citations | coverage (default: citations)"),
+      50,
+    ),
+    {
+      returns: [
+        "denominators.cited_run_count — D, the answers that cited anything",
+        "denominators.cited_total — S, the citation instances",
+        "domains[].citation_coverage — this domain's cited answers ÷ D, as {value, display} or null when D is zero",
+        "domains[].citation_share — this domain's citation instances ÷ S, as {value, display} or null when S is zero",
+        "domains[].tier — primary | tracked | secondary, the API's value; tier_label is the same thing in product words (Owned | Tracked | External)",
+        "domains[].avg_citation_rank — the average position the domain held in an answer's citation list; null when it was never cited",
+        "domains[].rank_by_citations — global rank over the whole result set, so page two still shows real ranks",
+        "total / limit / offset — the page; `page.next` in the JSON envelope is the runnable next call",
+      ],
+      exitCodes: {
+        ...apiExits,
+        2: "a date that is not YYYY-MM-DD, a window longer than 365 days, an unknown model or tier, or a --limit outside 1-100",
+        3: "no key, the organization lacks the GEO product, or the key lacks read:prompt",
+      },
+      examples: [
+        { comment: "Who the models cite most", command: "senso analytics domains" },
+        {
+          comment: "Only the sources you own",
+          command: "senso analytics domains --tier primary --sort coverage",
+        },
+      ],
+      seeAlso: ["senso analytics pages", "senso analytics citations", "senso analytics glossary"],
+    },
   ).action(
     runAction(
       program,
@@ -75,12 +110,13 @@ export function addDomainsCommand(analytics: Command, program: Command): void {
             tier: parseEnumFlag("--tier", cmdOpts.tier, TIER_VALUES),
             domain_contains: cmdOpts.domainContains,
             sort: parseEnumFlag("--sort", cmdOpts.sort, SORT_VALUES),
-            limit: cmdOpts.limit,
-            offset: cmdOpts.offset,
+            ...pagingParams(cmdOpts),
           },
           apiKey: ctx.apiKey,
           baseUrl: ctx.baseUrl,
         });
+
+        requireBlocks("/org/analytics/citations/domains", { denominators: data.denominators });
 
         const domains = data.domains ?? [];
         const context = [
@@ -114,6 +150,9 @@ export function addDomainsCommand(analytics: Command, program: Command): void {
               "avg_pos",
             ],
           },
+          empty: "cited domains",
+          emptyHint:
+            "No domain was cited in this window. Widen --from/--to, drop --tier, or check `senso analytics filters` for the days that have data.",
           plain: [
             ...context,
             "",
