@@ -257,7 +257,7 @@ describe("history-imports get, when the job completed but copied nothing", () =>
     const res = await runCli(["history-imports", "get", IMPORT_ID, "--output", "json"]);
 
     expect(envelope(res).next).toContainEqual({
-      why: expect.stringContaining("Nothing was copied") as unknown as string,
+      why: expect.stringContaining("Nothing was copied"),
       command: "senso prompts list",
     });
   });
@@ -287,7 +287,7 @@ describe("history-imports get, when the job failed", () => {
     const res = await runCli(["history-imports", "get", IMPORT_ID, "--output", "json"]);
 
     expect(envelope(res).next).toContainEqual({
-      why: expect.stringContaining("Failed is not terminal") as unknown as string,
+      why: expect.stringContaining("Failed is not terminal"),
       command: `senso history-imports get ${IMPORT_ID}`,
     });
   });
@@ -321,7 +321,7 @@ describe("history-imports get, while the job is still running", () => {
     const res = await runCli(["history-imports", "get", IMPORT_ID, "--output", "json"]);
 
     expect(envelope(res).next).toContainEqual({
-      why: expect.stringContaining("historic_runs_imported is above 0") as unknown as string,
+      why: expect.stringContaining("historic_runs_imported is above 0"),
       command: `senso history-imports get ${IMPORT_ID}`,
     });
   });
@@ -352,7 +352,7 @@ describe("history-imports get, on a job that really did copy history", () => {
     const env = envelope(res);
     expect(env.warnings).toBeUndefined();
     expect(env.next).toContainEqual({
-      why: expect.stringContaining("analytics window") as unknown as string,
+      why: expect.stringContaining("analytics window"),
       command: "senso analytics summary",
     });
   });

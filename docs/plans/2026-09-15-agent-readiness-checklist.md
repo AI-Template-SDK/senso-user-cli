@@ -1973,68 +1973,68 @@ has to change for the CLI to be able to say the right thing. Check items off in 
 
 **`senso partner`** · group
 
-- [ ] Say exactly what happens: 'An organization key returns HTTP 401 Authentication required from the partner auth middleware. Logging in again will not help — `senso login` stores an organization key.'
-- [ ] Say how to pass a partner key: `senso partner ... --api-key <partner-key>` or `SENSO_API_KEY=<partner-key> senso partner ...`, and that it is never stored.
-- [ ] Add the explicit org-key equivalence table to the group help.
-- [ ] Note which two commands have no org-key equivalent (summary, prompt-metrics) and that glossary is partner-only.
-- [ ] State the shared window contract (YYYY-MM-DD, --models allow-list, --location) once here, as for `industries`.
+- [x] Say exactly what happens: 'An organization key returns HTTP 401 Authentication required from the partner auth middleware. Logging in again will not help — `senso login` stores an organization key.'
+- [x] Say how to pass a partner key: `senso partner ... --api-key <partner-key>` or `SENSO_API_KEY=<partner-key> senso partner ...`, and that it is never stored.
+- [x] Add the explicit org-key equivalence table to the group help.
+- [x] Note which two commands have no org-key equivalent (summary, prompt-metrics) and that glossary is partner-only.
+- [x] State the shared window contract (YYYY-MM-DD, --models allow-list, --location) once here, as for `industries`.
 
 **`senso partner industries`** · group
 
-- [ ] Correct the scope sentence: `list` shows what this partner owns or subscribes to; the CI reads accept any industry that exists, so an industry_id from elsewhere will work even though `list` does not show it.
-- [ ] Say the leaderboard is `senso industries brands` (org key) — there is no partner leaderboard command here.
-- [ ] Name the id spaces and state the shared window contract.
+- [x] Correct the scope sentence: `list` shows what this partner owns or subscribes to; the CI reads accept any industry that exists, so an industry_id from elsewhere will work even though `list` does not show it.
+- [x] Say the leaderboard is `senso industries brands` (org key) — there is no partner leaderboard command here.
+- [x] Name the id spaces and state the shared window contract.
 
 **`senso partner glossary`** · 🟠 medium
 
-- [ ] Add `gotcha` to the declared columns, or better, give this command a hand-written plain renderer: metric, then definition, denominator and gotcha as indented lines.
-- [ ] Mirror the glossary under an org-key-reachable command (for example `senso industries glossary`, or a --glossary flag on the CI reads) so the definitions reach the callers who see the numbers. If no org route exists, ship the eight entries in the CLI and serve them locally — they are static content in the API too.
-- [ ] Add Returns / Exit codes / Examples, and list the eight metric keys in the help so an agent can look one up without calling.
-- [ ] Warn on stderr under --output table that definitions are truncated, and suggest plain or json.
+- [x] Add `gotcha` to the declared columns, or better, give this command a hand-written plain renderer: metric, then definition, denominator and gotcha as indented lines.
+- [x] Mirror the glossary under an org-key-reachable command (for example `senso industries glossary`, or a --glossary flag on the CI reads) so the definitions reach the callers who see the numbers. If no org route exists, ship the eight entries in the CLI and serve them locally — they are static content in the API too.
+- [x] Add Returns / Exit codes / Examples, and list the eight metric keys in the help so an agent can look one up without calling.
+- [x] Warn on stderr under --output table that definitions are truncated, and suggest plain or json.
 
 **`senso partner industries brand`** · 🟠 medium
 
-- [ ] Share the hand-written plain renderer with `senso industries brand`.
-- [ ] Add a `partner industries brand-by-id <industry> <brandId>` command wrapping GET /partner/industries/:id/brands-by-id/:brand_id, and point at it from here — the endpoint exists and the CLI does not expose it.
-- [ ] Help: warn that a never-seen brand name is added to the registry on first lookup; explain matched_on / match_confidence / surface_forms.
-- [ ] On mentioned=false, explain on stderr that it is an answer, not an error.
-- [ ] Validate <brandName> (non-empty), --from/--to and --models before the request; exit 2.
-- [ ] State the window default and the 90-day cap in the flag help.
+- [x] Share the hand-written plain renderer with `senso industries brand`.
+- [x] Add a `partner industries brand-by-id <industry> <brandId>` command wrapping GET /partner/industries/:id/brands-by-id/:brand_id, and point at it from here — the endpoint exists and the CLI does not expose it.
+- [x] Help: warn that a never-seen brand name is added to the registry on first lookup; explain matched_on / match_confidence / surface_forms.
+- [x] On mentioned=false, explain on stderr that it is an answer, not an error.
+- [x] Validate <brandName> (non-empty), --from/--to and --models before the request; exit 2.
+- [x] State the window default and the 90-day cap in the flag help.
 
 **`senso partner industries domain`** · 🟠 medium
 
-- [ ] Either add --url (sending ?url=) as in `senso industries domain`, or rename the argument to <domain> and say a URL is not accepted. Silently treating a URL as a domain is the worst of the three options.
-- [ ] Hand-written plain renderer: resolved block, cited, counts, then co_mentioned_brands as numbered rows.
-- [ ] On cited=false, explain on stderr that it is an answer and suggest widening the window.
-- [ ] Document the ownership values and that citation_references counts occurrences.
-- [ ] Validate --from/--to and --models before the request; state the default window and the 90-day cap.
-- [ ] Consider adding `partner industries citations` for GET /partner/industries/:id/citations so a caller can discover domains.
+- [x] Either add --url (sending ?url=) as in `senso industries domain`, or rename the argument to <domain> and say a URL is not accepted. Silently treating a URL as a domain is the worst of the three options.
+- [x] Hand-written plain renderer: resolved block, cited, counts, then co_mentioned_brands as numbered rows.
+- [x] On cited=false, explain on stderr that it is an answer and suggest widening the window.
+- [x] Document the ownership values and that citation_references counts occurrences.
+- [x] Validate --from/--to and --models before the request; state the default window and the 90-day cap.
+- [x] Consider adding `partner industries citations` for GET /partner/industries/:id/citations so a caller can discover domains.
 
 **`senso partner industries list`** · 🔴 high
 
-- [ ] Add --limit (1-100, default 10, validated) and --offset (>= 0, validated) and pass them through; without them the command cannot return more than 10 rows.
-- [ ] Add relationship, model_count and location_count to the default columns.
-- [ ] Say what 'visible' means in the description: owned plus subscribed.
-- [ ] Split the partner-auth hint: one runnable hint ('Retry with a partner key: senso partner industries list --api-key <partner-key>') and move the `senso industries` / `senso analytics` alternatives into the message body or a `next` block.
-- [ ] Add a pagination footer and `page` to the JSON envelope.
+- [x] Add --limit (1-100, default 10, validated) and --offset (>= 0, validated) and pass them through; without them the command cannot return more than 10 rows.
+- [x] Add relationship, model_count and location_count to the default columns.
+- [x] Say what 'visible' means in the description: owned plus subscribed.
+- [x] Split the partner-auth hint: one runnable hint ('Retry with a partner key: senso partner industries list --api-key <partner-key>') and move the `senso industries` / `senso analytics` alternatives into the message body or a `next` block.
+- [x] Add a pagination footer and `page` to the JSON envelope.
 
 **`senso partner industries prompt-metrics`** · 🔴 high
 
-- [ ] Hand-written plain/table renderer that uses industry_prompts as the rows and prints window/total as a header — the generic renderer cannot classify this payload.
-- [ ] Validate --limit (1-100) and --offset (>= 0) with parseIntFlag and exit 2, matching every other paged command in the CLI.
-- [ ] Add --group-by funnel_stage (parseEnumFlag over a one-value set) to expose the stage rollup, and describe the different payload it returns.
-- [ ] Say in the help that a nonexistent industry_id returns an EMPTY list rather than a 404, and tell the caller to confirm the id with `senso partner industries list`.
-- [ ] Add Returns naming industry_prompt_id as an industry prompt id (not a geo_question_id), and describing models[] and top_three_mentioned[].
-- [ ] Validate --from/--to and --models before the request.
-- [ ] Print a pagination footer and `page` in the JSON envelope; add a warning when the result is empty ('either this industry has no prompts in the window, or the industry_id does not exist — this endpoint does not 404').
+- [x] Hand-written plain/table renderer that uses industry_prompts as the rows and prints window/total as a header — the generic renderer cannot classify this payload.
+- [x] Validate --limit (1-100) and --offset (>= 0) with parseIntFlag and exit 2, matching every other paged command in the CLI.
+- [x] Add --group-by funnel_stage (parseEnumFlag over a one-value set) to expose the stage rollup, and describe the different payload it returns.
+- [x] Say in the help that a nonexistent industry_id returns an EMPTY list rather than a 404, and tell the caller to confirm the id with `senso partner industries list`.
+- [x] Add Returns naming industry_prompt_id as an industry prompt id (not a geo_question_id), and describing models[] and top_three_mentioned[].
+- [x] Validate --from/--to and --models before the request.
+- [x] Print a pagination footer and `page` in the JSON envelope; add a warning when the result is empty ('either this industry has no prompts in the window, or the industry_id does not exist — this endpoint does not 404').
 
 **`senso partner industries summary`** · 🟠 medium
 
-- [ ] Hand-written plain renderer with named sections: industry, window, answers_analyzed, top brand, citation summary, top external citers as numbered rows.
-- [ ] Render a null share as '(not available — the official-domain registry is not seeded for this industry)', never as blank.
-- [ ] Validate --from/--to (format, order, 90-day span) and --models before the request; exit 2.
-- [ ] Document the defaults (last 30 days) and the 90-day cap in the flag help, matching the `industries` group wording.
-- [ ] Add Returns / Exit codes / Examples and a pointer to `senso partner glossary`.
+- [x] Hand-written plain renderer with named sections: industry, window, answers_analyzed, top brand, citation summary, top external citers as numbered rows.
+- [x] Render a null share as '(not available — the official-domain registry is not seeded for this industry)', never as blank.
+- [x] Validate --from/--to (format, order, 90-day span) and --models before the request; exit 2.
+- [x] Document the defaults (last 30 days) and the 90-day cap in the flag help, matching the `industries` group wording.
+- [x] Add Returns / Exit codes / Examples and a pointer to `senso partner glossary`.
 
 ### `senso update` <sub>4 items</sub>
 

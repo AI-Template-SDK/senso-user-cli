@@ -21,7 +21,7 @@ import * as log from "../utils/logger.js";
  * user to log in again, which never fixes it.
  *
  * The exact answer matters, because the two statuses mean different things:
- * an API-key caller with an organization key gets 401 "Authentication
+ * an API-key caller with an organization key gets 403 "Partner credentials
  * required" from RequirePartnerAuth (it is neither a Clerk JWT nor a partner
  * key), while the 403 "Partner access required" belongs to a valid JWT whose
  * user has no partner. Both are exit 3; only the first is what an org key sees.
@@ -109,7 +109,7 @@ async function resolveIndustryId(
 
 /** Said in every leaf command's help, because every one of them needs it. */
 const PARTNER_KEY_NOTE =
-  "REQUIRES A PARTNER API KEY. An organization key — the one `senso login` stores — is answered with HTTP 401 “Authentication required” by the partner auth middleware, and logging in again cannot fix it. Pass a partner key with `--api-key <partner-key>` or SENSO_API_KEY. For the same data under an organization key, use `senso industries`; for your own organization's metrics, `senso analytics`.";
+  "REQUIRES A PARTNER API KEY. An organization key — the one `senso login` stores — is answered with HTTP 403 “Partner credentials required”: the key is valid, and its scope is wrong, so logging in again cannot fix it. (An older API build answered 401 instead; the CLI reports both the same way.) Pass a partner key with `--api-key <partner-key>` or SENSO_API_KEY. For the same data under an organization key, use `senso industries`; for your own organization's metrics, `senso analytics`.";
 
 /** What `<industry>` accepts, in the words every command in this group uses. */
 const INDUSTRY_ARG =
@@ -120,14 +120,14 @@ const WINDOW_NOTE = `--from and --to are YYYY-MM-DD (\`senso evals\` takes RFC 3
 
 /** Exit 3 means one thing on every command here. */
 const partnerExits = {
-  3: "the key is not a partner key — an organization key is answered with 401 by the partner auth middleware",
+  3: "the key is not a partner key — a valid organization key is answered with 403, and a key that authenticates nowhere with 401",
 };
 
 export function registerPartnerCommands(program: Command): void {
   const partner = program
     .command("partner")
     .description(
-      "Partner-network commands. REQUIRES A PARTNER API KEY: every command here reads a /partner/* endpoint, and the organization key stored by `senso login` gets HTTP 401 “Authentication required” from the partner auth middleware — running `senso login` again will not help. Pass a partner key per command with `--api-key <partner-key>` or SENSO_API_KEY; the CLI never stores one. Under an organization key instead: `partner industries list` → `senso industries list`, `partner industries brand` → `senso industries brand`, `partner industries domain` → `senso industries domain`, and the brand leaderboard is `senso industries brands`, which has no partner equivalent here. `partner industries summary`, `partner industries prompt-metrics` and `partner glossary` have no organization-key equivalent. For metrics about your own organization, use `senso analytics`.",
+      "Partner-network commands. REQUIRES A PARTNER API KEY: every command here reads a /partner/* endpoint, and the organization key stored by `senso login` gets HTTP 403 “Partner credentials required” from the partner auth middleware — the key is valid and its scope is wrong, so running `senso login` again will not help. Pass a partner key per command with `--api-key <partner-key>` or SENSO_API_KEY; the CLI never stores one. Under an organization key instead: `partner industries list` → `senso industries list`, `partner industries brand` → `senso industries brand`, `partner industries domain` → `senso industries domain`, and the brand leaderboard is `senso industries brands`, which has no partner equivalent here. `partner industries summary`, `partner industries prompt-metrics` and `partner glossary` have no organization-key equivalent. For metrics about your own organization, use `senso analytics`.",
     );
 
   const industries = partner
