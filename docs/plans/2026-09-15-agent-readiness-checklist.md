@@ -36,7 +36,7 @@ has to change for the CLI to be able to say the right thing. Check items off in 
 - [x] `emitConfirmation()` emits `data: { action, resource, id }` instead of `{ ok, message }`.
 - [x] Keep `--output json` implying quiet on stderr, but move the content of those hints into `next`/`warnings` so nothing is lost.
 - [x] Bump the major version; CHANGELOG entry explaining `.answer` → `.data.answer`; update README "Using it from an agent" and the root help epilog with the envelope shape.
-- [ ] Update every `jq` path in the seven skills (Part C).
+- [x] Update every `jq` path in the seven skills (Part C).
 
 ### A2. The error contract (`src/lib/errors.ts`, `src/lib/api-client.ts`, `src/lib/run-action.ts`)
 
@@ -63,8 +63,8 @@ has to change for the CLI to be able to say the right thing. Check items off in 
 - [x] Every closed set through `parseEnumFlag`, with the allowed values in the help text and in `error.allowed`. Missing today: `generate runs-list --status`, `generate runs-items --status`, `prompts create type`, `--models` everywhere, tracked-sources `--category`, several `--sort`/`--order` flags.
 - [x] Date flags: one helper per format, named in help ("YYYY-MM-DD" vs "RFC 3339 instant"), validated → exit 2. Decide whether `evals --from/--to` should accept the date form too.
 - [x] `--data` bodies: a per-command schema listing required keys, optional keys, and the meaning of `[]` vs `null` vs omitted; unknown keys named → exit 2. Refuse an empty replacement body (`kb tags set`, `content tags set`, `prompts tags set` with no flags currently send `{}` = clear all).
-- [ ] Mutually exclusive / required-together flag pairs checked → exit 2 naming both flags.
-- [ ] Files: `assertFilesExist` and a local content-type check before any upload call (`kb update-file` skips it today; `.md`/`.json`/`.xml` are always rejected by the API and should exit 2 pointing at `kb create-raw`).
+- [x] Mutually exclusive / required-together flag pairs checked → exit 2 naming both flags.
+- [x] Files: `assertFilesExist` and a local content-type check before any upload call (`kb update-file` skips it today; `.md`/`.json`/`.xml` are always rejected by the API and should exit 2 pointing at `kb create-raw`).
 
 ### A5. Plain and table rendering (`src/lib/output.ts`)
 
@@ -74,36 +74,36 @@ has to change for the CLI to be able to say the right thing. Check items off in 
 - [x] `findRows`: a payload that is one object-array plus scalar/object extras (`sort_by`, `scope`, `mode`, `window`, `totals`, `history_import`) renders as a list with the extras as a header block, instead of stringifying the array. Affects `questions list`, `run-config model-options`, `competitors suggest`, `industries brands`, `import-prompts`, `partner prompt-metrics`, `content verification`, `content versions`, `content provenance`, `evals get`.
 - [x] Table honors declared `columns` even when `findRows` declines, and warns on stderr when a declared column is absent from every row (this would have caught A6).
 - [x] Mutations: "✓ <Verb> <resource> <id>." on stderr, record on stdout, then "Next: <command>" lines.
-- [ ] Async: each status transition on stderr; the exact poll command whenever the CLI returns before the work is done.
+- [x] Async: each status transition on stderr; the exact poll command whenever the CLI returns before the work is done.
 
 ### A6. Columns that name fields the API never returns
 
 - [x] `tags list`, `kb tags *`, `content tags *`, `prompts tags *`: `tag_id` → `id` (dto.TagResponse).
 - [x] `competitors list`: `competitor_id` → `id`.
 - [x] `tracked-sources list`: `source_id` → `id`.
-- [ ] `prompts list`: verify `prompt_id` against the prompt DTO; `content list`/`generated-content list`: `status`/`processing_status`/`id` mappings.
+- [x] `prompts list`: verify `prompt_id` against the prompt DTO; `content list`/`generated-content list`: `status`/`processing_status`/`id` mappings.
 - [x] Policy test: every string in a `columns` array must be a json tag on the endpoint's response DTO (generate the tag list from `senso-api/internal/api/dto` into a fixture).
-- [ ] MSW fixtures are built from the DTO shapes, not invented; the existing fixtures spell ids the CLI's way, which is why the suite is green.
+- [x] MSW fixtures are built from the DTO shapes, not invented; the existing fixtures spell ids the CLI's way, which is why the suite is green.
 
 ### A7. Help text (`src/program.ts`, every `src/commands/*.ts`)
 
 - [x] A `describeCommand({ summary, arguments, returns, exitCodes, examples, seeAlso })` helper that emits the standard sections through `addHelpText`, so every leaf command has Arguments (with id space and source command), Options (required/default/allowed values), Returns (fields and enum meanings), Exit codes (specific to the command), Examples, See also.
-- [ ] Every group description states the id spaces it uses and the typical workflow as an ordered command list.
-- [ ] Every status/enum field a command returns has its values and meanings in Returns (processing_status, eval status/verdict/band, gap kind/problem/status/origin, run status, publish_status, tier).
-- [ ] Policy test: every leaf command's help contains the Returns, Exit codes and Examples sections.
-- [ ] `make reference` after; the generated reference picks the sections up.
+- [x] Every group description states the id spaces it uses and the typical workflow as an ordered command list.
+- [x] Every status/enum field a command returns has its values and meanings in Returns (processing_status, eval status/verdict/band, gap kind/problem/status/origin, run status, publish_status, tier).
+- [x] Policy test: every leaf command's help contains the Returns, Exit codes and Examples sections.
+- [x] `make reference` after; the generated reference picks the sections up.
 
 ### A8. Correctness fixes that fall out of the review
 
-- [ ] `engine publish`: branch on `publish_status` in the payload — "failed" is exit 1 with the per-destination reasons, not "✓ Content published".
-- [ ] `content unpublish`: report the API's `unpublished_count`, not the number of ids requested.
-- [ ] `kb upload` / `ingest upload` in plain mode: print `kb_node_id`, `content_id` and status per file on stdout; exit non-zero (or at least `warnings`) on a partial batch.
-- [ ] `search` with no hits: print "No results." and, when signals were on, "This search was filed as a gap; see `senso gaps list --status weak`".
-- [ ] `whoami --output json`: snake_case keys like every other command.
-- [ ] `analytics summary` and every hand-written renderer: guard the shape and throw a CliError naming the endpoint rather than a raw TypeError.
-- [ ] `skills install/remove`: fix the double prefix (`senso-ai/senso-senso-ai/…`), validate short names → exit 2, keep the API key out of argv, and do not echo argv on failure.
-- [ ] `update`/`uninstall`: capture npm output so stdout is one JSON document under `--output json`.
-- [ ] `questions` group help: prompts and questions are the same `geo_questions` rows; say so, and warn that `questions delete` destroys run history.
+- [x] `engine publish`: branch on `publish_status` in the payload — "failed" is exit 1 with the per-destination reasons, not "✓ Content published".
+- [x] `content unpublish`: report the API's `unpublished_count`, not the number of ids requested.
+- [x] `kb upload` / `ingest upload` in plain mode: print `kb_node_id`, `content_id` and status per file on stdout; exit non-zero (or at least `warnings`) on a partial batch.
+- [x] `search` with no hits: print "No results." and, when signals were on, "This search was filed as a gap; see `senso gaps list --status weak`".
+- [x] `whoami --output json`: snake_case keys like every other command.
+- [x] `analytics summary` and every hand-written renderer: guard the shape and throw a CliError naming the endpoint rather than a raw TypeError.
+- [x] `skills install/remove`: fix the double prefix (`senso-ai/senso-senso-ai/…`), validate short names → exit 2, keep the API key out of argv, and do not echo argv on failure.
+- [x] `update`/`uninstall`: capture npm output so stdout is one JSON document under `--output json`.
+- [x] `questions` group help: prompts and questions are the same `geo_questions` rows; say so, and warn that `questions delete` destroys run history.
 
 ---
 
@@ -150,59 +150,59 @@ has to change for the CLI to be able to say the right thing. Check items off in 
 
 **`senso --help epilog`** · 🟠 medium
 
-- [ ] Add a short 'Exit codes: 0 ok · 2 usage · 3 auth/permission · 4 not found · 5 network/429 · 1 other' line to every leaf help via a shared addHelpText on each command (or Commander's configureHelp).
-- [ ] Fix the Output note to describe the envelope and the Commander-error case once those are JSON; state 'json implies --quiet' and 'table truncates at 48 chars / 8 columns'.
-- [ ] Add the id-space glossary and a 'Start here' line; mention 403 under exit 3 and 429 under exit 5.
+- [x] Add a short 'Exit codes: 0 ok · 2 usage · 3 auth/permission · 4 not found · 5 network/429 · 1 other' line to every leaf help via a shared addHelpText on each command (or Commander's configureHelp).
+- [x] Fix the Output note to describe the envelope and the Commander-error case once those are JSON; state 'json implies --quiet' and 'table truncates at 48 chars / 8 columns'.
+- [x] Add the id-space glossary and a 'Start here' line; mention 403 under exit 3 and 429 under exit 5.
 
 **`senso --output json envelope`** · 🔴 high
 
-- [ ] Wrap every emit in {ok:true, command, data, page?, next?, warnings?}; keep `data` as the raw API payload; compute `page` from the envelope keys findRows already recognizes and include the next-page command; move every !quiet hint into next[]/warnings[] so JSON callers get them.
-- [ ] emitConfirmation: data = {action, resource, id} rather than {ok:true, message}.
-- [ ] Say 'implies --quiet' in the root help's --output option text.
+- [x] Wrap every emit in {ok:true, command, data, page?, next?, warnings?}; keep `data` as the raw API payload; compute `page` from the envelope keys findRows already recognizes and include the next-page command; move every !quiet hint into next[]/warnings[] so JSON callers get them.
+- [x] emitConfirmation: data = {action, resource, id} rather than {ok:true, message}.
+- [x] Say 'implies --quiet' in the root help's --output option text.
 
 **`senso --output plain renderer`** · 🔴 high
 
-- [ ] findRows: return [] (not null) when the payload is an envelope whose single array is empty, so emit prints 'No <resource> found.' (resource from an EmitOptions.resource name, default 'results') and a stderr note with the widening command.
-- [ ] keyValueLines: render nested objects as indented sub-blocks and arrays of objects as numbered sub-blocks; never JSON.stringify in plain.
-- [ ] itemBlocks: number each block, put the primary id first (EmitOptions.idKey), and print 'Showing a–b of N. Next page: <cmd>' on stderr when the envelope has offset/limit/total.
+- [x] findRows: return [] (not null) when the payload is an envelope whose single array is empty, so emit prints 'No <resource> found.' (resource from an EmitOptions.resource name, default 'results') and a stderr note with the widening command.
+- [x] keyValueLines: render nested objects as indented sub-blocks and arrays of objects as numbered sub-blocks; never JSON.stringify in plain.
+- [x] itemBlocks: number each block, put the primary id first (EmitOptions.idKey), and print 'Showing a–b of N. Next page: <cmd>' on stderr when the envelope has offset/limit/total.
 
 **`senso --output table renderer`** · 🟠 medium
 
-- [ ] Print '(+N columns hidden; use --output plain or json)' on stderr when columns are dropped, and '(cells truncated)' once when any cell was cut.
-- [ ] Share the empty-list fix with plain (findRows returns [] for an empty envelope) so table prints 'No <things> found.'.
-- [ ] Pagination line on stderr as in plain.
-- [ ] Root help --output text: 'table truncates cells to 48 characters and shows at most 8 columns'.
+- [x] Print '(+N columns hidden; use --output plain or json)' on stderr when columns are dropped, and '(cells truncated)' once when any cell was cut.
+- [x] Share the empty-list fix with plain (findRows returns [] for an empty envelope) so table prints 'No <things> found.'.
+- [x] Pagination line on stderr as in plain.
+- [x] Root help --output text: 'table truncates cells to 48 characters and shows at most 8 columns'.
 
 **`senso error reporting (reportError/toCliError)`** · 🔴 high
 
-- [ ] toCliError(err, ctx?) receives the request (method, path) and an optional resource descriptor from the command ({resource: 'KB node', id}) so 404 says 'KB node <id> not found in organization <slug>.' with the group's list command as hint; 401 names the key prefix.
-- [ ] 403: parse the middleware message for the permission/product name and say who can fix it; keep the API text.
-- [ ] 409/400/422: prefix with what was attempted ('Uploading <file> was refused: …'), pass the body's structured fields under error.data, add code 'validation' with fields[] for 400/422 field errors.
-- [ ] 402 hint: `senso credits balance --output json`. 429: read Retry-After into retry_after_seconds and the hint. Network/timeout: name the base URL and the request.
-- [ ] reportError: emit {ok:false, error:{code, message, status?, field?, received?, allowed?, hint, request?, data?}}; move allowed values out of hint prose into allowed[]; under json put the SENSO_DEBUG stack in error.debug instead of a raw line.
-- [ ] Update the seven skills: drop --quiet, replace `senso credits` with `senso credits balance`, replace HTTP-status tables with exit-code/error.code tables, and state that the JSON error is on stderr with stdout empty.
+- [x] toCliError(err, ctx?) receives the request (method, path) and an optional resource descriptor from the command ({resource: 'KB node', id}) so 404 says 'KB node <id> not found in organization <slug>.' with the group's list command as hint; 401 names the key prefix.
+- [x] 403: parse the middleware message for the permission/product name and say who can fix it; keep the API text.
+- [x] 409/400/422: prefix with what was attempted ('Uploading <file> was refused: …'), pass the body's structured fields under error.data, add code 'validation' with fields[] for 400/422 field errors.
+- [x] 402 hint: `senso credits balance --output json`. 429: read Retry-After into retry_after_seconds and the hint. Network/timeout: name the base URL and the request.
+- [x] reportError: emit {ok:false, error:{code, message, status?, field?, received?, allowed?, hint, request?, data?}}; move allowed values out of hint prose into allowed[]; under json put the SENSO_DEBUG stack in error.debug instead of a raw line.
+- [x] Update the seven skills: drop --quiet, replace `senso credits` with `senso credits balance`, replace HTTP-status tables with exit-code/error.code tables, and state that the JSON error is on stderr with stdout empty.
 
 **`senso senso (no args)`** · 🟠 medium
 
-- [ ] Print one line 'No command given.' + hint on stderr in plain, and the JSON usage error under --output json; keep exit 2. Offer `senso --help` rather than dumping it.
-- [ ] Route Commander's 'no subcommand' path through reportError so the format flag is honored.
+- [x] Print one line 'No command given.' + hint on stderr in plain, and the JSON usage error under --output json; keep exit 2. Offer `senso --help` rather than dumping it.
+- [x] Route Commander's 'no subcommand' path through reportError so the format flag is honored.
 
 **`senso senso <group> (no subcommand)`** · 🔴 high
 
-- [ ] One-line error 'senso kb is a command group; name a subcommand.' with allowed[] = its subcommand names and a hint naming the most common one; JSON under --output json; keep exit 2. Keep `senso kb --help` for the full dump.
-- [ ] Give every group a 'Typical workflow' block in its help (out of scope here; per-group reviewers).
+- [x] One-line error 'senso kb is a command group; name a subcommand.' with allowed[] = its subcommand names and a hint naming the most common one; JSON under --output json; keep exit 2. Keep `senso kb --help` for the full dump.
+- [x] Give every group a 'Typical workflow' block in its help (out of scope here; per-group reviewers).
 
 **`senso unknown command / unknown option (Commander errors)`** · 🔴 high
 
-- [ ] Configure Commander's error output through reportError: in exitOverride, read program.opts().output (already parsed for global flags) and emit the §2.2 error object with code usage, field/received/allowed and a hint naming `senso <cmd> --help`; keep exit 2.
-- [ ] Missing argument: name the argument with its id space from the command's own help.
+- [x] Configure Commander's error output through reportError: in exitOverride, read program.opts().output (already parsed for global flags) and emit the §2.2 error object with code usage, field/received/allowed and a hint naming `senso <cmd> --help`; keep exit 2.
+- [x] Missing argument: name the argument with its id space from the command's own help.
 
 **`senso update check banner`** · 🟢 low
 
-- [ ] Under --output json, when the cache already says a newer version exists, add a warnings[] entry 'A newer @senso-ai/cli (0.18.0) is available: senso update' to the envelope instead of nothing.
-- [ ] Await the check with the 3 s timeout only when the cache is stale AND the command is one that already made a network call; otherwise skip so a read-only local command (skills list-available) never stalls or writes config.
-- [ ] Document the config-file write and the once-a-day stall in the root help's SENSO_NO_UPDATE_CHECK line.
-- [ ] Drop the mini banner from the error path (print it only when a payload follows), or keep it and accept the noise.
+- [x] Under --output json, when the cache already says a newer version exists, add a warnings[] entry 'A newer @senso-ai/cli (0.18.0) is available: senso update' to the envelope instead of nothing.
+- [x] Await the check with the 3 s timeout only when the cache is stale AND the command is one that already made a network call; otherwise skip so a read-only local command (skills list-available) never stalls or writes config.
+- [x] Document the config-file write and the once-a-day stall in the root help's SENSO_NO_UPDATE_CHECK line.
+- [x] Drop the mini banner from the error path (print it only when a payload follows), or keep it and accept the noise.
 
 ### `senso auth` <sub>13 items</sub>
 
@@ -1199,36 +1199,36 @@ has to change for the CLI to be able to say the right thing. Check items off in 
 
 **`senso skills`** · group
 
-- [ ] Group help: say the commands are local, need shipables (or npx and network), use the short name as id, and are scoped to the current directory unless --global. Add the typical workflow as an ordered list.
-- [ ] Accept both the short name and the full `senso-ai/senso-<name>` package in install and remove.
+- [x] Group help: say the commands are local, need shipables (or npx and network), use the short name as id, and are scoped to the current directory unless --global. Add the typical workflow as an ordered list.
+- [x] Accept both the short name and the full `senso-ai/senso-<name>` package in install and remove.
 
 **`senso skills install`** · 🔴 high
 
-- [ ] Validate [names...] against SENSO_SKILLS (short or full package form) → exit 2 with field/received/allowed and a did-you-mean, before spawning anything.
-- [ ] Accept `senso-ai/senso-<name>` as-is (strip the prefix only when absent) so list-available's output round-trips.
-- [ ] Refuse (exit 3, code unauthorized) when no key is available unless --no-env is passed, instead of installing an unauthenticated skill.
-- [ ] Redact the key when echoing the child's argv in a failure message; never print `--env SENSO_API_KEY=<key>` on stderr.
-- [ ] Warn in help and on stderr (plain) that the key is passed on the child's command line; add --no-env.
-- [ ] On partial failure include the structured {installed, failed[{name, package, reason}]} under error.data so a JSON caller knows what happened; map a killed/timeout child to code timeout (exit 5) and a missing shipables + failed npx to a hint naming `npm install -g @senso-ai/shipables`.
-- [ ] Help: Returns / Exit codes / Examples per §2.1; say --all equals no names.
+- [x] Validate [names...] against SENSO_SKILLS (short or full package form) → exit 2 with field/received/allowed and a did-you-mean, before spawning anything.
+- [x] Accept `senso-ai/senso-<name>` as-is (strip the prefix only when absent) so list-available's output round-trips.
+- [x] Refuse (exit 3, code unauthorized) when no key is available unless --no-env is passed, instead of installing an unauthenticated skill.
+- [x] Redact the key when echoing the child's argv in a failure message; never print `--env SENSO_API_KEY=<key>` on stderr.
+- [x] Warn in help and on stderr (plain) that the key is passed on the child's command line; add --no-env.
+- [x] On partial failure include the structured {installed, failed[{name, package, reason}]} under error.data so a JSON caller knows what happened; map a killed/timeout child to code timeout (exit 5) and a missing shipables + failed npx to a hint naming `npm install -g @senso-ai/shipables`.
+- [x] Help: Returns / Exit codes / Examples per §2.1; say --all equals no names.
 
 **`senso skills list`** · 🟠 medium
 
-- [ ] Read ~/.shipables/installed.json the way uninstall.ts does (no subprocess, no npx download) and emit a normalized {scope, skills[{name, package, version, agents[]}]}; keep shipables as a fallback.
-- [ ] Empty: 'No Senso skills installed in <dir>.' on stdout, with a stderr note about other scopes and the widening command (`--global`).
-- [ ] Help: say scope is the current directory unless --global; Returns / Exit codes / Examples.
+- [x] Read ~/.shipables/installed.json the way uninstall.ts does (no subprocess, no npx download) and emit a normalized {scope, skills[{name, package, version, agents[]}]}; keep shipables as a fallback.
+- [x] Empty: 'No Senso skills installed in <dir>.' on stdout, with a stderr note about other scopes and the widening command (`--global`).
+- [x] Help: say scope is the current directory unless --global; Returns / Exit codes / Examples.
 
 **`senso skills list-available`** · 🟢 low
 
-- [ ] Rename shortName → name for consistency with uninstall's payload; add a one-line description per skill; move the 'Install all' hint to stderr.
-- [ ] Help: say it is static and offline; Returns/Examples.
+- [x] Rename shortName → name for consistency with uninstall's payload; add a one-line description per skill; move the 'Install all' hint to stderr.
+- [x] Help: say it is static and offline; Returns/Examples.
 
 **`senso skills remove`** · 🟠 medium
 
-- [ ] Map shipables' 'is not installed' (exit 4 / message text) to exit 4, code not_found, message naming the skill and scope, hint `senso skills list --output json` (+ --global).
-- [ ] Accept senso-ai/senso-<name> as well as the short name; validate against SENSO_SKILLS → exit 2 with allowed.
-- [ ] Rewrite the child's failure message: drop 'Command failed: shipables …', keep the reason, never echo the argv.
-- [ ] Emit {action:"removed", resource:"skill", name, package, scope}; help per §2.1 with the scope rule.
+- [x] Map shipables' 'is not installed' (exit 4 / message text) to exit 4, code not_found, message naming the skill and scope, hint `senso skills list --output json` (+ --global).
+- [x] Accept senso-ai/senso-<name> as well as the short name; validate against SENSO_SKILLS → exit 2 with allowed.
+- [x] Rewrite the child's failure message: drop 'Command failed: shipables …', keep the reason, never echo the argv.
+- [x] Emit {action:"removed", resource:"skill", name, package, scope}; help per §2.1 with the scope rule.
 
 ### `senso members` <sub>6 items</sub>
 
@@ -1675,97 +1675,97 @@ has to change for the CLI to be able to say the right thing. Check items off in 
 
 **`senso competitors`** · group
 
-- [ ] State the 50-per-org cap in the group description and distinguish it from the 50-items-per-request batch limit.
-- [ ] Name the id space (`id` in the payload, passed as <competitorId>) and the permission split (read is open, writes need update:org).
-- [ ] Add the ordered workflow: suggest → filter already_tracked → batch-add → list.
-- [ ] Add 'See also: senso analytics share-of-voice' (or whichever analytics command consumes this) so the agent knows why the list matters.
+- [x] State the 50-per-org cap in the group description and distinguish it from the 50-items-per-request batch limit.
+- [x] Name the id space (`id` in the payload, passed as <competitorId>) and the permission split (read is open, writes need update:org).
+- [x] Add the ordered workflow: suggest → filter already_tracked → batch-add → list.
+- [x] Add 'See also: senso analytics share-of-voice' (or whichever analytics command consumes this) so the agent knows why the list matters.
 
 **`senso competitors add`** · 🔴 high
 
-- [ ] Validate --name (non-empty after trim, ≤255) and --url (parses as an absolute http/https URL, ≤2048) before the request → exit 2 naming the flag and, for the URL, showing the corrected form.
-- [ ] Help: state the 50-per-org cap, that `source` is always 'manual' here, and that adding a name that already exists is a 409, not an upsert.
-- [ ] Map a 500 whose message is 'Failed to perform competitor operation' on this endpoint to a cap-specific hint — or better, have the API fix the status (see api_changes) and key off that.
-- [ ] Confirmation: '✓ Added competitor <id> ("Acme Analytics").' plus a Next line for `competitors list`.
-- [ ] 409 hint: `senso competitors list --output json | jq '.data.competitors[] | select(.name=="…")'`.
+- [x] Validate --name (non-empty after trim, ≤255) and --url (parses as an absolute http/https URL, ≤2048) before the request → exit 2 naming the flag and, for the URL, showing the corrected form.
+- [x] Help: state the 50-per-org cap, that `source` is always 'manual' here, and that adding a name that already exists is a 409, not an upsert.
+- [x] Map a 500 whose message is 'Failed to perform competitor operation' on this endpoint to a cap-specific hint — or better, have the API fix the status (see api_changes) and key off that.
+- [x] Confirmation: '✓ Added competitor <id> ("Acme Analytics").' plus a Next line for `competitors list`.
+- [x] 409 hint: `senso competitors list --output json | jq '.data.competitors[] | select(.name=="…")'`.
 
 **`senso competitors batch-add`** · 🔴 high
 
-- [ ] Validate --data before the request: `items` present, an array, 1–50 entries; each item has a non-empty `name` ≤255; `source` in the enum; `confidence` a number 0–1; `rationale` ≤280 characters; unknown keys named. Exit 2, and report the item INDEX in the message.
-- [ ] Compare the request against the response and emit warnings: items not present in the response (truncated by the cap or skipped for a blank name), and items whose returned created_at predates this call (already tracked).
-- [ ] Confirmation: '✓ Added N competitors (M were already tracked, K skipped).'
-- [ ] Help: separate the two 50s, and document the 280-character rationale cap with a jq recipe that truncates suggest output to fit.
-- [ ] Map the cap 500 to the same explanatory message as `competitors add`.
+- [x] Validate --data before the request: `items` present, an array, 1–50 entries; each item has a non-empty `name` ≤255; `source` in the enum; `confidence` a number 0–1; `rationale` ≤280 characters; unknown keys named. Exit 2, and report the item INDEX in the message.
+- [x] Compare the request against the response and emit warnings: items not present in the response (truncated by the cap or skipped for a blank name), and items whose returned created_at predates this call (already tracked).
+- [x] Confirmation: '✓ Added N competitors (M were already tracked, K skipped).'
+- [x] Help: separate the two 50s, and document the 280-character rationale cap with a jq recipe that truncates suggest output to fit.
+- [x] Map the cap 500 to the same explanatory message as `competitors add`.
 
 **`senso competitors delete`** · 🟠 medium
 
-- [ ] Validate <competitorId> as a UUID → exit 2.
-- [ ] JSON: `data: { action: "deleted", resource: "competitor", id: "…" }`.
-- [ ] Help: mention the 50-per-org cap this frees a slot in, and that the row is soft-deleted (it disappears from every list and from analytics queries).
-- [ ] 404: 'Competitor <id> not found in this organization (it may already be removed).' hint `senso competitors list`.
+- [x] Validate <competitorId> as a UUID → exit 2.
+- [x] JSON: `data: { action: "deleted", resource: "competitor", id: "…" }`.
+- [x] Help: mention the 50-per-org cap this frees a slot in, and that the row is soft-deleted (it disappears from every list and from analytics queries).
+- [x] 404: 'Competitor <id> not found in this organization (it may already be removed).' hint `senso competitors list`.
 
 **`senso competitors list`** · 🔴 high
 
-- [ ] Fix the columns to `id, name, url, source, confidence, created_at`, and fix the MSW fixtures so the tests protect the real field name.
-- [ ] Help: define the three `source` values, name `rationale`/`confidence`, and say the list is complete (no paging) and capped at 50 per org.
-- [ ] Empty list: 'No tracked competitors found.' on stdout, and on stderr 'Ask for candidates with `senso competitors suggest`.'
-- [ ] Add Returns / Exit codes / Examples.
+- [x] Fix the columns to `id, name, url, source, confidence, created_at`, and fix the MSW fixtures so the tests protect the real field name.
+- [x] Help: define the three `source` values, name `rationale`/`confidence`, and say the list is complete (no paging) and capped at 50 per org.
+- [x] Empty list: 'No tracked competitors found.' on stdout, and on stderr 'Ask for candidates with `senso competitors suggest`.'
+- [x] Add Returns / Exit codes / Examples.
 
 **`senso competitors suggest`** · 🔴 high
 
-- [ ] Supply a hand-written `plain` and `table` rendering (EmitOptions.table.rows = data.suggestions) so the columns actually apply. Columns: name, confidence, already_tracked, source, url. Print `mode`, `cached` and `duration_ms` on stderr as context.
-- [ ] Help: document mode, already_tracked, sampled_run_ids, the 5-per-hour rate limit, the 10-minute cache, and that the call costs model tokens.
-- [ ] 429: replace the generic message with 'Competitor suggestions are limited to 5 per hour for this organization. The last result is cached for 10 minutes — retry then.'
-- [ ] 422: hint 'Set a website with `senso org update --website https://…`, or run prompts first (`senso prompts run …`).'
-- [ ] 503: say the feature is not enabled on this deployment rather than 'API error (503)'.
-- [ ] Emit next steps: the exact `competitors batch-add` pipeline that filters already_tracked and truncates rationale to 280 characters.
+- [x] Supply a hand-written `plain` and `table` rendering (EmitOptions.table.rows = data.suggestions) so the columns actually apply. Columns: name, confidence, already_tracked, source, url. Print `mode`, `cached` and `duration_ms` on stderr as context.
+- [x] Help: document mode, already_tracked, sampled_run_ids, the 5-per-hour rate limit, the 10-minute cache, and that the call costs model tokens.
+- [x] 429: replace the generic message with 'Competitor suggestions are limited to 5 per hour for this organization. The last result is cached for 10 minutes — retry then.'
+- [x] 422: hint 'Set a website with `senso org update --website https://…`, or run prompts first (`senso prompts run …`).'
+- [x] 503: say the feature is not enabled on this deployment rather than 'API error (503)'.
+- [x] Emit next steps: the exact `competitors batch-add` pipeline that filters already_tracked and truncates rationale to 280 characters.
 
 **`senso competitors update`** · 🔴 high
 
-- [ ] Fix the semantics or the help. Either send `url` only when --url is given and document that the API clears it (the API cannot express 'leave alone'), or — better — require the agent to opt in: add --clear-url, and when --url is absent, refuse with exit 2 explaining that PUT would clear it.
-- [ ] Validate <competitorId> as a UUID, --name (non-empty ≤255) and --url (absolute URL ≤2048) → exit 2.
-- [ ] Confirmation: name what changed, and warn 'url cleared' when the request omits it.
-- [ ] Help: say provenance fields are preserved; name the 409 and the 404 semantics (another org's competitor reads as not found).
+- [x] Fix the semantics or the help. Either send `url` only when --url is given and document that the API clears it (the API cannot express 'leave alone'), or — better — require the agent to opt in: add --clear-url, and when --url is absent, refuse with exit 2 explaining that PUT would clear it.
+- [x] Validate <competitorId> as a UUID, --name (non-empty ≤255) and --url (absolute URL ≤2048) → exit 2.
+- [x] Confirmation: name what changed, and warn 'url cleared' when the request omits it.
+- [x] Help: say provenance fields are preserved; name the 409 and the 404 semantics (another org's competitor reads as not found).
 
 ### `senso tracked-sources` <sub>24 items</sub>
 
 **`senso tracked-sources`** · group
 
-- [ ] Rewrite in the §2.1 group shape with the id space (`id`, passed as <sourceId>), the update:org requirement on mutations (reads are ungated), and an ordered workflow.
-- [ ] State all three source_origin values and exactly what each allows: manual and onboarding are fully editable and deletable; published can only be activated/deactivated and cannot be deleted.
-- [ ] Warn that a PUT on a published rule silently ignores everything but --active, and that the CLI will refuse it client-side once source_origin is known.
-- [ ] Say that mutations kick off an async rollup recalc, so analytics lag a rule change by minutes.
+- [x] Rewrite in the §2.1 group shape with the id space (`id`, passed as <sourceId>), the update:org requirement on mutations (reads are ungated), and an ordered workflow.
+- [x] State all three source_origin values and exactly what each allows: manual and onboarding are fully editable and deletable; published can only be activated/deactivated and cannot be deleted.
+- [x] Warn that a PUT on a published rule silently ignores everything but --active, and that the CLI will refuse it client-side once source_origin is known.
+- [x] Say that mutations kick off an async rollup recalc, so analytics lag a rule change by minutes.
 
 **`senso tracked-sources add`** · 🔴 high
 
-- [ ] Validate --category with parseEnumFlag against the four values → exit 2, the same way --match-type and --tier already are.
-- [ ] Refuse --category with a tier other than `tracked` → exit 2, saying the API would discard it.
-- [ ] Validate client-side that --match-type path_prefix/exact_url has a pattern containing a path → exit 2.
-- [ ] Help: document normalization (and show the normalized value in the confirmation), tier meanings, the specificity-then-priority resolution order, and the async recalc.
-- [ ] 409 hint: `senso tracked-sources list --search <pattern>`.
+- [x] Validate --category with parseEnumFlag against the four values → exit 2, the same way --match-type and --tier already are.
+- [x] Refuse --category with a tier other than `tracked` → exit 2, saying the API would discard it.
+- [x] Validate client-side that --match-type path_prefix/exact_url has a pattern containing a path → exit 2.
+- [x] Help: document normalization (and show the normalized value in the confirmation), tier meanings, the specificity-then-priority resolution order, and the async recalc.
+- [x] 409 hint: `senso tracked-sources list --search <pattern>`.
 
 **`senso tracked-sources delete`** · 🔴 high
 
-- [ ] Validate <sourceId> as a UUID → exit 2.
-- [ ] On the 409, print the ready-made deactivate command with the rule's own pattern/match_type/tier filled in (the CLI can fetch the row from the list first, or from the search endpoint).
-- [ ] Help: name the published-rule refusal on this command, not only in the group description, and say the delete triggers a rollup recalc.
-- [ ] JSON: `data: { action: "deleted", resource: "tracked_source", id: "…" }`.
-- [ ] 404: 'Tracked source <id> not found in this organization (it may already be removed).' hint `senso tracked-sources list`.
+- [x] Validate <sourceId> as a UUID → exit 2.
+- [x] On the 409, print the ready-made deactivate command with the rule's own pattern/match_type/tier filled in (the CLI can fetch the row from the list first, or from the search endpoint).
+- [x] Help: name the published-rule refusal on this command, not only in the group description, and say the delete triggers a rollup recalc.
+- [x] JSON: `data: { action: "deleted", resource: "tracked_source", id: "…" }`.
+- [x] 404: 'Tracked source <id> not found in this organization (it may already be removed).' hint `senso tracked-sources list`.
 
 **`senso tracked-sources list`** · 🔴 high
 
-- [ ] Add --limit (1–100, default 50), --offset (≥0) and --search, validated client-side with parseIntFlag → exit 2, matching the API's own bounds.
-- [ ] Fix the columns to `id, pattern, match_type, tier, source_origin, active, priority`, and fix the MSW fixtures to use `id`.
-- [ ] Print the paging line on stderr: 'Showing 1–50 of 312. Next page: senso tracked-sources list --offset 50' — the data for it is already in the response.
-- [ ] Help: explain source_origin, tier, match_type and the specificity/priority resolution order.
-- [ ] Empty list: 'No tracked source rules found.' plus 'Every citation is classified External until you add a rule: senso tracked-sources add --pattern <your-domain> --match-type domain --tier primary'.
+- [x] Add --limit (1–100, default 50), --offset (≥0) and --search, validated client-side with parseIntFlag → exit 2, matching the API's own bounds.
+- [x] Fix the columns to `id, pattern, match_type, tier, source_origin, active, priority`, and fix the MSW fixtures to use `id`.
+- [x] Print the paging line on stderr: 'Showing 1–50 of 312. Next page: senso tracked-sources list --offset 50' — the data for it is already in the response.
+- [x] Help: explain source_origin, tier, match_type and the specificity/priority resolution order.
+- [x] Empty list: 'No tracked source rules found.' plus 'Every citation is classified External until you add a rule: senso tracked-sources add --pattern <your-domain> --match-type domain --tier primary'.
 
 **`senso tracked-sources update`** · 🔴 high
 
-- [ ] Fetch the rule first (or read source_origin from a prior list) and refuse a published rule with anything other than --active/--no-active → exit 2, explaining that the API would accept it and do nothing.
-- [ ] Add a dedicated `tracked-sources deactivate <sourceId>` / `activate <sourceId>` pair, or make --pattern/--match-type/--tier optional when only --active/--no-active is given.
-- [ ] Help: spell out the omission semantics of every optional flag — which ones clear and which ones preserve.
-- [ ] Validate --category with parseEnumFlag, and validate <sourceId> as a UUID → exit 2.
-- [ ] Warn on stderr when the response's pattern/tier differs from what was sent, and when a recalc was queued.
+- [x] Fetch the rule first (or read source_origin from a prior list) and refuse a published rule with anything other than --active/--no-active → exit 2, explaining that the API would accept it and do nothing.
+- [x] Add a dedicated `tracked-sources deactivate <sourceId>` / `activate <sourceId>` pair, or make --pattern/--match-type/--tier optional when only --active/--no-active is given.
+- [x] Help: spell out the omission semantics of every optional flag — which ones clear and which ones preserve.
+- [x] Validate --category with parseEnumFlag, and validate <sourceId> as a UUID → exit 2.
+- [x] Warn on stderr when the response's pattern/tier differs from what was sent, and when a recalc was queued.
 
 ### `senso generated-content` <sub>12 items</sub>
 
