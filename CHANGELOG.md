@@ -9,37 +9,67 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
+### Added
+
+- **`senso whoami` says which of the three sources supplied the key it used.**
+  A new `apiKeySource` field — `flag`, `env` or `config` — next to the
+  organization, and the same thing named beside the key in the plain rendering.
+  The environment outranks the stored file, so `senso login` can store a key
+  that no later command sends: log in as one organization, have `SENSO_API_KEY`
+  exported in a shell profile, and every command quietly reaches a different
+  one. `whoami` already re-verified against the API, so it was honest about
+  which organization; it is now also honest about why that key was chosen.
+
+- **`senso whoami` reports a second, different key that is being shadowed.** A
+  new `apiKeyShadowedSources` list, and the same thing on stderr. Knowing the
+  key came from the environment is only half the answer: "the environment holds
+  the only key" is the ordinary CI setup, and "the environment is shadowing the
+  key this user just logged in with" is almost always a mistake, and the two
+  were indistinguishable. Silent, and the field omitted, when nothing is
+  shadowed or when two sources hold the same key — a warning that fires on
+  every ordinary run is one the next reader learns to skip. Suppressed under
+  `--quiet` and `--output json`, where the payload carries the same fact and
+  where stderr has to stay parseable as the JSON error object.
+
+- **`senso login` warns when `SENSO_API_KEY` would override the key it just
+  stored.** On stderr, non-fatal: the key is still written and the command still
+  exits 0. It stays quiet when the variable is unset, empty, or holds the same
+  key, none of which change what any command does.
+
+  Precedence itself is unchanged — `--api-key`, then `SENSO_API_KEY`, then the
+  config file, as documented. Nothing that relies on the environment variable
+  needs to change: it remains the way to authenticate in CI, in a container, and
+  anywhere `login` has no terminal to prompt on.
+
 ### Fixed
 
-- **`senso engine publish` no longer claims success over a publish that reached
-  nothing.** The endpoint answers 200 even when a destination failed — the real
-  outcome is per-destination, under `publish_destinations[].status` — and the
-  command printed "Content published." without reading it. A destination now
-  counts as a problem when it is `failed` or carries an `error_msg`, which
-  follows the server in testing positively for `success` rather than treating
-  "not failed" as landed: a `pending` destination means "publish record saved
-  but enqueue failed" and nothing published. Each problem is named on stderr
-  with its reason, a partial failure says how many of how many did not publish,
-  and every destination failing exits 1 with an empty stdout, carrying the
-  reasons and the content id in the error — the error is all a `--output json`
-  caller sees, since that format implies `--quiet`. A retry can then target the
-  item that was already saved rather than creating another. A publish where
-  every destination is `queued` reports that it is queued rather than
-  published, because nothing is live yet. Content recorded with
-  `mark_as_published`, which reaches no destination by design, still reports
-  success.
+- **`senso login` no longer writes the API key to stdout.** The prompt used
+  clack's `text`, which redraws into stdout on every keystroke, so the whole key
+  was written there one character at a time — `senso login > install.log`, a CI
+  capture or a terminal recording persisted the credential. It now prompts with
+  `password`, which masks it. Only a truncated 8-character prefix is ever
+  printed, by `whoami`.
 
-- **`senso engine draft` and `publish` document the fields they actually
-  accept.** Both take `content_id`, and passing it saves a new version of an
-  existing content item — that is how an edit loop revises one item instead of
-  leaving a trail of new ones. It worked all along and was missing from
-  `--data`, so an agent working from `--help` could not discover it. Also added:
-  `generation_run_id`, `generation_receipt_id`, and `manual_published_url` on
-  `publish`. Both descriptions also claimed `geo_question_id` was required; it is
-  optional, and only `raw_markdown` and `seo_title` are not.
-  `builder_workspace_id` and `expected_workspace_version_id` are deliberately
-  NOT documented: both require an acting user, which an organization API key
-  never carries, so every attempt from this CLI is a 400.
+- **A config file that is not an object no longer breaks every command.**
+  `JSON.parse("null")` succeeds and returns `null`, so the guard in `readConfig`
+  never caught it and each `readConfig().x` threw instead. A `config.json`
+  holding `null`, a bare string or an array now reads as no configuration at
+  all, which is what it is. This defeated the documented escape hatch:
+  `--api-key` and `SENSO_API_KEY` are what you reach for when the stored config
+  is broken, and they stopped working precisely then.
+
+- **A stored `apiKey` that is not a string no longer breaks every command.** The
+  config file is user-editable, so the declared type is a convention rather than
+  a guarantee; `{"apiKey": 123}` threw out of the credential resolver. It now
+  reads as no stored key, which is what it is.
+
+- **A key is no longer judged by whitespace around it.** `SENSO_API_KEY=$(cat
+key.txt)` and a Docker `--env-file` both readily carry a trailing newline.
+  HTTP strips it, so the request always worked — but the comparison did not, so
+  a key identical to the stored one was reported as shadowed and warned about a
+  conflict that did not exist. Keys are now trimmed once, where they are
+  resolved, and a whitespace-only value falls through to the next source exactly
+  as the empty string already did.
 
 ## [0.17.0] — 2026-09-15
 

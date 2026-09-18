@@ -104,10 +104,16 @@ freely; changing a code is a breaking change.
 
 ## Things that look like bugs but are not
 
-- **`getApiKey` and `getBaseUrl` use `||`, not `??`, and that is deliberate.**
-  An empty string is not a usable key: `SENSO_API_KEY=` in CI must fall through
-  to the stored value rather than authenticate with `""`. There is an
-  `eslint-disable` on exactly those two functions saying so.
+- **`resolveApiKey` tests truthiness and `getBaseUrl` uses `||`, not `??`, and
+  that is deliberate.** An empty string is not a usable key: `SENSO_API_KEY=` in
+  CI must fall through to the stored value rather than authenticate with `""`.
+  There is an `eslint-disable` on `getBaseUrl` saying so.
+
+- **The API key and the name of its source come out of one resolution.**
+  `resolveApiKey` returns both, and `getApiKey` wraps it. Two
+  separate walks down the same precedence chain can drift, and `senso whoami`
+  reporting a source the request did not use would be worse than reporting
+  nothing.
 
 - **`no-unnecessary-condition` is off for `src/commands/`.** `apiRequest<T>` is
   a cast, not a validator, so the response interfaces are assertions the compiler

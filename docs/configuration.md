@@ -143,7 +143,7 @@ read-then-write is what stops it from writing back a snapshot taken before
 
 ### Credential precedence
 
-Resolved per call by `getApiKey()`:
+Resolved per call by `resolveApiKey()`:
 
 1. `--api-key`
 2. `SENSO_API_KEY`
@@ -152,6 +152,38 @@ Resolved per call by `getApiKey()`:
 An empty value at any level falls through to the next. If all three are empty the
 command exits **3** with `Not authenticated: no API key found.` before making any
 request.
+
+The key and the name of the source it came from are resolved in the same pass, so
+they cannot disagree — `getApiKey()` is a thin wrapper over that one resolution.
+Keys are trimmed there, so a trailing newline from `$(cat key.txt)` or a Docker
+`--env-file` neither changes which key is sent nor counts as a different key. A
+value that is empty or only whitespace is not a key and falls through.
+
+### Seeing which key is in use
+
+The environment outranks the config file, which means `senso login` can store a
+key that no later command sends. That is invisible unless something says so, so
+two places do:
+
+- `senso whoami` reports `apiKeySource` — `flag`, `env` or `config` — alongside
+  the organization. It re-verifies against the API, so it names the organization
+  the key actually reaches, and now also why that key was chosen. Offline, where
+  it answers from the cache written by `login`, it says when the cached values
+  describe a key that is being ignored.
+- `senso whoami` also reports `apiKeyShadowedSources` when a **different** key is
+  available from a source that was outranked, and says so on stderr. This is the
+  case `login`'s warning cannot reach: someone logs in in their terminal, sees
+  the warning, and then hands that shell to an agent that never saw it. Without
+  this, "the environment holds the only key" — the ordinary CI setup — and "the
+  environment is shadowing the key this user just logged in with" look identical.
+  The field is absent, and stderr silent, when nothing is shadowed or when the
+  sources hold the same key, so an agent can treat its presence as the signal.
+- `senso login` warns when `SENSO_API_KEY` is set to something other than the key
+  just stored. Non-fatal, on stderr: the key is still written, and the warning
+  names `senso whoami` for checking which organization commands reach.
+
+Both stay quiet when the environment is unset or holds the same key, because
+neither changes what any command does.
 
 `getBaseUrl()` follows the same order with one more step at the end:
 `--base-url`, `SENSO_BASE_URL`, `baseUrl` in `config.json`, then
