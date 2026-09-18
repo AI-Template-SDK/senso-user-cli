@@ -185,3 +185,117 @@ describe("credits balance, on success", () => {
     expect(res.stdout).toContain("available_credits");
   });
 });
+
+describe("credits history, when the window is not a usable number", () => {
+  /**
+   * `--days` is validated here rather than round-tripped: the server rejects
+   * anything outside 1-365 with a 400, and a billing script deserves exit 2 for
+   * its own typo rather than an API error it has to parse.
+   */
+  const CASES: [string, string][] = [
+    ["not a number", "thirty"],
+    ["zero", "0"],
+    ["negative", "-5"],
+    ["over the 365-day ceiling", "400"],
+    ["fractional", "1.5"],
+  ];
+
+  for (const [label, value] of CASES) {
+    it(`exits 2 when --days is ${label}, without making a request`, async () => {
+      let called = false;
+      server.use(
+        http.get(apiUrl("/org/credits/history"), () => {
+          called = true;
+          return HttpResponse.json({});
+        }),
+      );
+
+      const res = await runCli(["credits", "history", "--days", value]);
+
+      expect(res.exitCode).toBe(2);
+      expect(res.stdout).toBe("");
+      expect(called).toBe(false);
+    });
+  }
+});
+
+describe("credits history, on success", () => {
+  const HISTORY = {
+    org_id: "org-1",
+    days: 3,
+    period_usage: 12.5,
+    history: [
+      { date: "2026-09-16", usage: 4 },
+      { date: "2026-09-17", usage: 0 },
+      { date: "2026-09-18", usage: 8.5 },
+    ],
+  };
+
+  function historyResponds(): { seen: () => URL | undefined } {
+    let url: URL | undefined;
+    server.use(
+      http.get(apiUrl("/org/credits/history"), ({ request }) => {
+        url = new URL(request.url);
+        return HttpResponse.json(HISTORY);
+      }),
+    );
+    return { seen: () => url };
+  }
+
+  it("sends no days parameter at all when the flag is omitted", async () => {
+    // The server's own default is 30; sending one would override a default the
+    // API is free to change.
+    const { seen } = historyResponds();
+
+    await runCli(["credits", "history"]);
+
+    expect(seen()?.searchParams.has("days")).toBe(false);
+  });
+
+  it("passes the window through when given", async () => {
+    const { seen } = historyResponds();
+
+    await runCli(["credits", "history", "--days", "7"]);
+
+    expect(seen()?.searchParams.get("days")).toBe("7");
+  });
+
+  it("gives a JSON caller the whole envelope, totals included", async () => {
+    // The per-day rows are what the table shows, but `period_usage` is the
+    // number a script actually wants and it is not one of the rows.
+    historyResponds();
+
+    const res = await runCli(["credits", "history", "--output", "json"]);
+
+    expect(res.json()).toEqual(HISTORY);
+  });
+
+  it("renders the days as rows rather than collapsing them into one cell", async () => {
+    // `org_id` and `period_usage` are not envelope keys, so the generic list
+    // detection does not find `history` on its own.
+    historyResponds();
+
+    const res = await runCli(["credits", "history", "--output", "table"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain("date");
+    expect(res.stdout).toContain("2026-09-17");
+    expect(res.stdout).toContain("8.5");
+  });
+
+  it("keeps a zero-usage day, which is a real day and not a gap", async () => {
+    historyResponds();
+
+    const res = await runCli(["credits", "history"]);
+
+    expect(res.stdout).toContain("2026-09-17");
+  });
+
+  it("does not fall over when the body carries no history", async () => {
+    server.use(http.get(apiUrl("/org/credits/history"), () => HttpResponse.json({ org_id: "o" })));
+
+    const res = await runCli(["credits", "history", "--output", "table"]);
+
+    expect(res.exitCode).toBe(0);
+  });
+});

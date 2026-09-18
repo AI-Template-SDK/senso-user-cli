@@ -1615,6 +1615,18 @@ Get the current credit balance for the organization. Returns available credits a
 senso credits balance [options]
 ```
 
+### senso credits history
+
+Get a day-by-day breakdown of credit spend over a trailing window, plus the total across it. Every day in the window is present — a day with no spend comes back as 0, so there are no gaps to fill. Entries run oldest to newest, and the last one is today, which is still accumulating.
+
+```
+senso credits history [options]
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--days <n>` | Length of the trailing window in days, 1-365 (default 30) |  |
+
 ## senso questions
 
 Manage org-scoped geo questions. These are lightweight CRUD questions distinct from prompts (which include full run history).
@@ -2566,6 +2578,25 @@ senso industries list [options]
 | `--sort <order>` | Sort order: name_asc, name_desc, created_asc, created_desc (default name_asc) |  |
 | `--live` | Only industries actively running — at least one model enabled and one active prompt |  |
 
+### senso industries answers
+
+Read the newest stored answer for each of an industry's prompts, from each AI model at each location, with the full response text — and for every answer, whether it named your brand, where in the answer, and in what tone. This is how you find the prompts the AI answers without you, and read exactly what it says when it does. Only your organization's own industry can be read here; any other id is a 404. There is no date window: each prompt, model and location has exactly one newest answer, and --since hides combinations whose newest answer is older than that day rather than returning older ones.
+
+```
+senso industries answers [options] <industry>
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--mentioned <bool>` | Only answers that did (true) or did not (false) name your brand |  |
+| `--models <list>` | Comma-separated model filter: gpt-4.1, chatgpt, perplexity, aioverview, gemini, linkup, claude-sonnet-4-6, grok |  |
+| `--location <code>` | One location, e.g. US or US/California (default: every location) |  |
+| `--prompt-ids <list>` | Comma-separated prompt ids to restrict to |  |
+| `--since <date>` | Only answers collected on or after this day, YYYY-MM-DD |  |
+| `--include-empty` | Include answers where the model returned nothing |  |
+| `--limit <n>` | Page size, 1-100 (default 25) |  |
+| `--offset <n>` | Number of answers to skip (default 0) |  |
+
 ### senso industries prompts
 
 List the prompts an industry runs. These are the industry's own prompts, not your organization's (`senso prompts list`) — their ids are what `industries import-prompts` and `senso generate industry-draft` accept.
@@ -2592,7 +2623,7 @@ senso industries brands [options] <industry>
 | `--from <date>` | Start of the window, YYYY-MM-DD (default: 30 days ago) |  |
 | `--to <date>` | End of the window, YYYY-MM-DD (default: today) |  |
 | `--models <list>` | Comma-separated model filter |  |
-| `--location <code>` | 2-letter location code (e.g. US) |  |
+| `--location <code>` | One location, as the industry's runs record it: a country code such as US, or a country/region pair such as US/California |  |
 | `--limit <n>` | Page size, 1-100 (default 100) |  |
 | `--offset <n>` | Number of brands to skip (default 0) |  |
 | `--no-canonicalize` | Do not merge spelling variants — raw per-spelling rows |  |
@@ -2612,7 +2643,7 @@ senso industries brand [options] <industry> <brandName>
 | `--from <date>` | Start of the window, YYYY-MM-DD (default: 30 days ago) |  |
 | `--to <date>` | End of the window, YYYY-MM-DD (default: today) |  |
 | `--models <list>` | Comma-separated model filter |  |
-| `--location <code>` | 2-letter location code (e.g. US) |  |
+| `--location <code>` | One location, as the industry's runs record it: a country code such as US, or a country/region pair such as US/California |  |
 
 ### senso industries brand-by-id
 
@@ -2627,7 +2658,7 @@ senso industries brand-by-id [options] <industry> <brandId>
 | `--from <date>` | Start of the window, YYYY-MM-DD (default: 30 days ago) |  |
 | `--to <date>` | End of the window, YYYY-MM-DD (default: today) |  |
 | `--models <list>` | Comma-separated model filter |  |
-| `--location <code>` | 2-letter location code (e.g. US) |  |
+| `--location <code>` | One location, as the industry's runs record it: a country code such as US, or a country/region pair such as US/California |  |
 
 ### senso industries domain
 
@@ -2642,7 +2673,7 @@ senso industries domain [options] <industry> <domain>
 | `--from <date>` | Start of the window, YYYY-MM-DD (default: 30 days ago) |  |
 | `--to <date>` | End of the window, YYYY-MM-DD (default: today) |  |
 | `--models <list>` | Comma-separated model filter |  |
-| `--location <code>` | 2-letter location code (e.g. US) |  |
+| `--location <code>` | One location, as the industry's runs record it: a country code such as US, or a country/region pair such as US/California |  |
 | `--url <url>` | Look up this full URL instead of the bare domain |  |
 
 ### senso industries import-prompts

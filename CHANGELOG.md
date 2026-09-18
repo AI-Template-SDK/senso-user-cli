@@ -11,6 +11,32 @@ mattered, and what you need to do differently.
 
 ### Added
 
+- **`senso credits history` — where the credits went, day by day.** A trailing
+  window of daily spend plus the total across it, over `GET
+/org/credits/history`. `--days` takes 1-365 and defaults to the server's own
+  30; a value outside that is a usage error here rather than a 400 from the API.
+  Every day in the window is present, so a day with no spend comes back as `0`
+  and a chart has no gaps to fill; the last entry is today and is still
+  accumulating. `--output json` carries the whole envelope, `period_usage`
+  included, because the total is not one of the rows.
+
+- **`senso industries answers <industry>` — what the AI models actually say.**
+  The newest stored answer for each of your industry's prompts, from each model
+  at each location, with the full response text, over `GET
+/org/industries/{id}/answers/latest`. Every answer records whether it named
+  your brand, at what rank, in what tone, and with what share of the brand
+  mentions, plus the brands and citations it carried. This is how you find the
+  prompts a model answers without you: `--mentioned false --models <one model>`.
+  Filters for `--models`, `--location`, `--prompt-ids`, `--since` and
+  `--include-empty`, paged with `--limit` and `--offset`. Only your own
+  organization's industry can be read, so any other id is a 404. There is no
+  date window — each prompt, model and location has exactly one newest answer,
+  and `--since` hides combinations whose newest answer is older than that day
+  rather than returning older ones. `--models`, `--prompt-ids`, `--since`,
+  `--mentioned`, `--limit` and `--offset` are all validated before the request,
+  because each is applied server-side before paging: a typo would otherwise come
+  back as a perfectly plausible empty answer list.
+
 - **`senso whoami` says which of the three sources supplied the key it used.**
   A new `apiKeySource` field — `flag`, `env` or `config` — next to the
   organization, and the same thing named beside the key in the plain rendering.

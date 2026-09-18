@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { apiRequest } from "../lib/api-client.js";
+import { ApiError, apiRequest } from "../lib/api-client.js";
 import { parseEnumFlag, parseIntFlag } from "../lib/enum-arg.js";
 import { CliError, EXIT } from "../lib/errors.js";
 import { emit } from "../lib/output.js";
@@ -70,7 +70,10 @@ function withWindowOptions(cmd: Command): Command {
     .option("--from <date>", "Start of the window, YYYY-MM-DD (default: 30 days ago)")
     .option("--to <date>", "End of the window, YYYY-MM-DD (default: today)")
     .option("--models <list>", "Comma-separated model filter")
-    .option("--location <code>", "2-letter location code (e.g. US)");
+    .option(
+      "--location <code>",
+      "One location, as the industry's runs record it: a country code such as US, or a country/region pair such as US/California",
+    );
 }
 
 const ENTITY_TYPES = [
@@ -110,6 +113,145 @@ function parseEntityTypes(value: string | undefined): string | undefined {
 }
 
 const SORTS = ["name_asc", "name_desc", "created_asc", "created_desc"] as const;
+
+const MODELS = [
+  "gpt-4.1",
+  "chatgpt",
+  "perplexity",
+  "aioverview",
+  "gemini",
+  "linkup",
+  "claude-sonnet-4-6",
+  "grok",
+] as const;
+
+/**
+ * `--models` is a comma-separated list, so `parseEnumFlag` cannot check it.
+ * The server rejects an unknown model with a 400, and rule 5 says a typo should
+ * exit 2 rather than round-trip — an unfiltered answer list looks exactly like
+ * a filtered one that matched nothing.
+ *
+ * Only the commands added since the spec enumerated these values validate here;
+ * the older `--models` filters in this group still pass through.
+ */
+function parseModels(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  const parts = value
+    .split(",")
+    .map((p) => p.trim().toLowerCase())
+    .filter((p) => p.length > 0);
+  if (parts.length === 0) {
+    throw new CliError("Invalid --models: no value given.", EXIT.USAGE, { code: "usage" });
+  }
+  for (const part of parts) {
+    if (!MODELS.includes(part as (typeof MODELS)[number])) {
+      throw new CliError(`Invalid --models: "${part}".`, EXIT.USAGE, {
+        code: "usage",
+        hint: `Must be one of: ${MODELS.join(", ")}.`,
+      });
+    }
+  }
+  return parts.join(",");
+}
+
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** `--since` is a day, not an instant: the server rejects anything else. */
+function parseDayFlag(flag: string, value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  if (!DAY_RE.test(value.trim())) {
+    throw new CliError(`Invalid ${flag}: "${value}" is not a date.`, EXIT.USAGE, {
+      code: "usage",
+      hint: "Use YYYY-MM-DD, for example 2026-09-18.",
+    });
+  }
+  return value.trim();
+}
+
+/**
+ * `--prompt-ids` is a comma-separated list of uuids. The server answers 400 for
+ * a malformed one, and checking here keeps a mistyped id a usage error.
+ */
+function parsePromptIds(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  const parts = value
+    .split(",")
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
+  if (parts.length === 0) {
+    throw new CliError("Invalid --prompt-ids: no value given.", EXIT.USAGE, { code: "usage" });
+  }
+  for (const part of parts) {
+    if (!isUuid(part)) {
+      throw new CliError(`Invalid --prompt-ids: "${part}" is not a UUID.`, EXIT.USAGE, {
+        code: "usage",
+        hint: "Prompt ids come from `senso industries prompts <industry>`.",
+      });
+    }
+  }
+  return parts.join(",");
+}
+
+/** `--mentioned` filters on a tri-state: true, false, or omitted for all. */
+function parseBoolFlag(flag: string, value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  const v = value.trim().toLowerCase();
+  if (v !== "true" && v !== "false") {
+    throw new CliError(`Invalid ${flag}: "${value}".`, EXIT.USAGE, {
+      code: "usage",
+      hint: `Pass ${flag} true or ${flag} false, or omit it for both.`,
+    });
+  }
+  return v;
+}
+
+/**
+ * Eight columns is the cap `outputTable` renders, and these are the eight that
+ * answer "which prompts does this model answer without naming me". The full
+ * response text and the per-answer brand and citation lists are in the JSON.
+ */
+const ANSWER_COLUMNS = [
+  "prompt_text",
+  "model",
+  "location",
+  "mentioned",
+  "rank",
+  "sentiment",
+  "sov_pct",
+  "run_at",
+];
+
+interface IndustryAnswersResponse {
+  answers?: Record<string, unknown>[];
+}
+
+/**
+ * `answers/latest` reads only your own organization's industry; any other id is
+ * a 404, however real it is.
+ *
+ * The generic 404 hint — "check the ID, a list command will show what exists" —
+ * is worse than nothing here, because `senso industries list` WILL show that
+ * industry: it is in the public catalog, just not yours. The caller verifies
+ * the id, finds it correct, and is no closer.
+ */
+async function answersOrNotYours(
+  industryId: string,
+  opts: Parameters<typeof apiRequest>[0],
+): Promise<IndustryAnswersResponse> {
+  try {
+    return await apiRequest<IndustryAnswersResponse>(opts);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) {
+      throw new CliError(`No readable answers for industry ${industryId}.`, EXIT.NOT_FOUND, {
+        code: "not_found",
+        status: 404,
+        hint: "This endpoint reads only your own organization's industry, so an industry that exists in the public catalog still answers 404 here. Run `senso org get` to see which industry your organization is set to.",
+        cause: err,
+      });
+    }
+    throw err;
+  }
+}
 
 export function registerIndustriesCommands(program: Command): void {
   const industries = program
@@ -169,6 +311,74 @@ export function registerIndustriesCommands(program: Command): void {
               "model_count",
               "location_count",
             ],
+          });
+        },
+      ),
+    );
+
+  industries
+    .command("answers <industry>")
+    .description(
+      "Read the newest stored answer for each of an industry's prompts, from each AI model at each location, with the full response text — and for every answer, whether it named your brand, where in the answer, and in what tone. This is how you find the prompts the AI answers without you, and read exactly what it says when it does. Only your organization's own industry can be read here; any other id is a 404. There is no date window: each prompt, model and location has exactly one newest answer, and --since hides combinations whose newest answer is older than that day rather than returning older ones.",
+    )
+    .option("--mentioned <bool>", "Only answers that did (true) or did not (false) name your brand")
+    .option("--models <list>", `Comma-separated model filter: ${MODELS.join(", ")}`)
+    .option("--location <code>", "One location, e.g. US or US/California (default: every location)")
+    .option("--prompt-ids <list>", "Comma-separated prompt ids to restrict to")
+    .option("--since <date>", "Only answers collected on or after this day, YYYY-MM-DD")
+    .option("--include-empty", "Include answers where the model returned nothing")
+    .option("--limit <n>", "Page size, 1-100 (default 25)")
+    .option("--offset <n>", "Number of answers to skip (default 0)")
+    .action(
+      runAction(
+        program,
+        async (
+          ctx: Ctx,
+          industry: string,
+          cmdOpts: {
+            mentioned?: string;
+            models?: string;
+            location?: string;
+            promptIds?: string;
+            since?: string;
+            includeEmpty?: boolean;
+            limit?: string;
+            offset?: string;
+          },
+        ) => {
+          // Validated before the industry lookup: a bad flag should not cost a
+          // round trip, and `resolveIndustryId` makes one for a name.
+          const mentioned = parseBoolFlag("--mentioned", cmdOpts.mentioned);
+          const models = parseModels(cmdOpts.models);
+          const promptIds = parsePromptIds(cmdOpts.promptIds);
+          const since = parseDayFlag("--since", cmdOpts.since);
+          const limit = parseIntFlag("--limit", cmdOpts.limit, { min: 1, max: 100 });
+          const offset = parseIntFlag("--offset", cmdOpts.offset, { min: 0 });
+
+          const industryId = await resolveIndustryId(industry, ctx);
+
+          const data = await answersOrNotYours(industryId, {
+            path: `/org/industries/${industryId}/answers/latest`,
+            params: {
+              mentioned,
+              models,
+              location: cmdOpts.location,
+              prompt_ids: promptIds,
+              since,
+              // Sent only when asked for: the server defaults it to false, and
+              // an explicit `false` would read as a deliberate choice.
+              include_empty: cmdOpts.includeEmpty ? "true" : undefined,
+              limit: limit?.toString(),
+              offset: offset?.toString(),
+            },
+            apiKey: ctx.apiKey,
+            baseUrl: ctx.baseUrl,
+          });
+          // `notes` and `definitions` sit alongside the rows and are not
+          // envelope keys, so the generic list detection does not find
+          // `answers` on its own. JSON still carries all three.
+          emit(ctx, data, {
+            table: { rows: data.answers ?? [], columns: ANSWER_COLUMNS },
           });
         },
       ),

@@ -565,3 +565,250 @@ describe("industries list, rendering", () => {
     expect(res.stderr).toContain("json, table, plain");
   });
 });
+
+describe("industries answers, when a filter is not a usable value", () => {
+  /**
+   * Every one of these filters is applied server-side before paging, so a typo
+   * that reached the API would come back as a plausible empty answer list
+   * rather than an error — the same trap `--entity-type` sets above. All of
+   * them must fail before any request, including the industry lookup, which is
+   * itself a round trip when the argument is a name rather than a UUID.
+   */
+  const CASES: [string, string[]][] = [
+    ["--mentioned is not a boolean", ["--mentioned", "yes"]],
+    ["--models names a model that does not exist", ["--models", "gpt-9"]],
+    ["--models is empty", ["--models", ""]],
+    ["--prompt-ids holds something that is not a UUID", ["--prompt-ids", "not-a-uuid"]],
+    ["--since is not a date", ["--since", "last tuesday"]],
+    ["--since is an instant rather than a day", ["--since", "2026-09-18T00:00:00Z"]],
+    ["--limit is above the 100 ceiling", ["--limit", "101"]],
+    ["--limit is zero", ["--limit", "0"]],
+    ["--offset is negative", ["--offset", "-1"]],
+  ];
+
+  for (const [label, flags] of CASES) {
+    it(`exits 2 when ${label}, without making any request`, async () => {
+      let called = false;
+      server.use(
+        http.get(apiUrl("/org/industries"), () => {
+          called = true;
+          return HttpResponse.json({ industries: [] });
+        }),
+        http.get(apiUrl("/org/industries/:id/answers/latest"), () => {
+          called = true;
+          return HttpResponse.json({});
+        }),
+      );
+
+      const res = await runCli(["industries", "answers", "Airlines", ...flags]);
+
+      expect(res.exitCode).toBe(2);
+      expect(res.stdout).toBe("");
+      expect(called).toBe(false);
+    });
+  }
+
+  it("names the models it will accept, so the typo is correctable", async () => {
+    const res = await runCli(["industries", "answers", INDUSTRY_UUID, "--models", "gpt-9"]);
+
+    expect(res.stderr).toContain("perplexity");
+  });
+});
+
+describe("industries answers, on success", () => {
+  const ANSWERS = {
+    total: 2,
+    limit: 25,
+    offset: 0,
+    answers: [
+      {
+        prompt_id: "11111111-1111-1111-1111-111111111111",
+        prompt_text: "best airline for families",
+        model: "chatgpt",
+        location: "CA",
+        mentioned: true,
+        rank: 2,
+        sentiment: "positive",
+        sov_pct: 33.3,
+        run_at: "2026-09-18T10:00:00Z",
+        response_text: "A long answer.",
+      },
+      {
+        prompt_id: "22222222-2222-2222-2222-222222222222",
+        prompt_text: "cheapest transatlantic carrier",
+        model: "perplexity",
+        location: "CA",
+        mentioned: false,
+        rank: 0,
+        sentiment: "neutral",
+        sov_pct: 0,
+        run_at: "2026-09-18T10:00:00Z",
+        response_text: "Another answer.",
+      },
+    ],
+    notes: ["Answers are the newest per prompt, model and location."],
+    definitions: { sov_pct: "Share of brand mentions in this answer." },
+  };
+
+  function answersRespond(): { seen: () => URL | undefined } {
+    let url: URL | undefined;
+    server.use(
+      http.get(apiUrl(`/org/industries/${INDUSTRY_UUID}/answers/latest`), ({ request }) => {
+        url = new URL(request.url);
+        return HttpResponse.json(ANSWERS);
+      }),
+    );
+    return { seen: () => url };
+  }
+
+  it("reads the org-scoped path, not the partner one", async () => {
+    const { seen } = answersRespond();
+
+    await runCli(["industries", "answers", INDUSTRY_UUID]);
+
+    expect(seen()?.pathname).toContain(`/org/industries/${INDUSTRY_UUID}/answers/latest`);
+  });
+
+  it("sends no filters at all when none were given", async () => {
+    // Every one of these has a server-side default, and sending one would pin a
+    // default the API is free to change.
+    const { seen } = answersRespond();
+
+    await runCli(["industries", "answers", INDUSTRY_UUID]);
+
+    const q = seen()?.searchParams;
+    for (const key of ["mentioned", "models", "location", "prompt_ids", "since", "limit", "offset"])
+      expect(q?.has(key)).toBe(false);
+  });
+
+  it("sends include_empty only when the flag is passed", async () => {
+    // An explicit `false` would read as a deliberate choice rather than the
+    // server's own default.
+    const { seen } = answersRespond();
+
+    await runCli(["industries", "answers", INDUSTRY_UUID]);
+    expect(seen()?.searchParams.has("include_empty")).toBe(false);
+
+    await runCli(["industries", "answers", INDUSTRY_UUID, "--include-empty"]);
+    expect(seen()?.searchParams.get("include_empty")).toBe("true");
+  });
+
+  it("passes mentioned=false through, which is a filter and not an omission", async () => {
+    // "Which prompts does the model answer without naming me" is the whole
+    // point of the command, and it is spelled `--mentioned false`.
+    const { seen } = answersRespond();
+
+    await runCli(["industries", "answers", INDUSTRY_UUID, "--mentioned", "false"]);
+
+    expect(seen()?.searchParams.get("mentioned")).toBe("false");
+  });
+
+  it("normalizes and forwards the remaining filters", async () => {
+    const { seen } = answersRespond();
+
+    await runCli([
+      "industries",
+      "answers",
+      INDUSTRY_UUID,
+      "--models",
+      "ChatGPT, Perplexity",
+      "--location",
+      "US/California",
+      "--prompt-ids",
+      "11111111-1111-1111-1111-111111111111",
+      "--since",
+      "2026-09-01",
+      "--limit",
+      "10",
+      "--offset",
+      "5",
+    ]);
+
+    const q = seen()?.searchParams;
+    expect(q?.get("models")).toBe("chatgpt,perplexity");
+    expect(q?.get("location")).toBe("US/California");
+    expect(q?.get("prompt_ids")).toBe("11111111-1111-1111-1111-111111111111");
+    expect(q?.get("since")).toBe("2026-09-01");
+    expect(q?.get("limit")).toBe("10");
+    expect(q?.get("offset")).toBe("5");
+  });
+
+  it("gives a JSON caller the whole envelope, notes and definitions included", async () => {
+    answersRespond();
+
+    const res = await runCli(["industries", "answers", INDUSTRY_UUID, "--output", "json"]);
+
+    expect(res.json()).toEqual(ANSWERS);
+  });
+
+  it("renders the answers as rows rather than one cell", async () => {
+    // `notes` and `definitions` are not envelope keys, so the generic list
+    // detection does not find `answers` on its own.
+    answersRespond();
+
+    const res = await runCli(["industries", "answers", INDUSTRY_UUID, "--output", "table"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain("prompt_text");
+    expect(res.stdout).toContain("best airline for families");
+    expect(res.stdout).toContain("perplexity");
+  });
+
+  it("does not fall over when the body carries no answers", async () => {
+    server.use(
+      http.get(apiUrl(`/org/industries/${INDUSTRY_UUID}/answers/latest`), () =>
+        HttpResponse.json({ total: 0, limit: 25, offset: 0 }),
+      ),
+    );
+
+    const res = await runCli(["industries", "answers", INDUSTRY_UUID, "--output", "table"]);
+
+    expect(res.exitCode).toBe(0);
+  });
+
+  /**
+   * The generic 404 hint sends the caller to `senso industries list` to check
+   * the id — which is the one thing that will not help, because the industry IS
+   * in the public catalog and the listing shows it. It is simply not theirs.
+   */
+  it("exits 4 when the industry is not the organization's own", async () => {
+    server.use(
+      http.get(apiUrl(`/org/industries/${INDUSTRY_UUID}/answers/latest`), () =>
+        HttpResponse.json({ error: "not found" }, { status: 404 }),
+      ),
+    );
+
+    const res = await runCli(["industries", "answers", INDUSTRY_UUID]);
+
+    expect(res.exitCode).toBe(4);
+    expect(res.stdout).toBe("");
+  });
+
+  it("explains that a 404 here means the industry is not yours", async () => {
+    server.use(
+      http.get(apiUrl(`/org/industries/${INDUSTRY_UUID}/answers/latest`), () =>
+        HttpResponse.json({ error: "not found" }, { status: 404 }),
+      ),
+    );
+
+    const res = await runCli(["industries", "answers", INDUSTRY_UUID]);
+
+    expect(res.stderr).toContain("only your own organization's industry");
+    expect(res.stderr).toContain("senso org get");
+    // The misleading advice must not survive.
+    expect(res.stderr).not.toContain("A list command in the same group");
+  });
+
+  it("leaves other failures to the generic handler", async () => {
+    server.use(
+      http.get(apiUrl(`/org/industries/${INDUSTRY_UUID}/answers/latest`), () =>
+        HttpResponse.json({ error: "boom" }, { status: 500 }),
+      ),
+    );
+
+    const res = await runCli(["industries", "answers", INDUSTRY_UUID]);
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stderr).not.toContain("only your own organization's industry");
+  });
+});
