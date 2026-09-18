@@ -2,7 +2,15 @@ import { Command } from "commander";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { apiRequest } from "../lib/api-client.js";
-import { readConfig, writeConfig, clearConfig, getApiKey, getConfigPath } from "../lib/config.js";
+import {
+  readConfig,
+  writeConfig,
+  clearConfig,
+  resolveApiKey,
+  getConfigPath,
+  API_KEY_SOURCE_LABELS,
+  type ApiKeySource,
+} from "../lib/config.js";
 import { CliError, EXIT, toCliError } from "../lib/errors.js";
 import { emit, emitConfirmation } from "../lib/output.js";
 import { runAction } from "../lib/run-action.js";
@@ -23,6 +31,10 @@ async function verifyApiKey(apiKey: string, baseUrl?: string): Promise<OrgMeResp
     apiKey,
     baseUrl,
   });
+}
+
+function sourceSuffix(source: ApiKeySource | undefined): string {
+  return source ? pc.dim(` (from ${API_KEY_SOURCE_LABELS[source]})`) : "";
 }
 
 export function registerAuthCommands(program: Command): void {
@@ -50,9 +62,12 @@ export function registerAuthCommands(program: Command): void {
         log.raw(`  ${pc.dim("1.")} Go to ${pc.cyan("https://docs.senso.ai")} to create an account`);
         log.raw(`  ${pc.dim("2.")} Generate an API key from your dashboard\n`);
 
-        const result = await p.text({
+        // `password`, not `text`: clack redraws the prompt into stdout on every
+        // keystroke, so `text` wrote the whole key there one character at a
+        // time — `senso login > install.log`, a CI capture or an asciinema
+        // recording would persist the credential. `password` masks it.
+        const result = await p.password({
           message: "Paste your API key:",
-          placeholder: "tgr_...",
           validate: (val) => {
             if (!val || val.trim().length < 4) return "API key is required";
           },
@@ -95,6 +110,22 @@ export function registerAuthCommands(program: Command): void {
 
         log.success(`Authenticated as ${pc.bold(`"${org.name}"`)} (${pc.dim(org.org_id)})`);
         log.success(`Config saved to ${pc.dim(getConfigPath())}`);
+
+        // The key that was just stored is not necessarily the key the next
+        // command will use: SENSO_API_KEY outranks the file (see resolveApiKey).
+        // Exported in a shell profile, it makes every command talk to a
+        // different organization than the one login just confirmed on screen —
+        // and nothing else in the CLI would ever mention it. Warn only when the
+        // two differ; the same key from both sources changes no behavior.
+        // Trimmed on both sides, as `resolveApiKey` does: the pasted key is
+        // already trimmed, so an env var carrying a trailing newline would
+        // otherwise look like a different key and warn about nothing.
+        const envKey = (process.env.SENSO_API_KEY ?? "").trim();
+        if (envKey && envKey !== apiKey) {
+          log.warn(
+            "SENSO_API_KEY is set in this environment and overrides the key just stored, so commands will keep using it and not the key you logged in with. Logging in again will not change that: unset SENSO_API_KEY to use the stored key, or set it to the key you want. Run `senso whoami` to see which organization commands reach.",
+          );
+        }
       }),
     );
 
@@ -115,7 +146,9 @@ export function registerAuthCommands(program: Command): void {
     )
     .action(
       runAction(program, async (ctx) => {
-        const apiKey = getApiKey({ apiKey: ctx.apiKey });
+        // Resolved together so the reported source is the source of the key
+        // this command actually used, not a second guess at the same chain.
+        const { key: apiKey, source, shadowed } = resolveApiKey({ apiKey: ctx.apiKey });
 
         if (!apiKey) {
           throw new CliError("Not authenticated: no API key found.", EXIT.AUTH, {
@@ -125,6 +158,20 @@ export function registerAuthCommands(program: Command): void {
         }
 
         const config = readConfig();
+
+        // Whoever runs this may not be whoever set the key up. Someone runs
+        // `senso login` in a terminal that already exports SENSO_API_KEY, sees
+        // the warning, and then hands the shell to an agent that never saw it —
+        // from there, "which key am I using" and "is another one being ignored"
+        // are different questions, and only the second explains a surprise.
+        // Suppressed under --output json, which implies --quiet; the payload
+        // carries `apiKeyShadowedSources` for that caller instead.
+        if (shadowed.length > 0 && source && !ctx.quiet) {
+          const ignored = shadowed.map((sh) => API_KEY_SOURCE_LABELS[sh]).join(" and ");
+          log.warn(
+            `More than one API key is available here: ${API_KEY_SOURCE_LABELS[source]} takes precedence, and the key in ${ignored} is being ignored. If this is not the organization you expected, that is why — and running \`senso login\` will not change it while ${API_KEY_SOURCE_LABELS[source]} is set.`,
+          );
+        }
 
         try {
           const org = await verifyApiKey(apiKey, ctx.baseUrl);
@@ -138,6 +185,14 @@ export function registerAuthCommands(program: Command): void {
               // A prefix, never the key. `whoami` is the command people paste
               // into a support thread.
               apiKeyPrefix: apiKey.slice(0, 8) + "...",
+              // Which of the three sources supplied that key. `login` writes
+              // the config file but the environment outranks it, so "which
+              // organization" is only half an answer without "and why".
+              apiKeySource: source,
+              // Always present, empty when there is no conflict. A field that
+              // is sometimes absent and sometimes an array is a worse contract
+              // for the agent doing the parsing than one that is always there.
+              apiKeyShadowedSources: shadowed,
               configPath: getConfigPath(),
             },
             {
@@ -147,7 +202,7 @@ export function registerAuthCommands(program: Command): void {
                 `  ${pc.bold("Org ID:")}        ${org.org_id}`,
                 `  ${pc.bold("Slug:")}          ${org.slug}`,
                 `  ${pc.bold("Tier:")}          ${org.is_free_tier ? "Free" : "Paid"}`,
-                `  ${pc.bold("API Key:")}       ${apiKey.slice(0, 8)}...`,
+                `  ${pc.bold("API Key:")}       ${apiKey.slice(0, 8)}...${sourceSuffix(source)}`,
                 `  ${pc.bold("Config:")}        ${getConfigPath()}`,
                 "",
               ],
@@ -167,6 +222,19 @@ export function registerAuthCommands(program: Command): void {
           if (!config.orgName) throw err;
 
           log.warn("Could not reach the Senso API. Showing the last known values.");
+          // The cache was written by `login`, so it describes the STORED key.
+          // The test is whether the key in use IS that stored key — not whether
+          // a source was shadowed. An environment variable repeating the stored
+          // key is not a mismatch and must not warn; a config holding a cached
+          // org but no key at all (hand-edited) is one, and shadowing misses it.
+          // `typeof` rather than trusting `SensoConfig`: the file is
+          // user-editable, so `apiKey` is only a string by convention.
+          const storedKey = typeof config.apiKey === "string" ? config.apiKey.trim() : "";
+          if (storedKey !== apiKey) {
+            log.warn(
+              "The organization above was cached by `senso login`, which stored the key that is being ignored, so it may not be the organization the key in use belongs to.",
+            );
+          }
           emit(
             ctx,
             {
@@ -175,6 +243,8 @@ export function registerAuthCommands(program: Command): void {
               orgSlug: config.orgSlug,
               isFreeTier: config.isFreeTier,
               apiKeyPrefix: apiKey.slice(0, 8) + "...",
+              apiKeySource: source,
+              apiKeyShadowedSources: shadowed,
               configPath: getConfigPath(),
               cached: true,
             },
@@ -183,6 +253,7 @@ export function registerAuthCommands(program: Command): void {
                 "",
                 `  ${pc.bold("Organization:")}  ${config.orgName} ${pc.dim("(cached)")}`,
                 `  ${pc.bold("Org ID:")}        ${config.orgId ?? pc.dim("unknown")}`,
+                `  ${pc.bold("API Key:")}       ${apiKey.slice(0, 8)}...${sourceSuffix(source)}`,
                 `  ${pc.bold("Config:")}        ${getConfigPath()}`,
                 "",
               ],

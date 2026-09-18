@@ -184,6 +184,253 @@ describe("resolving the API key", () => {
   });
 });
 
+describe("reporting where the API key came from", () => {
+  /**
+   * `senso login` writes the config file, but the environment outranks it. A
+   * key exported in a shell profile makes every command talk to a different
+   * organization than the one `login` just confirmed, and nothing said so.
+   * `whoami` reports this, which is only worth anything if it reports the
+   * source of the key the command actually used — hence one resolver for both.
+   */
+  it("names the flag when the flag supplied the key", async () => {
+    const { writeConfig, resolveApiKey } = await loadConfig();
+    writeConfig({ apiKey: "from_file" });
+    process.env.SENSO_API_KEY = "from_env";
+
+    expect(resolveApiKey({ apiKey: "from_flag" }).source).toBe("flag");
+  });
+
+  it("names the environment when it outranks the stored file", async () => {
+    const { writeConfig, resolveApiKey } = await loadConfig();
+    writeConfig({ apiKey: "from_file" });
+    process.env.SENSO_API_KEY = "from_env";
+
+    expect(resolveApiKey().source).toBe("env");
+  });
+
+  it("names the config file when nothing outranks it", async () => {
+    const { writeConfig, resolveApiKey } = await loadConfig();
+    writeConfig({ apiKey: "from_file" });
+
+    expect(resolveApiKey().source).toBe("config");
+  });
+
+  it("is undefined when there is no key anywhere", async () => {
+    const { resolveApiKey } = await loadConfig();
+    expect(resolveApiKey().source).toBeUndefined();
+  });
+
+  /**
+   * The source is only useful if it cannot disagree with the key. An empty
+   * environment variable falls through for `getApiKey`, so it must fall through
+   * here too — reporting "env" over a request that used the stored key would be
+   * a worse answer than reporting nothing.
+   */
+  it("skips an empty environment variable, as the key resolution does", async () => {
+    const { writeConfig, resolveApiKey } = await loadConfig();
+    writeConfig({ apiKey: "from_file" });
+    process.env.SENSO_API_KEY = "";
+
+    expect(resolveApiKey().source).toBe("config");
+  });
+
+  it("skips an empty flag, as the key resolution does", async () => {
+    const { writeConfig, resolveApiKey } = await loadConfig();
+    writeConfig({ apiKey: "from_file" });
+    process.env.SENSO_API_KEY = "from_env";
+
+    expect(resolveApiKey({ apiKey: "" }).source).toBe("env");
+  });
+
+  it("returns the key and its source from one resolution, always agreeing", async () => {
+    const { writeConfig, resolveApiKey, getApiKey } = await loadConfig();
+    writeConfig({ apiKey: "from_file" });
+    process.env.SENSO_API_KEY = "";
+
+    const resolved = resolveApiKey();
+
+    expect(resolved).toEqual({ key: "from_file", source: "config", shadowed: [] });
+    expect(resolved.key).toBe(getApiKey());
+  });
+});
+
+describe("reporting a key that is being shadowed", () => {
+  /**
+   * The scenario this exists for: someone runs `senso login` in a terminal that
+   * already exports SENSO_API_KEY. `login` warns at the time, but the next
+   * thing to use that shell — an agent, typically — never saw the warning. From
+   * there, "SENSO_API_KEY is the only key here" (the ordinary CI setup) and
+   * "SENSO_API_KEY is quietly shadowing the key this user just logged in with"
+   * are indistinguishable without this.
+   */
+  it("names the stored key that the environment is shadowing", async () => {
+    const { writeConfig, resolveApiKey } = await loadConfig();
+    writeConfig({ apiKey: "from_file" });
+    process.env.SENSO_API_KEY = "from_env";
+
+    expect(resolveApiKey().shadowed).toEqual(["config"]);
+  });
+
+  it("names both when the flag shadows an environment and a stored key", async () => {
+    const { writeConfig, resolveApiKey } = await loadConfig();
+    writeConfig({ apiKey: "from_file" });
+    process.env.SENSO_API_KEY = "from_env";
+
+    expect(resolveApiKey({ apiKey: "from_flag" }).shadowed).toEqual(["env", "config"]);
+  });
+
+  /**
+   * Two sources agreeing changes nothing about which organization is reached,
+   * so reporting it would be a false alarm — and a warning that cries wolf is
+   * one the next reader learns to skip.
+   */
+  it("says nothing when the sources hold the same key", async () => {
+    const { writeConfig, resolveApiKey } = await loadConfig();
+    writeConfig({ apiKey: "same_key" });
+    process.env.SENSO_API_KEY = "same_key";
+
+    expect(resolveApiKey().shadowed).toEqual([]);
+  });
+
+  it("says nothing when only one source holds a key", async () => {
+    const { writeConfig, resolveApiKey } = await loadConfig();
+    writeConfig({ apiKey: "from_file" });
+
+    expect(resolveApiKey().shadowed).toEqual([]);
+  });
+
+  it("says nothing when there is no key at all", async () => {
+    const { resolveApiKey } = await loadConfig();
+    expect(resolveApiKey().shadowed).toEqual([]);
+  });
+
+  it("does not count an empty environment variable as a shadowed key", async () => {
+    const { writeConfig, resolveApiKey } = await loadConfig();
+    writeConfig({ apiKey: "from_file" });
+    process.env.SENSO_API_KEY = "";
+
+    expect(resolveApiKey().shadowed).toEqual([]);
+  });
+
+  it("reports the key, its source and what it outranked from one resolution", async () => {
+    const { writeConfig, resolveApiKey } = await loadConfig();
+    writeConfig({ apiKey: "from_file" });
+    process.env.SENSO_API_KEY = "from_env";
+
+    expect(resolveApiKey()).toEqual({
+      key: "from_env",
+      source: "env",
+      shadowed: ["config"],
+    });
+  });
+});
+
+describe("a config file that is not an object", () => {
+  /**
+   * `JSON.parse("null")` SUCCEEDS, returning null — the catch in `readConfig`
+   * never sees it, so every `readConfig().x` in the codebase threw instead.
+   * That defeated the documented escape hatch: `--api-key` and SENSO_API_KEY
+   * are exactly what you reach for when the stored config is broken, and they
+   * stopped working precisely then.
+   */
+  it("treats a file containing `null` as no config at all", async () => {
+    const { readConfig } = await loadConfig();
+    writeRawConfig("null");
+
+    expect(readConfig()).toEqual({});
+  });
+
+  it("still resolves a flag key when the file contains `null`", async () => {
+    const { resolveApiKey } = await loadConfig();
+    writeRawConfig("null");
+
+    expect(resolveApiKey({ apiKey: "from_flag" })).toEqual({
+      key: "from_flag",
+      source: "flag",
+      shadowed: [],
+    });
+  });
+
+  it("still resolves an environment key when the file contains `null`", async () => {
+    const { resolveApiKey } = await loadConfig();
+    writeRawConfig("null");
+    process.env.SENSO_API_KEY = "from_env";
+
+    expect(resolveApiKey().key).toBe("from_env");
+  });
+
+  it.each([
+    ["a number", '{"apiKey": 123}'],
+    ["an object", '{"apiKey": {"k": 1}}'],
+    ["a boolean", '{"apiKey": true}'],
+    ["an array", '{"apiKey": ["x"]}'],
+    ["null", '{"apiKey": null}'],
+  ])("ignores a stored apiKey that is %s, rather than throwing", async (_label, body) => {
+    // `SensoConfig` describes what this CLI writes, not what is on disk. The
+    // file is user-editable, so the declared `string` is an assumption, and
+    // acting on it threw out of every command — including ones handed a good
+    // key by --api-key.
+    const { resolveApiKey } = await loadConfig();
+    writeRawConfig(body);
+
+    expect(resolveApiKey({ apiKey: "from_flag" })).toEqual({
+      key: "from_flag",
+      source: "flag",
+      shadowed: [],
+    });
+    expect(resolveApiKey()).toEqual({ shadowed: [] });
+  });
+
+  it.each([
+    ["a bare string", '"just a string"'],
+    ["an array", "[1,2,3]"],
+    ["a number", "42"],
+  ])("treats %s as no config at all", async (_label, body) => {
+    const { readConfig } = await loadConfig();
+    writeRawConfig(body);
+
+    expect(readConfig()).toEqual({});
+  });
+});
+
+describe("keys that differ only by surrounding whitespace", () => {
+  /**
+   * `SENSO_API_KEY=$(cat key.txt)` and a Docker --env-file both readily carry a
+   * trailing newline. Node strips it from the header, so the request succeeds —
+   * but an untrimmed comparison called the two keys different and warned about
+   * a conflict that did not exist, in exactly the case the warning is meant to
+   * stay silent about.
+   */
+  it("does not call an identical key shadowed because of a trailing newline", async () => {
+    const { writeConfig, resolveApiKey } = await loadConfig();
+    writeConfig({ apiKey: "tgr_same_key" });
+    process.env.SENSO_API_KEY = "tgr_same_key\n";
+
+    expect(resolveApiKey().shadowed).toEqual([]);
+  });
+
+  it("sends the trimmed key, which is what the header would carry anyway", async () => {
+    const { writeConfig, resolveApiKey } = await loadConfig();
+    writeConfig({ apiKey: "tgr_stored" });
+    process.env.SENSO_API_KEY = "  tgr_padded  ";
+
+    expect(resolveApiKey().key).toBe("tgr_padded");
+  });
+
+  it("treats a whitespace-only value as absent, as it does the empty string", async () => {
+    const { writeConfig, resolveApiKey } = await loadConfig();
+    writeConfig({ apiKey: "tgr_the_real_key" });
+    process.env.SENSO_API_KEY = "   ";
+
+    // Otherwise a stray space in a shell profile costs the user a working key.
+    expect(resolveApiKey()).toEqual({
+      key: "tgr_the_real_key",
+      source: "config",
+      shadowed: [],
+    });
+  });
+});
+
 describe("resolving the base URL", () => {
   it("falls back to production when nothing overrides it", async () => {
     const { getBaseUrl } = await loadConfig();

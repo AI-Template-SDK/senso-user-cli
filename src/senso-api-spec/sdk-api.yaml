@@ -599,12 +599,37 @@ paths:
         imported, so the stage you pick by is the stage you get.
 
 
+        Each prompt also carries how it went over the date window. `models` has one
+        entry per AI model that answered it, with your own brand overlaid: how many
+        answers that model gave, and how many of them named you. `top_three_mentioned`
+        is the three brands named most often on that prompt by anyone — so a prompt
+        whose `models` show no mentions of you, next to a full `top_three_mentioned`,
+        is one worth looking at: the AI answers it, and the brands it names are not
+        yours.
+
+
+        The window bounds the FIGURES, never the list. Every active prompt is returned
+        whether or not it has results in the window; one without them carries `[]` for
+        both.
+
+
+        Figures are grouped into whole weeks, Monday to Sunday, UTC. A week is counted
+        when its Monday falls inside `from`–`to`, so a `from` that lands mid-week starts
+        the figures at the following Monday, and the last week is counted in full even
+        where it runs past `to`. Pass Mondays for exact weekly slices. `window` echoes
+        the dates you asked for.
+
+
         Prompts come back oldest first, in a stable order. `limit` and `offset` are
         validated rather than adjusted: a `limit` above 100 is a `400`, not a silently
         smaller page. Requires the GEO product.
       operationId: orgListIndustryPrompts
       parameters:
         - $ref: "#/components/parameters/IndustryID"
+        - $ref: "#/components/parameters/IndustryFrom"
+        - $ref: "#/components/parameters/IndustryTo"
+        - $ref: "#/components/parameters/IndustryModels"
+        - $ref: "#/components/parameters/IndustryLocation"
         - name: limit
           in: query
           description: Page size (1-100). Defaults to 50. Anything else is a `400`.
@@ -629,6 +654,108 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OrgIndustryPromptListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /org/industries/{id}/answers/latest:
+    get:
+      tags: [Industries]
+      summary: Latest industry answers
+      description: >-
+        The newest stored answer for each of your industry's prompts, from each AI model at
+        each location, with the full response text — and for every answer, whether it named
+        your brand, where in the answer, and in what tone. This is how you find the prompts
+        the AI answers without you, and read exactly what it says when it does.
+
+
+        Only your organization's own industry can be read here; any other id is a `404`.
+        Requires the GEO product.
+
+
+        Each prompt × model × location has exactly one newest answer, so there is no date
+        window: `since` hides combinations whose newest answer is older than that day
+        rather than returning older answers. Ask "which prompts does this model answer
+        without naming me" with `mentioned=false` and `models` set to that one model —
+        every other model's answer to the same prompt is a separate row, and you have not
+        asked for it.
+
+
+        Answers where the model returned nothing are left out unless you pass
+        `include_empty=true`. An answer with no text names no brands, so it would otherwise
+        read as an answer that left you out.
+
+
+        The same brand is named in one answer as `Rival Bank` and in another as `Rival`;
+        `brands[].key` is the same for both, so you can group on it. Paged, newest first.
+        `limit` and `offset` are validated rather than adjusted: a `limit` above 100 is a
+        `400`, not a silently smaller page.
+      operationId: orgListIndustryLatestAnswers
+      parameters:
+        - $ref: "#/components/parameters/IndustryID"
+        - name: mentioned
+          in: query
+          description: >-
+            Restrict to answers that did (`true`) or did not (`false`) name your brand.
+            Omit for all answers.
+          schema:
+            type: boolean
+        - $ref: "#/components/parameters/IndustryModels"
+        - $ref: "#/components/parameters/IndustryLocation"
+        - name: prompt_ids
+          in: query
+          description: >-
+            Comma-separated prompt ids (from `GET /org/industries/{id}/prompts`) to
+            restrict to. Omit for every prompt. An id that is not a uuid is a `400`.
+          schema:
+            type: string
+        - name: since
+          in: query
+          description: >-
+            Only include answers collected on or after this day, `YYYY-MM-DD`. Omit for no
+            lower bound.
+          schema:
+            type: string
+            format: date
+        - name: include_empty
+          in: query
+          description: >-
+            `true` to include answers where the model returned nothing. Defaults to
+            `false`.
+          schema:
+            type: boolean
+            default: false
+        - name: limit
+          in: query
+          description: Page size (1-100). Defaults to 25. Anything else is a `400`.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: offset
+          in: query
+          description: >-
+            Number of answers to skip. Defaults to 0. A negative or non-integer value is a
+            `400`.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: >-
+            One page of the industry's newest answers. When the industry has no results
+            yet, or is not included in your plan, `answers` is empty and `notes` says so.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrgIndustryAnswersResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -1343,6 +1470,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
         "403":
           $ref: "#/components/responses/Forbidden"
 
@@ -1380,6 +1509,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
         "403":
           $ref: "#/components/responses/Forbidden"
 
@@ -1417,6 +1548,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
         "403":
           $ref: "#/components/responses/Forbidden"
 
@@ -1454,6 +1587,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
         "403":
           $ref: "#/components/responses/Forbidden"
 
@@ -1498,225 +1633,10 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
         "403":
           $ref: "#/components/responses/Forbidden"
-
-  # ──────────────────────────────────────────────
-  # Evals — /org/evals
-  # ──────────────────────────────────────────────
-  /org/evals/text:
-    post:
-      tags: [Evals]
-      summary: Evaluate text you supply
-      description: >-
-        Judges arbitrary text with no setup — paste a draft, an answer, or a page and
-        have every factual claim it makes about your brand checked against your
-        knowledge base (the default `kb_accuracy` evaluator), or its writing graded
-        against your brand kit (`brand_alignment`). The text is stored with the run
-        and returned in the run detail. By default the run is queued and a `202`
-        returns the run to poll at `GET /org/evals/runs/{runId}`. With `wait: true`
-        the connection is held and the finished run is returned as a `200`; if the
-        run has not finished within the server's wait ceiling (about a minute), the
-        response degrades to the `202` handle and the run keeps executing. Send an
-        `idempotency_key` to make a retried trigger return the original run instead
-        of judging the same text twice.
-      operationId: orgEvalText
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/EvalTextRequest"
-            example:
-              title: Homepage hero copy
-              text: Senso compiles an enterprise's knowledge into verified ground truth for AI agents.
-              evaluator: kb_accuracy
-              label: homepage-draft-3
-      responses:
-        "200":
-          description: >-
-            The run finished within the wait ceiling (`wait: true` only) — the full
-            run, including claims, verdicts, and the judge's audit trail.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/EvalRunDetail"
-        "202":
-          description: >-
-            The run to poll at `GET /org/evals/runs/{runId}`. Normally a freshly queued
-            run. On an `idempotency_key` match it is the original run in whatever
-            state it had reached; when `wait: true` timed out it is the run as queued —
-            poll for its current status.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/EvalRunSummary"
-        "400":
-          $ref: "#/components/responses/BadRequestBody"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "422":
-          $ref: "#/components/responses/UnprocessableEntity"
-        "503":
-          $ref: "#/components/responses/ServiceUnavailable"
-
-  /org/evals/content:
-    post:
-      tags: [Evals]
-      summary: Evaluate a saved content item
-      description: >-
-        Judges the latest saved version of one content item — a knowledge-base
-        document or a generated article — identified by its content id. Only items
-        whose latest version is raw text can be judged: file and web items (an
-        uploaded PDF, a crawled page) store a pointer rather than text of their own
-        and are a `422`, as is an item with no saved version. An id that is not one
-        of your organization's items is a `404`. Evaluator selection, `wait`, and
-        `idempotency_key` behave exactly as for `POST /org/evals/text`.
-      operationId: orgEvalContent
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/EvalContentRequest"
-            example:
-              content_id: 123e4567-e89b-12d3-a456-426614174000
-              evaluator: kb_accuracy
-              wait: true
-      responses:
-        "200":
-          description: >-
-            The run finished within the wait ceiling (`wait: true` only) — the full
-            run, including claims, verdicts, and the judge's audit trail.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/EvalRunDetail"
-        "202":
-          description: >-
-            The run to poll at `GET /org/evals/runs/{runId}`. Normally a freshly queued
-            run. On an `idempotency_key` match it is the original run in whatever
-            state it had reached; when `wait: true` timed out it is the run as queued —
-            poll for its current status.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/EvalRunSummary"
-        "400":
-          $ref: "#/components/responses/BadRequestBody"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "422":
-          $ref: "#/components/responses/UnprocessableEntity"
-        "503":
-          $ref: "#/components/responses/ServiceUnavailable"
-
-  /org/evals/runs:
-    get:
-      tags: [Evals]
-      summary: List eval runs
-      description: >-
-        Returns one page of your organization's eval runs, newest first, with each
-        run's status and headline metrics. The bulky payloads — the subject
-        snapshot, claims, searches, and evidence — are left to the single-run read.
-        Filter by creation time, evaluator, and subject type.
-      operationId: orgListEvalRuns
-      parameters:
-        - $ref: "#/components/parameters/EvalFrom"
-        - $ref: "#/components/parameters/EvalTo"
-        - $ref: "#/components/parameters/EvalEvaluatorFilter"
-        - $ref: "#/components/parameters/EvalSubjectTypeFilter"
-        - $ref: "#/components/parameters/EvalLimit"
-        - $ref: "#/components/parameters/EvalOffset"
-      responses:
-        "200":
-          description: One page of eval runs.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/EvalRunListResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-
-  /org/evals/runs/{runId}:
-    get:
-      tags: [Evals]
-      summary: Get an eval run
-      description: >-
-        Returns everything about one run: its status and metrics, the subject as it
-        was judged, every claim with its verdict and evidence, and the judge's audit
-        trail — every search it ran and every passage it read — so a verdict can be
-        checked rather than trusted. This is the poll target for a queued run; the
-        run is finished when `status` is `completed`, `gated`, or `failed`.
-      operationId: orgGetEvalRun
-      parameters:
-        - $ref: "#/components/parameters/EvalRunID"
-      responses:
-        "200":
-          description: The run.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/EvalRunDetail"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "404":
-          $ref: "#/components/responses/NotFound"
-
-  /org/evals/claims:
-    get:
-      tags: [Evals]
-      summary: List judged claims
-      description: >-
-        Returns one page of judged claims across your organization's runs, newest
-        first — the gap report. Each claim carries its verdict, its classification
-        bucket, and the evidence behind it. Filter by creation time, evaluator,
-        subject type, or a single run.
-      operationId: orgListEvalClaims
-      parameters:
-        - $ref: "#/components/parameters/EvalFrom"
-        - $ref: "#/components/parameters/EvalTo"
-        - $ref: "#/components/parameters/EvalEvaluatorFilter"
-        - $ref: "#/components/parameters/EvalSubjectTypeFilter"
-        - $ref: "#/components/parameters/EvalClaimRunIDFilter"
-        - $ref: "#/components/parameters/EvalLimit"
-        - $ref: "#/components/parameters/EvalOffset"
-      responses:
-        "200":
-          description: One page of judged claims.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/EvalClaimListResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-
-  /org/evals/evaluators:
-    get:
-      tags: [Evals]
-      summary: List available evaluators
-      description: >-
-        Returns the evaluators your organization can run, each with the subject types
-        it accepts and descriptors for the metrics it reports, so results can be
-        rendered without knowing an evaluator in advance.
-      operationId: orgListEvaluators
-      responses:
-        "200":
-          description: The available evaluators.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/EvaluatorListResponse"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
 
   # ──────────────────────────────────────────────
   # Gaps — /org/gaps (what the knowledge base could not back up)
@@ -1993,6 +1913,223 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+  # ──────────────────────────────────────────────
+  # Evals — /org/evals
+  # ──────────────────────────────────────────────
+  /org/evals/text:
+    post:
+      tags: [Evals]
+      summary: Evaluate text you supply
+      description: >-
+        Judges arbitrary text with no setup — paste a draft, an answer, or a page and
+        have every factual claim it makes about your brand checked against your
+        knowledge base (the default `kb_accuracy` evaluator), or its writing graded
+        against your brand kit (`brand_alignment`). The text is stored with the run
+        and returned in the run detail. By default the run is queued and a `202`
+        returns the run to poll at `GET /org/evals/runs/{runId}`. With `wait: true`
+        the connection is held and the finished run is returned as a `200`; if the
+        run has not finished within the server's wait ceiling (about a minute), the
+        response degrades to the `202` handle and the run keeps executing. Send an
+        `idempotency_key` to make a retried trigger return the original run instead
+        of judging the same text twice.
+      operationId: orgEvalText
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvalTextRequest"
+            example:
+              title: Homepage hero copy
+              text: Senso compiles an enterprise's knowledge into verified ground truth for AI agents.
+              evaluator: kb_accuracy
+              label: homepage-draft-3
+      responses:
+        "200":
+          description: >-
+            The run finished within the wait ceiling (`wait: true` only) — the full
+            run, including claims, verdicts, and the judge's audit trail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvalRunDetail"
+        "202":
+          description: >-
+            The run to poll at `GET /org/evals/runs/{runId}`. Normally a freshly queued
+            run. On an `idempotency_key` match it is the original run in whatever
+            state it had reached; when `wait: true` timed out it is the run as queued —
+            poll for its current status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvalRunSummary"
+        "400":
+          $ref: "#/components/responses/BadRequestBody"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /org/evals/content:
+    post:
+      tags: [Evals]
+      summary: Evaluate a saved content item
+      description: >-
+        Judges the latest saved version of one content item — a knowledge-base
+        document or a generated article — identified by its content id. Only items
+        whose latest version is raw text can be judged: file and web items (an
+        uploaded PDF, a crawled page) store a pointer rather than text of their own
+        and are a `422`, as is an item with no saved version. An id that is not one
+        of your organization's items is a `404`. Evaluator selection, `wait`, and
+        `idempotency_key` behave exactly as for `POST /org/evals/text`.
+      operationId: orgEvalContent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvalContentRequest"
+            example:
+              content_id: 123e4567-e89b-12d3-a456-426614174000
+              evaluator: kb_accuracy
+              wait: true
+      responses:
+        "200":
+          description: >-
+            The run finished within the wait ceiling (`wait: true` only) — the full
+            run, including claims, verdicts, and the judge's audit trail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvalRunDetail"
+        "202":
+          description: >-
+            The run to poll at `GET /org/evals/runs/{runId}`. Normally a freshly queued
+            run. On an `idempotency_key` match it is the original run in whatever
+            state it had reached; when `wait: true` timed out it is the run as queued —
+            poll for its current status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvalRunSummary"
+        "400":
+          $ref: "#/components/responses/BadRequestBody"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /org/evals/runs:
+    get:
+      tags: [Evals]
+      summary: List eval runs
+      description: >-
+        Returns one page of your organization's eval runs, newest first, with each
+        run's status and headline metrics. The bulky payloads — the subject
+        snapshot, claims, searches, and evidence — are left to the single-run read.
+        Filter by creation time, evaluator, and subject type.
+      operationId: orgListEvalRuns
+      parameters:
+        - $ref: "#/components/parameters/EvalFrom"
+        - $ref: "#/components/parameters/EvalTo"
+        - $ref: "#/components/parameters/EvalEvaluatorFilter"
+        - $ref: "#/components/parameters/EvalSubjectTypeFilter"
+        - $ref: "#/components/parameters/EvalLimit"
+        - $ref: "#/components/parameters/EvalOffset"
+      responses:
+        "200":
+          description: One page of eval runs.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvalRunListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /org/evals/runs/{runId}:
+    get:
+      tags: [Evals]
+      summary: Get an eval run
+      description: >-
+        Returns everything about one run: its status and metrics, the subject as it
+        was judged, every claim with its verdict and evidence, and the judge's audit
+        trail — every search it ran and every passage it read — so a verdict can be
+        checked rather than trusted. This is the poll target for a queued run; the
+        run is finished when `status` is `completed`, `gated`, or `failed`.
+      operationId: orgGetEvalRun
+      parameters:
+        - $ref: "#/components/parameters/EvalRunID"
+      responses:
+        "200":
+          description: The run.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvalRunDetail"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /org/evals/claims:
+    get:
+      tags: [Evals]
+      summary: List judged claims
+      description: >-
+        Returns one page of judged claims across your organization's runs, newest
+        first — the gap report. Each claim carries its verdict, its classification
+        bucket, and the evidence behind it. Filter by creation time, evaluator,
+        subject type, or a single run.
+      operationId: orgListEvalClaims
+      parameters:
+        - $ref: "#/components/parameters/EvalFrom"
+        - $ref: "#/components/parameters/EvalTo"
+        - $ref: "#/components/parameters/EvalEvaluatorFilter"
+        - $ref: "#/components/parameters/EvalSubjectTypeFilter"
+        - $ref: "#/components/parameters/EvalClaimRunIDFilter"
+        - $ref: "#/components/parameters/EvalLimit"
+        - $ref: "#/components/parameters/EvalOffset"
+      responses:
+        "200":
+          description: One page of judged claims.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvalClaimListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /org/evals/evaluators:
+    get:
+      tags: [Evals]
+      summary: List available evaluators
+      description: >-
+        Returns the evaluators your organization can run, each with the subject types
+        it accepts and descriptors for the metrics it reports, so results can be
+        rendered without knowing an evaluator in advance.
+      operationId: orgListEvaluators
+      responses:
+        "200":
+          description: The available evaluators.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvaluatorListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
   # ──────────────────────────────────────────────
   # Knowledge Base — /org/kb
@@ -6385,10 +6522,13 @@ paths:
     get:
       tags: [Credits]
       summary: Get the org credit balance
-      description: >-
-        Returns your organization's credit balance and usage. On a free-tier org,
-        `credits_available` is the remaining allowance (spend limit minus usage, never below zero), or
-        `null` when no spend limit is set; on a paid org it is the current balance.
+      description: |
+        Returns the organization's credit position — what it can still spend, and
+        what it has spent to date. Takes no parameters.
+
+        The response always carries the same fields. Branch on `dedicated_balance`:
+        an organization that holds its own credit balance is not governed by a spend
+        limit, while any other organization spends against an optional `credit_limit`.
       operationId: orgGetCreditBalance
       responses:
         "200":
@@ -6401,6 +6541,34 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+
+  /org/credits/history:
+    get:
+      tags: [Credits]
+      summary: Get the org credit usage history
+      description: |
+        Returns a day-by-day breakdown of the organization's credit spend over a
+        trailing window, plus the total spent across it — enough to draw a usage chart
+        or spot a trend without post-processing.
+
+        Every day in the window is present, so a day with no spend comes back with a
+        `usage` of `0` and there are no gaps to fill. Entries run oldest to newest and
+        the last one is today, which is still accumulating — its `usage` will keep
+        rising until the day closes.
+      operationId: orgGetCreditHistory
+      parameters:
+        - $ref: "#/components/parameters/CreditsHistoryDays"
+      responses:
+        "200":
+          description: The daily usage series for the requested window.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrgCreditHistoryResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
   # ──────────────────────────────────────────────
   # Content Generation — /org/content-generation
@@ -7542,6 +7710,19 @@ components:
         type: integer
         minimum: 0
         default: 0
+
+    CreditsHistoryDays:
+      name: days
+      in: query
+      description: >-
+        Length of the trailing window in days, 1–365 (default 30), counting back from
+        today. A value outside that range, a non-numeric one, or `?days=` with no
+        value at all is rejected with 400 rather than falling back to the default.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 365
+        default: 30
 
   # Reusable error responses. Every non-2xx body is an ErrorResponse; endpoints that
   # validate a request body can answer 400 with a ValidationErrorResponse instead.
@@ -10909,7 +11090,6 @@ components:
     ContentEngineDraftRequest:
       type: object
       required:
-        - geo_question_id
         - raw_markdown
         - seo_title
       properties:
@@ -12040,12 +12220,14 @@ components:
             $ref: "#/components/schemas/OrgPromptRunResponse"
     OrgIndustryPromptItem:
       type: object
-      description: One prompt an industry runs.
+      description: One prompt an industry runs, and how it went over the window.
       additionalProperties: false
       required:
         - id
         - text
         - funnel_stage
+        - models
+        - top_three_mentioned
       properties:
         id:
           type: string
@@ -12063,15 +12245,85 @@ components:
             Where the question sits in a buyer's journey, and the stage the prompt would
             have in your organization once imported.
           example: consideration
+        models:
+          type: array
+          description: >-
+            One entry per AI model that answered this prompt in the window, with your
+            own brand overlaid on the mention counts. `[]` when the prompt has no
+            results in the window.
+          items:
+            $ref: "#/components/schemas/OrgIndustryPromptModelMetrics"
+        top_three_mentioned:
+          type: array
+          description: >-
+            The three brands named most often on this prompt in the window, by any
+            brand — yours appears only when it is one of them. `[]` when no brand was
+            named.
+          items:
+            $ref: "#/components/schemas/OrgIndustryPromptMentionedBrand"
+    OrgIndustryPromptModelMetrics:
+      type: object
+      description: How one AI model answered a prompt over the window.
+      additionalProperties: false
+      required:
+        - model
+        - answered_count
+        - brand_mention_count
+        - brand_mention_rate
+      properties:
+        model:
+          type: string
+          description: The AI model, named the way the industry's runs record it.
+          example: chatgpt
+        answered_count:
+          type: integer
+          description: Answers this model gave to the prompt in the window.
+          example: 8
+        brand_mention_count:
+          type: integer
+          description: How many of those answers named your organization's brand.
+          example: 2
+        brand_mention_rate:
+          type: number
+          format: double
+          description: >-
+            `brand_mention_count` divided by `answered_count`, as a fraction between 0
+            and 1. `0` when the model gave no answers.
+          example: 0.25
+    OrgIndustryPromptMentionedBrand:
+      type: object
+      description: One brand named on a prompt, with how often it was named.
+      additionalProperties: false
+      required:
+        - brand_name
+        - mentioned_count
+      properties:
+        brand_id:
+          type: string
+          format: uuid
+          description: >-
+            Stable id for the brand, for matching it across industries and windows.
+            Absent for a brand the AI named that has no registry entry yet.
+        brand_name:
+          type: string
+          description: The brand as the AI answers spell it.
+          example: Acme Bank
+        mentioned_count:
+          type: integer
+          description: Answers to this prompt that named the brand, across every model.
+          example: 6
     OrgIndustryPromptListResponse:
       type: object
       additionalProperties: false
       required:
+        - window
         - prompts
         - total
         - limit
         - offset
       properties:
+        window:
+          $ref: "#/components/schemas/IndustryWindow"
         prompts:
           type: array
           description: One page of the industry's active prompts, in a stable order.
@@ -12090,6 +12342,226 @@ components:
           type: integer
           description: The offset applied.
           example: 0
+    OrgIndustryAnswersResponse:
+      type: object
+      description: One page of an industry's newest answers, evaluated for your brand.
+      additionalProperties: false
+      required:
+        - total
+        - limit
+        - offset
+        - answers
+        - notes
+        - definitions
+      properties:
+        total:
+          type: integer
+          description: >-
+            Answers matching every filter, including `mentioned`, across all pages — not the
+            size of this page.
+          example: 47
+        limit:
+          type: integer
+          description: The page size applied.
+          example: 25
+        offset:
+          type: integer
+          description: The offset applied.
+          example: 0
+        answers:
+          type: array
+          description: Newest first.
+          items:
+            $ref: "#/components/schemas/OrgIndustryAnswer"
+        notes:
+          type: array
+          description: >-
+            How to read the payload — always that rows are single answers and must never be
+            summed; when the industry has nothing to show you, why `answers` is empty.
+          items:
+            type: string
+        definitions:
+          type: object
+          additionalProperties:
+            type: string
+          description: One-line definitions of the metrics behind this payload, keyed by glossary metric name (not by response field name).
+    OrgIndustryAnswer:
+      type: object
+      description: >-
+        The newest stored answer for one prompt from one AI model at one location, with your
+        brand read against it. One answer, never a total — two rows for the same prompt are
+        two models or two locations.
+      additionalProperties: false
+      required:
+        - prompt_id
+        - prompt_text
+        - model
+        - location
+        - run_at
+        - observation_id
+        - response_text
+        - empty
+        - mentioned
+        - rank
+        - sentiment
+        - sov_pct
+        - brand_count
+        - brands
+        - citation_count
+        - source_count
+        - citations
+      properties:
+        prompt_id:
+          type: string
+          format: uuid
+          description: The industry prompt's id — what you pass to the import and draft endpoints.
+        prompt_text:
+          type: string
+          description: The question the industry asks the AI models.
+          example: Which bank has the best mortgage rates?
+        model:
+          type: string
+          description: The AI model that gave this answer.
+          example: chatgpt
+        location:
+          type: string
+          description: The location the answer was collected for.
+          example: US
+        run_at:
+          type: string
+          format: date-time
+          description: When the answer was collected.
+        observation_id:
+          type: string
+          description: >-
+            An opaque, stable id for this answer. Use it to tie an evaluation or a note back
+            to the exact text it was made from.
+        response_text:
+          type: string
+          description: The model's full answer text. Empty when `empty` is true.
+        empty:
+          type: boolean
+          description: >-
+            Whether the model returned no answer in its most recent run. Such answers are
+            only present when `include_empty=true` was passed.
+        mentioned:
+          type: boolean
+          description: Whether the answer named your brand.
+        rank:
+          type: integer
+          nullable: true
+          description: >-
+            Your brand's ordinal position among the brands the answer named (1 = named
+            first), or null when the answer did not name you.
+          example: 2
+        sentiment:
+          type: string
+          nullable: true
+          description: >-
+            The tone of the answer towards your brand — `positive`, `neutral`, or
+            `negative` — or null when the answer did not name you.
+          example: positive
+        sov_pct:
+          type: number
+          format: double
+          nullable: true
+          description: >-
+            Your share of every brand mention in this one answer, as a percentage from 0 to
+            100 — or null when the answer named no brands at all. A share of one answer, not
+            a rate; it is not comparable with `brand_mention_rate` on the prompt list, which
+            is a fraction of answers.
+          example: 25
+        brand_count:
+          type: integer
+          description: >-
+            How many distinct brands the answer named. `brands` may list fewer, so a
+            `brand_count` larger than its length tells you the list was shortened.
+          example: 7
+        brands:
+          type: array
+          description: The brands the answer named, in the order it named them.
+          items:
+            $ref: "#/components/schemas/IndustryAnswerBrand"
+        citation_count:
+          type: integer
+          description: How many links the answer cited. `citations` may list fewer.
+          example: 9
+        source_count:
+          type: integer
+          description: How many pages the model consulted to write the answer. `citations` may list fewer.
+          example: 12
+        citations:
+          type: array
+          description: The links the answer cited or consulted, cited ones first.
+          items:
+            $ref: "#/components/schemas/IndustryAnswerCitation"
+    IndustryAnswerBrand:
+      type: object
+      description: One brand named in one answer.
+      additionalProperties: false
+      required:
+        - key
+        - name
+        - rank
+        - mentions
+        - sentiment
+      properties:
+        key:
+          type: string
+          description: >-
+            A normalized form of the brand's name, the same for every spelling of the brand.
+            Group on this; display `name`.
+          example: rival bank
+        name:
+          type: string
+          description: The brand as the answer named it.
+          example: Rival Bank
+        rank:
+          type: integer
+          nullable: true
+          description: The brand's ordinal position in the answer (1 = named first), when known.
+          example: 1
+        mentions:
+          type: integer
+          description: How many times the answer named the brand.
+          example: 3
+        sentiment:
+          type: string
+          description: The tone of the answer towards this brand — `positive`, `neutral`, or `negative`.
+          example: positive
+    IndustryAnswerCitation:
+      type: object
+      description: One link the answer cited or consulted.
+      additionalProperties: false
+      required:
+        - url
+        - domain
+        - cited
+        - sourced
+        - source_rank
+        - citation_rank
+      properties:
+        url:
+          type: string
+          description: The link.
+        domain:
+          type: string
+          description: The link's domain.
+          example: nerdwallet.com
+        cited:
+          type: boolean
+          description: Whether the answer cited this link in its text.
+        sourced:
+          type: boolean
+          description: Whether the model consulted this link while writing the answer.
+        source_rank:
+          type: integer
+          nullable: true
+          description: The link's position among the pages consulted (1 = first), when known.
+        citation_rank:
+          type: integer
+          nullable: true
+          description: The link's position among the citations (1 = first), when known.
     ImportIndustryPromptsRequest:
       type: object
       additionalProperties: false
@@ -13242,31 +13714,110 @@ components:
         domain:
           type: string
           description: The custom domain to register (e.g. `blog.example.com`).
+    # ── Credits ───────────────────────────────
+    # One flat shape for every organization: all six fields are always present.
+    # `dedicated_balance` says how to read the two limit fields.
     OrgCreditBalanceResponse:
       type: object
+      description: >-
+        An organization's credit position — what it can still spend, and what it has
+        spent to date.
       additionalProperties: false
       required:
         - org_id
+        - dedicated_balance
+        - credit_limit_set
+        - credit_limit
+        - total_usage
         - credits_available
-        - usage
-        - is_free_tier
       properties:
         org_id:
           type: string
           format: uuid
+        dedicated_balance:
+          type: boolean
+          description: Whether the organization holds its own credit balance. Branch on this.
+        credit_limit_set:
+          type: boolean
+          description: >-
+            Whether a spend limit governs the organization. Always `false` when
+            `dedicated_balance` is `true` — spend limits do not apply to an
+            organization that holds its own balance.
+        credit_limit:
+          type: number
+          nullable: true
+          description: >-
+            The spend allowance in credits, or `null` when no limit governs the
+            organization. Since `total_usage` is a lifetime figure, this is a total
+            allowance that does not reset.
+          example: 100.00
+        total_usage:
+          type: number
+          description: >-
+            Credits spent over the organization's lifetime — not spend within the
+            current billing period.
+          example: 30.00
         credits_available:
           type: number
           nullable: true
           description: >-
-            Credits available to spend. On a free-tier org this is your remaining
-            allowance (spend limit minus usage, never below zero), or `null` when no spend limit is set; on a
-            paid org it is the current balance.
+            Credits still spendable — the organization's own balance when
+            `dedicated_balance` is `true`, otherwise the spend limit minus lifetime
+            usage, floored at zero. Never negative: an organization past its limit
+            reports `0`. It is `null` only when no limit governs an organization
+            that has no balance of its own — that means unmetered, not exhausted, so
+            do not read `null` as zero.
+          example: 70.00
+
+    OrgCreditHistoryResponse:
+      type: object
+      description: >-
+        Daily credit spend across a trailing window, with the window total.
+      additionalProperties: false
+      required:
+        - org_id
+        - days
+        - period_usage
+        - history
+      properties:
+        org_id:
+          type: string
+          format: uuid
+        days:
+          type: integer
+          description: The window that was applied — your `days` parameter, or the default.
+          example: 7
+        period_usage:
+          type: number
+          description: >-
+            Credits spent across the window, equal to the sum of `history[].usage`.
+            This covers the requested window only — for lifetime spend read
+            `total_usage` from `GET /org/credits/balance`, which will not match.
+          example: 43.15
+        history:
+          type: array
+          description: >-
+            One entry per day, oldest first, always exactly `days` entries long.
+          items:
+            $ref: "#/components/schemas/OrgCreditHistoryEntry"
+
+    OrgCreditHistoryEntry:
+      type: object
+      description: One day of credit spend.
+      additionalProperties: false
+      required:
+        - date
+        - usage
+      properties:
+        date:
+          type: string
+          format: date
+          description: The calendar day, as `YYYY-MM-DD`.
+          example: "2026-09-04"
         usage:
           type: number
-          description: Total credits used by the organization.
-        is_free_tier:
-          type: boolean
-          description: Whether the organization is on the free tier.
+          description: Credits spent that day — `0` on a day with no spend.
+          example: 12.50
 
     # ── Evals ──
     EvalTriggerOptions:
@@ -17073,12 +17624,11 @@ components:
     ContentEnginePublishRequest:
       type: object
       description: >-
-        Publishes generated markdown as a content item. `geo_question_id`, `raw_markdown`,
-        and `seo_title` are required. `builder_workspace_id` and
+        Publishes generated markdown as a content item. `raw_markdown` and `seo_title`
+        are required; `geo_question_id` is optional. `builder_workspace_id` and
         `expected_workspace_version_id` must be supplied together.
       additionalProperties: false
       required:
-        - geo_question_id
         - raw_markdown
         - seo_title
       properties:

@@ -179,6 +179,10 @@ Set `SENSO_CONFIG_DIR` to put it somewhere else. Credentials resolve in this
 order: `--api-key`, then `SENSO_API_KEY`, then the config file. `senso login`
 needs a terminal; in CI or an agent, set the environment variable.
 
+Because the environment outranks the file, `senso login` can store a key that no
+later command sends. `senso whoami` reports which of the three sources supplied
+the key it used, and `login` warns when `SENSO_API_KEY` is set to something else.
+
 The CLI checks npm for a newer version once a day and prints a notice on stderr.
 `senso update` upgrades it; `SENSO_NO_UPDATE_CHECK=1` turns the check off.
 

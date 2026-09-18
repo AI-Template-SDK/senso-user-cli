@@ -48,7 +48,14 @@ const DEFAULT_BASE_URL = "https://apiv2.senso.ai/api/v1";
  */
 export function readConfig(): SensoConfig {
   try {
-    return JSON.parse(readFileSync(CONFIG_FILE, "utf-8")) as SensoConfig;
+    const parsed: unknown = JSON.parse(readFileSync(CONFIG_FILE, "utf-8"));
+    // `JSON.parse("null")` SUCCEEDS and returns null, so the catch never sees
+    // it and every `readConfig().x` in the codebase throws instead. A file
+    // holding `null`, a string or an array is as unusable as a missing one —
+    // and the whole point of `--api-key` and SENSO_API_KEY is to keep working
+    // when the stored config is broken.
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return {};
+    return parsed;
   } catch {
     return {};
   }
@@ -83,23 +90,104 @@ export function clearConfig(): void {
 }
 
 /**
- * The API key, by precedence: flag, then environment, then the stored file.
+ * Where a resolved API key came from.
  *
- * `||` rather than `??` deliberately: an empty string is not a usable key, and
- * `SENSO_API_KEY=` in a CI environment should fall through to the stored value
- * rather than authenticate with "".
+ * Part of the `whoami` payload, so these spellings are a stable interface.
  */
-/* eslint-disable @typescript-eslint/prefer-nullish-coalescing --
-   `||` is the correct operator in both functions below, and `??` would be a
-   bug. An empty string is not a usable key or URL: `SENSO_API_KEY=` in a CI
-   environment, or `--api-key ""` from a shell variable that did not expand,
-   must fall through to the next source rather than authenticate with "". `??`
-   only falls through on null and undefined, so it would accept the empty
-   string and produce a confusing 401. */
+export type ApiKeySource = "flag" | "env" | "config";
+
+/**
+ * How each source is named to a reader. The payloads carry the bare enum; this
+ * is what appears in a sentence.
+ */
+export const API_KEY_SOURCE_LABELS: Record<ApiKeySource, string> = {
+  flag: "--api-key",
+  env: "SENSO_API_KEY",
+  config: "the config file",
+};
+
+export interface ResolvedApiKey {
+  key?: string;
+  source?: ApiKeySource;
+  /**
+   * Sources that also hold a key, hold a DIFFERENT one, and were outranked.
+   *
+   * The interesting case is someone running `senso login` in a terminal that
+   * already exports SENSO_API_KEY. `login` warns at the time, but whoever works
+   * in that shell next — an agent, most of all — never saw the warning and
+   * cannot otherwise tell "SENSO_API_KEY is the only key here", which is the
+   * normal CI setup, from "SENSO_API_KEY is quietly shadowing the key this user
+   * just logged in with", which is almost always a mistake.
+   *
+   * Identical keys are not listed: two sources agreeing changes nothing.
+   */
+  shadowed: ApiKeySource[];
+}
+
+/**
+ * The API key, where it came from, and what it outranked — by precedence:
+ * flag, then environment, then the stored file.
+ *
+ * Resolved in one pass, because the whole point of reporting the source is to
+ * answer "which key is this command actually using" — and two separate walks
+ * down the same precedence chain are two things that can drift apart and
+ * answer differently.
+ *
+ * A source counts only when it holds a non-empty string. `SENSO_API_KEY=` in a
+ * CI environment, or `--api-key ""` from a shell variable that did not expand,
+ * falls through to the next source rather than authenticating with "" and
+ * producing a confusing 401.
+ *
+ * Every source is read rather than short-circuited at the winner, which costs
+ * one small synchronous file read on a path that already does several. Knowing
+ * what was outranked is the entire feature, and it cannot be known lazily.
+ */
+export function resolveApiKey(opts?: { apiKey?: string }): ResolvedApiKey {
+  // Trimmed once, here, so a key is judged by what would actually be sent.
+  // `SENSO_API_KEY=$(cat key.txt)` and a Docker --env-file both readily carry a
+  // trailing newline; Node strips it from the header anyway, so an untrimmed
+  // comparison reported a key as "shadowed" by an identical one and warned
+  // about a conflict that did not exist. Whitespace-only is not a key at all,
+  // and falls through to the next source exactly as the empty string does.
+  const candidates: { source: ApiKeySource; key: string }[] = [];
+  // `raw` is typed `unknown` on purpose. `SensoConfig` describes what this CLI
+  // writes, not what is on disk: the file is user-editable, so `apiKey` can be
+  // a number, an object or null however the type reads. Trusting the type here
+  // meant `{"apiKey": 123}` threw ".trim is not a function" out of EVERY
+  // command, including ones given a perfectly good key by --api-key.
+  const consider = (source: ApiKeySource, raw: unknown): void => {
+    if (typeof raw !== "string") return;
+    const key = raw.trim();
+    if (key) candidates.push({ source, key });
+  };
+
+  consider("flag", opts?.apiKey);
+  consider("env", process.env.SENSO_API_KEY);
+  consider("config", readConfig().apiKey);
+
+  const winner = candidates[0];
+  if (!winner) return { shadowed: [] };
+
+  return {
+    key: winner.key,
+    source: winner.source,
+    shadowed: candidates
+      .slice(1)
+      .filter((c) => c.key !== winner.key)
+      .map((c) => c.source),
+  };
+}
 
 export function getApiKey(opts?: { apiKey?: string }): string | undefined {
-  return opts?.apiKey || process.env.SENSO_API_KEY || readConfig().apiKey;
+  return resolveApiKey(opts).key;
 }
+
+/* eslint-disable @typescript-eslint/prefer-nullish-coalescing --
+   `||` is the correct operator below, and `??` would be a bug, for the same
+   reason resolveApiKey tests truthiness: an empty string is not a usable URL,
+   and `SENSO_BASE_URL=` must fall through to the next source rather than
+   produce a request against "". `??` only falls through on null and undefined,
+   so it would accept the empty string. */
 
 export function getBaseUrl(opts?: { baseUrl?: string }): string {
   return opts?.baseUrl || process.env.SENSO_BASE_URL || readConfig().baseUrl || DEFAULT_BASE_URL;

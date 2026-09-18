@@ -9,6 +9,94 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
+### Added
+
+- **`senso credits history` — where the credits went, day by day.** A trailing
+  window of daily spend plus the total across it, over `GET
+/org/credits/history`. `--days` takes 1-365 and defaults to the server's own
+  30; a value outside that is a usage error here rather than a 400 from the API.
+  Every day in the window is present, so a day with no spend comes back as `0`
+  and a chart has no gaps to fill; the last entry is today and is still
+  accumulating. `--output json` carries the whole envelope, `period_usage`
+  included, because the total is not one of the rows.
+
+- **`senso industries answers <industry>` — what the AI models actually say.**
+  The newest stored answer for each of your industry's prompts, from each model
+  at each location, with the full response text, over `GET
+/org/industries/{id}/answers/latest`. Every answer records whether it named
+  your brand, at what rank, in what tone, and with what share of the brand
+  mentions, plus the brands and citations it carried. This is how you find the
+  prompts a model answers without you: `--mentioned false --models <one model>`.
+  Filters for `--models`, `--location`, `--prompt-ids`, `--since` and
+  `--include-empty`, paged with `--limit` and `--offset`. Only your own
+  organization's industry can be read, so any other id is a 404. There is no
+  date window — each prompt, model and location has exactly one newest answer,
+  and `--since` hides combinations whose newest answer is older than that day
+  rather than returning older ones. `--models`, `--prompt-ids`, `--since`,
+  `--mentioned`, `--limit` and `--offset` are all validated before the request,
+  because each is applied server-side before paging: a typo would otherwise come
+  back as a perfectly plausible empty answer list.
+
+- **`senso whoami` says which of the three sources supplied the key it used.**
+  A new `apiKeySource` field — `flag`, `env` or `config` — next to the
+  organization, and the same thing named beside the key in the plain rendering.
+  The environment outranks the stored file, so `senso login` can store a key
+  that no later command sends: log in as one organization, have `SENSO_API_KEY`
+  exported in a shell profile, and every command quietly reaches a different
+  one. `whoami` already re-verified against the API, so it was honest about
+  which organization; it is now also honest about why that key was chosen.
+
+- **`senso whoami` reports a second, different key that is being shadowed.** A
+  new `apiKeyShadowedSources` list, and the same thing on stderr. Knowing the
+  key came from the environment is only half the answer: "the environment holds
+  the only key" is the ordinary CI setup, and "the environment is shadowing the
+  key this user just logged in with" is almost always a mistake, and the two
+  were indistinguishable. Silent, and the field omitted, when nothing is
+  shadowed or when two sources hold the same key — a warning that fires on
+  every ordinary run is one the next reader learns to skip. Suppressed under
+  `--quiet` and `--output json`, where the payload carries the same fact and
+  where stderr has to stay parseable as the JSON error object.
+
+- **`senso login` warns when `SENSO_API_KEY` would override the key it just
+  stored.** On stderr, non-fatal: the key is still written and the command still
+  exits 0. It stays quiet when the variable is unset, empty, or holds the same
+  key, none of which change what any command does.
+
+  Precedence itself is unchanged — `--api-key`, then `SENSO_API_KEY`, then the
+  config file, as documented. Nothing that relies on the environment variable
+  needs to change: it remains the way to authenticate in CI, in a container, and
+  anywhere `login` has no terminal to prompt on.
+
+### Fixed
+
+- **`senso login` no longer writes the API key to stdout.** The prompt used
+  clack's `text`, which redraws into stdout on every keystroke, so the whole key
+  was written there one character at a time — `senso login > install.log`, a CI
+  capture or a terminal recording persisted the credential. It now prompts with
+  `password`, which masks it. Only a truncated 8-character prefix is ever
+  printed, by `whoami`.
+
+- **A config file that is not an object no longer breaks every command.**
+  `JSON.parse("null")` succeeds and returns `null`, so the guard in `readConfig`
+  never caught it and each `readConfig().x` threw instead. A `config.json`
+  holding `null`, a bare string or an array now reads as no configuration at
+  all, which is what it is. This defeated the documented escape hatch:
+  `--api-key` and `SENSO_API_KEY` are what you reach for when the stored config
+  is broken, and they stopped working precisely then.
+
+- **A stored `apiKey` that is not a string no longer breaks every command.** The
+  config file is user-editable, so the declared type is a convention rather than
+  a guarantee; `{"apiKey": 123}` threw out of the credential resolver. It now
+  reads as no stored key, which is what it is.
+
+- **A key is no longer judged by whitespace around it.** `SENSO_API_KEY=$(cat
+key.txt)` and a Docker `--env-file` both readily carry a trailing newline.
+  HTTP strips it, so the request always worked — but the comparison did not, so
+  a key identical to the stored one was reported as shadowed and warned about a
+  conflict that did not exist. Keys are now trimmed once, where they are
+  resolved, and a whitespace-only value falls through to the next source exactly
+  as the empty string already did.
+
 ## [0.17.0] — 2026-09-15
 
 ### Added
