@@ -126,7 +126,7 @@ senso org update [options]
 
 ### senso org set-industry
 
-Set the industry your organization belongs to, chosen from the public catalog (`senso industries list`). This can be done ONCE: afterwards the call is rejected and changing it is not self-serve. It is what `senso industries import-prompts` and `senso generate industry-draft` work from, and where an org with no models or locations of its own inherits them on activation. Nothing else happens — no prompts are created and no runs start.
+Set the industry your organization belongs to, chosen from the public catalog (`senso industries list`). An organization that already has one can change it: the new choice replaces the old. Prompts already imported from the previous industry stay, and the run history copied onto them is kept — what changes is which industry's results the organization reads from then on. It is what `senso industries import-prompts` and `senso generate industry-draft` work from, and where an org with no models or locations of its own inherits them on activation. Nothing else happens — no prompts are created and no runs start.
 
 ```
 senso org set-industry [options] <industryId>
@@ -1290,7 +1290,7 @@ senso content-types list [options]
 
 ### senso content-types create
 
-Create a new content type. Requires a name and a config defining the output structure. config accepts a defined set of keys: template, template_spec, cta_text, cta_destination, writing_rules (array). Unknown keys are rejected.
+Create a new content type. Requires a name and a config defining the output structure. config accepts a defined set of keys: template, cta_text, cta_destination, writing_rules (array). Unknown keys are rejected. `template` is markdown, not a description of markdown: the server derives the section structure from its headings, and word budgets from annotations like (40-80 words). Prose that describes a structure parses to zero sections and is accepted silently. `template_spec` is derived from `template` and is not settable — sending it fails validation.
 
 ```
 senso content-types create [options]
@@ -1298,7 +1298,7 @@ senso content-types create [options]
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "name": "Blog Post", "config": { "template": "...", "cta_text": "...", "cta_destination": "...", "writing_rules": [] } } |  |
+| `--data <json>` | JSON: { "name": "Blog Post", "config": { "template": "# Title\n\nDirect answer to the question. (40-80 words)\n\n## Detail\n\nSupporting evidence from the knowledge base. (150-250 words)\n", "cta_text": "Talk to us", "cta_destination": "https://example.com", "writing_rules": [] } } |  |
 
 ### senso content-types get
 
@@ -1310,7 +1310,7 @@ senso content-types get [options] <id>
 
 ### senso content-types update
 
-Replace a content type's name and config (PUT). Both fields are required — run 'get <id>' first to preserve existing values. For single-field updates, use 'content-types patch <id>'.
+Replace a content type's name and config (PUT). Both fields are required — run 'get <id>' first to preserve existing values. For single-field updates, use 'content-types patch <id>'. `template` is markdown and the server re-derives the section structure from its headings; see 'content-types create --help'.
 
 ```
 senso content-types update [options] <id>
@@ -1318,11 +1318,11 @@ senso content-types update [options] <id>
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "name": "Updated Name", "config": { "template": "...", "cta_text": "...", "cta_destination": "...", "writing_rules": [] } } |  |
+| `--data <json>` | JSON: { "name": "Updated Name", "config": { "template": "# Title\n\nDirect answer to the question. (40-80 words)\n\n## Detail\n\nSupporting evidence from the knowledge base. (150-250 words)\n", "cta_text": "Talk to us", "cta_destination": "https://example.com", "writing_rules": [] } } |  |
 
 ### senso content-types patch
 
-Partially update a content type (PATCH). Only the fields you provide are changed — existing fields are preserved. Preferred over 'update' for targeted changes like updating just the template.
+Partially update a content type (PATCH). Only the fields you provide are changed — existing fields are preserved. Preferred over 'update' for targeted changes like updating just the template. `template` is markdown and the server re-derives the section structure from its headings; see 'content-types create --help'.
 
 ```
 senso content-types patch [options] <id>
@@ -1330,7 +1330,7 @@ senso content-types patch [options] <id>
 
 | Option | Description | Default |
 |---|---|---|
-| `--data <json>` | JSON: { "config": { "template": "Updated template instruction" } } |  |
+| `--data <json>` | JSON: { "config": { "template": "# Title\n\nDirect answer to the question. (40-80 words)\n\n## Detail\n\nSupporting evidence from the knowledge base. (150-250 words)\n" } } |  |
 
 ### senso content-types delete
 

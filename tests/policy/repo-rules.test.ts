@@ -388,3 +388,60 @@ describe("CI and the Makefile cannot mean different things", () => {
     ).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// The content-type `--data` examples, which an agent copies verbatim
+// ---------------------------------------------------------------------------
+
+describe("the content-types --data examples", () => {
+  // `template` is markdown, and the server derives the section structure from
+  // its headings. It accepts anything else with a 200: prose describing a
+  // structure yields zero sections, and one long instruction yields a single
+  // section titled with the whole paragraph. Nothing in the response says so,
+  // so the example in the help IS the specification as far as a caller is
+  // concerned — a placeholder like "..." got one agent to write prose, and the
+  // content type it created generated against no structure at all.
+  const examples = allCommands()
+    .filter(({ path }) => path.startsWith("content-types "))
+    .flatMap(({ path, cmd }) =>
+      cmd.options
+        .filter((o) => o.long === "--data")
+        .map((o) => ({ path, description: o.description })),
+    );
+
+  it("found a --data example on create, update and patch", () => {
+    expect(examples.map((e) => e.path).sort()).toEqual([
+      "content-types create",
+      "content-types patch",
+      "content-types update",
+    ]);
+  });
+
+  for (const { path, description } of examples) {
+    it(`offers \`${path}\` an example that parses as JSON`, () => {
+      const json = description.slice(description.indexOf("{"));
+      expect(() => JSON.parse(json), `${path}: ${json}`).not.toThrow();
+    });
+
+    it(`offers \`${path}\` a template that is markdown, not a description of one`, () => {
+      const body = JSON.parse(description.slice(description.indexOf("{"))) as {
+        config?: { template?: string };
+      };
+      const template = body.config?.template ?? "";
+      expect(template, `${path} has no config.template`).not.toBe("");
+      // A heading is what produces a section. Without one the server derives
+      // nothing and still answers 200.
+      expect(template, `${path}: template has no markdown heading`).toMatch(/(^|\\n)#{1,6} /);
+    });
+
+    it(`does not offer \`${path}\` the derived template_spec as an input`, () => {
+      // Sending it costs one 400 per field and is discarded on success.
+      expect(description, `${path} advertises template_spec`).not.toContain("template_spec");
+    });
+  }
+
+  it("does not advertise template_spec as a settable config key", () => {
+    const create = allCommands().find(({ path }) => path === "content-types create");
+    expect(create?.cmd.description()).not.toMatch(/keys:[^.]*template_spec/);
+  });
+});

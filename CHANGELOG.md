@@ -9,6 +9,41 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`senso content-types` help no longer teaches a broken template.** `--data`
+  on `create`, `update` and `patch` showed `"template": "..."` (and, on `patch`,
+  the prose value `"Updated template instruction"`), and the key list advertised
+  `template_spec` as settable. Both are traps. `template` is markdown: the server
+  derives the section structure from its headings and word budgets from
+  annotations like `(40-80 words)`. Prose that _describes_ a structure parses to
+  zero sections, and the create still returns 200 — a content type that generates
+  against no structure at all, with nothing to indicate it. Prose that reads like
+  one long instruction is worse: it derives a single section whose title is the
+  whole paragraph. `template_spec`, meanwhile, is validated field by field and
+  then discarded, so setting it costs a round trip per field and changes nothing.
+  All three examples are now a real markdown template that can be pasted as-is,
+  and the descriptions say what `template` is and that `template_spec` is
+  derived.
+
+- **`senso org set-industry` no longer says the choice is permanent.** Its
+  description claimed the industry could be set ONCE and that changing it
+  afterwards was not self-serve, and it translated a 409 into "contact Senso
+  support". The API does not work that way: the write overwrites whatever is
+  there, the handler has no conflict branch at all, and a repeat call returns 200. The claim came from the spec, which has since been corrected. The command
+  now describes what actually happens — an organization that already has an
+  industry can change it, prompts already imported stay, and the run history
+  copied onto them is kept; what changes is which industry's results the
+  organization reads from then on. The 409 special case is gone, so a conflict
+  that did appear would be reported by the generic handler rather than as advice
+  to contact support.
+
+- **`senso industries answers` says why the list is empty.** The endpoint answers
+  200 with an empty list and the reason in `notes` when there is nothing to
+  show; those notes were discarded, leaving a bare "No results." They are now
+  reported on stderr, where diagnostics belong, and suppressed under `--quiet`
+  and `--output json`, whose payload already carries them.
+
 ## [0.17.1] — 2026-09-18
 
 ### Added
