@@ -362,31 +362,38 @@ describe("org set-runs, on success", () => {
 });
 
 /**
- * `org set-industry` is the one irreversible call in this group: the API accepts
- * it once and answers every later attempt with a 409. The 409 therefore is not a
- * transient conflict a caller should retry — the message has to say so, and the
- * server's own message names the industry already in place, which is the detail
- * worth keeping.
+ * `org set-industry` overwrites whatever is there: an organization that already
+ * has an industry can change it, and the write simply replaces the old choice.
+ *
+ * This command previously special-cased a 409 with "an industry can be set only
+ * once", which the spec documented and the server never implemented — the
+ * handler has no conflict branch at all, and a repeat call returns 200.
+ * Re-setting is an ordinary success, and any 409 that did appear would be a
+ * genuine conflict for the generic handler to report.
  */
 describe("org set-industry", () => {
   const INDUSTRY_UUID = "367d71d1-0fd4-4050-9f6c-a2346cbd8fbc";
 
-  it("exits 1 and passes the server's message through on a 409", async () => {
+  it("treats setting an industry over an existing one as an ordinary success", async () => {
     server.use(
       http.put(apiUrl("/org/me/industry"), () =>
-        HttpResponse.json(
-          { message: "Your organization's industry is already set to abc and cannot be changed" },
-          { status: 409 },
-        ),
+        HttpResponse.json({ org_id: "org-1", industry_id: INDUSTRY_UUID }),
       ),
     );
 
     const res = await runCli(["org", "set-industry", INDUSTRY_UUID]);
 
-    expect(res.exitCode).toBe(1);
-    expect(res.stdout).toBe("");
-    expect(res.stderr).toContain("already set");
-    expect(res.stderr).toContain("only once");
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain(INDUSTRY_UUID);
+  });
+
+  it("does not claim the industry can only be set once", async () => {
+    const res = await runCli(["org", "set-industry", "--help"]);
+    const help = res.stdout + res.stderr;
+
+    expect(help).not.toContain("ONCE");
+    expect(help).not.toContain("not self-serve");
+    expect(help).toContain("can change it");
   });
 
   it("exits 4 when no industry in the catalog has that id", async () => {

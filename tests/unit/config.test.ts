@@ -15,9 +15,32 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync, mkdirSync } from "node:fs";
+import {
+  chmodSync,
+  lstatSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+  mkdirSync,
+} from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+
+/**
+ * Tests that read a file mode, plant a symlink or compare inodes.
+ *
+ * Windows has none of the three in the POSIX sense — `stat` reports 0666 or
+ * 0444 whatever was asked for, and creating a symlink needs a privilege — so
+ * on that platform they are skipped, visibly, rather than failing or being
+ * quietly satisfied. The same pattern guards the executable bit in
+ * tests/e2e/cli.test.ts. CI runs the unit suite on ubuntu, so this is about
+ * the tests telling the truth wherever they are run, not about CI.
+ */
+const posixOnly = it.skipIf(process.platform === "win32");
 
 let dir: string;
 
@@ -68,7 +91,7 @@ describe("writing the config", () => {
     expect(readConfig()).toEqual({ apiKey: "tgr_abc", orgName: "Acme" });
   });
 
-  it("writes the file owner-readable only", async () => {
+  posixOnly("writes the file owner-readable only", async () => {
     const { writeConfig, getConfigPath } = await loadConfig();
 
     writeConfig({ apiKey: "tgr_abc" });
@@ -458,5 +481,303 @@ describe("SENSO_CONFIG_DIR", () => {
 
     expect(getConfigDir()).toBe(dir);
     expect(getConfigPath()).toBe(join(dir, "config.json"));
+  });
+});
+
+describe("the in-flight device authorization", () => {
+  const PENDING = {
+    deviceCode: "a-43-char-opaque-device-code-goes-right-here",
+    userCode: "FXGQ-HKTG",
+    verificationUri: "https://app.senso.ai/cli/verify",
+    interval: 5,
+    expiresAt: new Date(Date.now() + 300_000).toISOString(),
+    baseUrl: "https://apiv2.senso.ai/api/v1",
+  };
+
+  function writeRawState(contents: string): void {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "device-auth.json"), contents);
+  }
+
+  it("round-trips what --complete needs to act alone", async () => {
+    const { writeDeviceAuthState, readDeviceAuthState } = await loadConfig();
+
+    writeDeviceAuthState(PENDING);
+
+    expect(readDeviceAuthState()).toEqual(PENDING);
+  });
+
+  posixOnly("is readable by its owner only, like the credential it will become", async () => {
+    const { writeDeviceAuthState, getDeviceAuthPath } = await loadConfig();
+
+    writeDeviceAuthState(PENDING);
+
+    expect(statSync(getDeviceAuthPath()).mode & 0o777).toBe(0o600);
+  });
+
+  posixOnly("tightens a file that already existed with a looser mode", async () => {
+    // The bug this covers: `mode` on writeFileSync applies only when the file is
+    // created. A file left world-readable by an older version, a restored backup
+    // or a stray `touch` would otherwise keep those permissions and have a
+    // secret written into it.
+    writeRawState("{}");
+    const { writeDeviceAuthState, getDeviceAuthPath } = await loadConfig();
+    const { chmodSync } = await import("node:fs");
+    chmodSync(getDeviceAuthPath(), 0o644);
+
+    writeDeviceAuthState(PENDING);
+
+    expect(statSync(getDeviceAuthPath()).mode & 0o777).toBe(0o600);
+  });
+
+  it("reads a missing file as nothing pending", async () => {
+    const { readDeviceAuthState } = await loadConfig();
+
+    expect(readDeviceAuthState()).toBeUndefined();
+  });
+
+  it("reads a half-written or hand-edited file as nothing pending", async () => {
+    // A truncated write must not throw out of `--complete`. "Nothing pending"
+    // sends the user to `senso login`, which is the right answer anyway.
+    const { readDeviceAuthState } = await loadConfig();
+
+    for (const contents of ["{ truncated", "null", "[]", '"a string"']) {
+      writeRawState(contents);
+      expect(readDeviceAuthState()).toBeUndefined();
+    }
+  });
+
+  it("refuses a file with no device code, which is the only thing it cannot do without", async () => {
+    writeRawState(JSON.stringify({ userCode: "FXGQ-HKTG", expiresAt: PENDING.expiresAt }));
+    const { readDeviceAuthState } = await loadConfig();
+
+    expect(readDeviceAuthState()).toBeUndefined();
+  });
+
+  it("refuses a file whose expiry is not a date", async () => {
+    // Without a readable expiry there is no backstop on the poll loop.
+    writeRawState(JSON.stringify({ deviceCode: "dc", expiresAt: "some time on Tuesday" }));
+    const { readDeviceAuthState } = await loadConfig();
+
+    expect(readDeviceAuthState()).toBeUndefined();
+  });
+
+  it("falls back to the protocol interval when the stored one is unusable", async () => {
+    writeRawState(JSON.stringify({ deviceCode: "dc", expiresAt: PENDING.expiresAt, interval: 0 }));
+    const { readDeviceAuthState } = await loadConfig();
+
+    expect(readDeviceAuthState()?.interval).toBe(5);
+  });
+});
+
+describe("sweeping an abandoned device authorization", () => {
+  const stateAt = (expiresAt: string): string =>
+    JSON.stringify({ deviceCode: "dc", userCode: "AAAA-BBBB", interval: 5, expiresAt });
+
+  function writeStateExpiring(expiresAt: string): void {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "device-auth.json"), stateAt(expiresAt));
+  }
+
+  it("leaves a live authorization alone", async () => {
+    writeStateExpiring(new Date(Date.now() + 120_000).toISOString());
+    const { sweepDeviceAuthState, readDeviceAuthState } = await loadConfig();
+
+    expect(sweepDeviceAuthState()).toBe(false);
+    expect(readDeviceAuthState()).toBeDefined();
+  });
+
+  it("leaves one alone that only just expired", async () => {
+    // The grace period is the point. Expiry is the server's to decide, and a
+    // local clock running fast must not let `senso whoami` delete a login the
+    // user is in the middle of approving.
+    writeStateExpiring(new Date(Date.now() - 60_000).toISOString());
+    const { sweepDeviceAuthState, readDeviceAuthState } = await loadConfig();
+
+    expect(sweepDeviceAuthState()).toBe(false);
+    expect(readDeviceAuthState()).toBeDefined();
+  });
+
+  it("collects one that is long dead", async () => {
+    writeStateExpiring(new Date(Date.now() - 3_600_000).toISOString());
+    const { sweepDeviceAuthState, readDeviceAuthState } = await loadConfig();
+
+    expect(sweepDeviceAuthState()).toBe(true);
+    expect(readDeviceAuthState()).toBeUndefined();
+  });
+
+  it("does nothing, cheaply, when there is no state file at all", async () => {
+    const { sweepDeviceAuthState } = await loadConfig();
+
+    expect(sweepDeviceAuthState()).toBe(false);
+  });
+});
+
+describe("logging out", () => {
+  it("ends a login in progress as well as one already stored", async () => {
+    // A pending authorization is a credential in flight. It also has to go for
+    // `senso uninstall` to work at all: it rmdir's the config directory, which
+    // fails while anything is left in it.
+    const { writeConfig, writeDeviceAuthState, clearConfig, readConfig, readDeviceAuthState } =
+      await loadConfig();
+    writeConfig({ apiKey: "tgr_abc" });
+    writeDeviceAuthState({
+      deviceCode: "dc",
+      userCode: "AAAA-BBBB",
+      verificationUri: "https://app.senso.ai/cli/verify",
+      interval: 5,
+      expiresAt: new Date(Date.now() + 300_000).toISOString(),
+    });
+
+    clearConfig();
+
+    expect(readConfig()).toEqual({});
+    expect(readDeviceAuthState()).toBeUndefined();
+  });
+});
+
+describe("writing a secret to disk", () => {
+  /**
+   * These are about the mechanism, not the contents. A credential file has
+   * three ways to go wrong that an ordinary `writeFileSync` does nothing about,
+   * and the tests below each pin one of them.
+   */
+  const stored = (): string => readFileSync(join(dir, "config.json"), "utf-8");
+
+  posixOnly("replaces a symlink at the path instead of writing the secret through it", async () => {
+    // A link planted at config.json would otherwise carry the key to wherever
+    // it points — a shared SENSO_CONFIG_DIR is enough to make that plausible.
+    mkdirSync(dir, { recursive: true });
+    const elsewhere = join(dir, "captured.json");
+    symlinkSync(elsewhere, join(dir, "config.json"));
+    const { writeConfig } = await loadConfig();
+
+    writeConfig({ apiKey: "tgr_secret" });
+
+    expect(lstatSync(join(dir, "config.json")).isSymbolicLink()).toBe(false);
+    expect(() => statSync(elsewhere)).toThrow();
+    expect(JSON.parse(stored())).toEqual({ apiKey: "tgr_secret" });
+  });
+
+  posixOnly("never has the secret on disk under the old file's looser permissions", async () => {
+    // `mode` applies only when a file is created. Rewriting a 0644 file in
+    // place left the key world-readable until a later chmod — a window. A new
+    // inode proves the old file was replaced, never written into.
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "config.json"), "{}");
+    chmodSync(join(dir, "config.json"), 0o644);
+    const before = statSync(join(dir, "config.json"));
+    const { writeConfig } = await loadConfig();
+
+    writeConfig({ apiKey: "tgr_secret" });
+
+    const after = statSync(join(dir, "config.json"));
+    expect(after.mode & 0o777).toBe(0o600);
+    expect(after.ino).not.toBe(before.ino);
+  });
+
+  it("leaves nothing behind but the file itself", async () => {
+    const { writeConfig, writeDeviceAuthState } = await loadConfig();
+
+    writeConfig({ apiKey: "tgr_secret" });
+    writeDeviceAuthState({
+      deviceCode: "dc",
+      userCode: "AAAA-BBBB",
+      verificationUri: "https://app.senso.ai/cli/verify",
+      interval: 5,
+      expiresAt: new Date(Date.now() + 300_000).toISOString(),
+    });
+
+    expect(readdirSync(dir).sort()).toEqual(["config.json", "device-auth.json"]);
+  });
+
+  /**
+   * A config module whose `renameSync` fails as scripted, everything else real.
+   *
+   * The directory cannot simply be made unwritable: the helper re-chmods it to
+   * 0700 as its first act, which an owner is always allowed to do. Failing the
+   * rename itself is both deterministic and the honest test — it is the one
+   * step whose failure has to leave the old file exactly as it was.
+   */
+  async function loadConfigWithRename(renameSync: (from: string, to: string) => void) {
+    vi.resetModules();
+    process.env.SENSO_CONFIG_DIR = dir;
+    vi.doMock("node:fs", async (importOriginal) => ({
+      ...(await importOriginal<typeof import("node:fs")>()),
+      renameSync,
+    }));
+    try {
+      return await import("../../src/lib/config.js");
+    } finally {
+      vi.doUnmock("node:fs");
+    }
+  }
+
+  const errno = (code: string): NodeJS.ErrnoException => Object.assign(new Error(code), { code });
+
+  it("keeps the previous credential intact when the replacement cannot land", async () => {
+    // The interrupted-write case, made deterministic: the new file is written,
+    // the swap fails, and the credential that worked a moment ago must still
+    // work — with nothing half-written left beside it.
+    const { writeConfig } = await loadConfig();
+    writeConfig({ apiKey: "tgr_the_key_that_works" });
+    const failing = await loadConfigWithRename(() => {
+      throw errno("ENOSPC");
+    });
+
+    expect(() => {
+      failing.writeConfig({ apiKey: "tgr_never_lands" });
+    }).toThrow(/ENOSPC/);
+
+    expect(JSON.parse(stored())).toEqual({ apiKey: "tgr_the_key_that_works" });
+    expect(readdirSync(dir)).toEqual(["config.json"]);
+  });
+
+  it("rides out the transient EPERM a Windows antivirus scanner produces", async () => {
+    // Two refusals, then the real rename. The write must succeed rather than
+    // report a failed login on a machine where nothing is actually wrong.
+    const { renameSync: realRename } = await import("node:fs");
+    let attempts = 0;
+    const flaky = await loadConfigWithRename((from, to) => {
+      attempts += 1;
+      if (attempts <= 2) throw errno("EPERM");
+      realRename(from, to);
+    });
+
+    flaky.writeConfig({ apiKey: "tgr_eventually" });
+
+    expect(JSON.parse(stored())).toEqual({ apiKey: "tgr_eventually" });
+    expect(attempts).toBe(3);
+  });
+
+  it("gives up on a failure that is not transient, rather than retrying it", async () => {
+    let calls = 0;
+    const broken = await loadConfigWithRename(() => {
+      calls += 1;
+      throw errno("EACCES");
+    });
+
+    expect(() => {
+      broken.writeConfig({ apiKey: "tgr_x" });
+    }).toThrow(/EACCES/);
+    expect(calls).toBe(1);
+  });
+
+  posixOnly("protects the in-flight device code the same way", async () => {
+    mkdirSync(dir, { recursive: true });
+    const elsewhere = join(dir, "captured-code.json");
+    symlinkSync(elsewhere, join(dir, "device-auth.json"));
+    const { writeDeviceAuthState } = await loadConfig();
+
+    writeDeviceAuthState({
+      deviceCode: "the-secret-device-code",
+      userCode: "AAAA-BBBB",
+      verificationUri: "https://app.senso.ai/cli/verify",
+      interval: 5,
+      expiresAt: new Date(Date.now() + 300_000).toISOString(),
+    });
+
+    expect(lstatSync(join(dir, "device-auth.json")).isSymbolicLink()).toBe(false);
+    expect(() => statSync(elsewhere)).toThrow();
   });
 });

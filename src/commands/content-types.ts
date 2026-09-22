@@ -31,11 +31,11 @@ export function registerContentTypeCommands(program: Command): void {
 
   ct.command("create")
     .description(
-      "Create a new content type. Requires a name and a config defining the output structure. config accepts a defined set of keys: template, template_spec, cta_text, cta_destination, writing_rules (array). Unknown keys are rejected.",
+      "Create a new content type. Requires a name and a config defining the output structure. config accepts a defined set of keys: template, cta_text, cta_destination, writing_rules (array). Unknown keys are rejected. `template` is markdown, not a description of markdown: the server derives the section structure from its headings, and word budgets from annotations like (40-80 words). Prose that describes a structure parses to zero sections and is accepted silently. `template_spec` is derived from `template` and is not settable — sending it fails validation.",
     )
     .requiredOption(
       "--data <json>",
-      'JSON: { "name": "Blog Post", "config": { "template": "...", "cta_text": "...", "cta_destination": "...", "writing_rules": [] } }',
+      'JSON: { "name": "Blog Post", "config": { "template": "# Title\\n\\nDirect answer to the question. (40-80 words)\\n\\n## Detail\\n\\nSupporting evidence from the knowledge base. (150-250 words)\\n", "cta_text": "Talk to us", "cta_destination": "https://example.com", "writing_rules": [] } }',
     )
     .action(
       runAction(program, async (ctx, cmdOpts: { data: string }) => {
@@ -67,11 +67,11 @@ export function registerContentTypeCommands(program: Command): void {
 
   ct.command("update <id>")
     .description(
-      "Replace a content type's name and config (PUT). Both fields are required — run 'get <id>' first to preserve existing values. For single-field updates, use 'content-types patch <id>'.",
+      "Replace a content type's name and config (PUT). Both fields are required — run 'get <id>' first to preserve existing values. For single-field updates, use 'content-types patch <id>'. `template` is markdown and the server re-derives the section structure from its headings; see 'content-types create --help'.",
     )
     .requiredOption(
       "--data <json>",
-      'JSON: { "name": "Updated Name", "config": { "template": "...", "cta_text": "...", "cta_destination": "...", "writing_rules": [] } }',
+      'JSON: { "name": "Updated Name", "config": { "template": "# Title\\n\\nDirect answer to the question. (40-80 words)\\n\\n## Detail\\n\\nSupporting evidence from the knowledge base. (150-250 words)\\n", "cta_text": "Talk to us", "cta_destination": "https://example.com", "writing_rules": [] } }',
     )
     .action(
       runAction(program, async (ctx, id: string, cmdOpts: { data: string }) => {
@@ -90,11 +90,11 @@ export function registerContentTypeCommands(program: Command): void {
 
   ct.command("patch <id>")
     .description(
-      "Partially update a content type (PATCH). Only the fields you provide are changed — existing fields are preserved. Preferred over 'update' for targeted changes like updating just the template.",
+      "Partially update a content type (PATCH). Only the fields you provide are changed — existing fields are preserved. Preferred over 'update' for targeted changes like updating just the template. `template` is markdown and the server re-derives the section structure from its headings; see 'content-types create --help'.",
     )
     .requiredOption(
       "--data <json>",
-      'JSON: { "config": { "template": "Updated template instruction" } }',
+      'JSON: { "config": { "template": "# Title\\n\\nDirect answer to the question. (40-80 words)\\n\\n## Detail\\n\\nSupporting evidence from the knowledge base. (150-250 words)\\n" } }',
     )
     .action(
       runAction(program, async (ctx, id: string, cmdOpts: { data: string }) => {

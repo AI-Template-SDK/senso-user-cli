@@ -176,8 +176,35 @@ denominator and its gotcha, straight from the API.
 | Windows  | `%APPDATA%\senso\Config\config.json`      |
 
 Set `SENSO_CONFIG_DIR` to put it somewhere else. Credentials resolve in this
-order: `--api-key`, then `SENSO_API_KEY`, then the config file. `senso login`
-needs a terminal; in CI or an agent, set the environment variable.
+order: `--api-key`, then `SENSO_API_KEY`, then the config file.
+
+### Signing in
+
+`senso login` asks an org admin to approve this device in a browser, and stores
+the key that approval mints. It works with or without a terminal — the only
+difference is the shape:
+
+```bash
+senso login              # in a terminal: prints a code, then waits
+```
+
+```bash
+senso login              # without one: prints the code and exits 0
+senso login --complete   # waits for the approval and stores the key
+```
+
+The split exists because an agent's shell usually shows a command's output only
+after it exits, so one blocking process would hide the code until it expired.
+Approval happens on the page the first command prints: sign in, type the code,
+confirm. The code lasts five minutes and the key it mints lasts seven days.
+
+Two other ways in, for anyone who already holds a key:
+
+| Command                       | Stores it? | Needs a terminal? |
+| ----------------------------- | ---------- | ----------------- |
+| `senso login --api-key <key>` | yes        | no                |
+| `senso login --interactive`   | yes        | yes — it prompts  |
+| `export SENSO_API_KEY=<key>`  | no         | no                |
 
 Because the environment outranks the file, `senso login` can store a key that no
 later command sends. `senso whoami` reports which of the three sources supplied

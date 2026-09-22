@@ -270,9 +270,11 @@ paths:
         runs start.
 
 
-        The industry can be set only once. Once your organization has one this returns a
-        `409` naming the industry it already has; changing it afterwards is not
-        self-serve. Returns your organization with the industry applied.
+        An organization that already has an industry can change it — the new choice
+        replaces the old one. Prompts already imported from the previous industry stay
+        where they are, and the run history already copied onto them is kept; what
+        changes is which industry's results your organization reads from that point on.
+        Returns your organization with the industry applied.
       operationId: orgSetIndustry
       requestBody:
         required: true
@@ -297,12 +299,6 @@ paths:
           description: >-
             No industry in the public catalogue has that id, or your organization no
             longer exists.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "409":
-          description: Your organization's industry is already set and cannot be changed.
           content:
             application/json:
               schema:

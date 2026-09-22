@@ -102,6 +102,16 @@ interface RequestOptions {
    */
   headers?: Record<string, string>;
   /**
+   * Whether to send a credential.
+   *
+   * `"none"` is for the two public halves of the device-authorization flow,
+   * which exist precisely because the caller has no key yet: sending one would
+   * be sending a key in order to be given a key. It is not a way to make an
+   * ordinary command work without authentication — every other endpoint needs
+   * `X-API-Key` and answers 401 without it.
+   */
+  auth?: "api-key" | "none";
+  /**
    * Override the abort budget for this one call.
    *
    * The default suits a request that should come back promptly. It does not
@@ -133,8 +143,9 @@ function appendQuery(url: URL, params: Record<string, QueryValue> | undefined): 
 }
 
 export async function apiRequest<T = unknown>(opts: RequestOptions): Promise<T> {
-  const apiKey = getApiKey({ apiKey: opts.apiKey });
-  if (!apiKey) {
+  const anonymous = opts.auth === "none";
+  const apiKey = anonymous ? undefined : getApiKey({ apiKey: opts.apiKey });
+  if (!anonymous && !apiKey) {
     throw missingApiKeyError();
   }
 
@@ -156,7 +167,7 @@ export async function apiRequest<T = unknown>(opts: RequestOptions): Promise<T> 
       method,
       headers: {
         ...opts.headers,
-        "X-API-Key": apiKey,
+        ...(apiKey ? { "X-API-Key": apiKey } : {}),
         Accept: "application/json",
         ...(opts.body ? { "Content-Type": "application/json" } : {}),
         "User-Agent": `senso-cli/${version}`,

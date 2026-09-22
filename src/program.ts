@@ -13,6 +13,7 @@ import { version } from "./lib/version.js";
 import { miniBanner } from "./utils/branding.js";
 import { checkForUpdate } from "./utils/updater.js";
 import { EXIT, ExitSignal } from "./lib/errors.js";
+import { sweepDeviceAuthState } from "./lib/config.js";
 
 // Command registrations
 import { registerAuthCommands } from "./commands/auth.js";
@@ -129,6 +130,21 @@ export function createProgram(): Command {
       const decorated = !opts.quiet && opts.output !== "json";
       if (decorated) {
         miniBanner();
+      }
+
+      // Collect an abandoned device login, on any command.
+      //
+      // Ctrl-C during a poll, or an agent that never ran `senso login
+      // --complete`, leaves a state file whose code is already dead. It is
+      // harmless — single-use, five minutes old — but the next `--complete`
+      // would report a pending login that cannot be completed. Doing it here
+      // costs one file read and needs no daemon.
+      //
+      // `login` is exempt, and that is the whole subtlety: it owns the file,
+      // and `--complete` must be free to poll a code its local clock thinks is
+      // expired, because the server is the authority on that.
+      if (actionCommand.name() !== "login") {
+        sweepDeviceAuthState();
       }
 
       // Best-effort and deliberately not awaited.

@@ -14,7 +14,7 @@
  * afterwards rather than that `unlinkSync` was called.
  */
 
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { join } from "node:path";
 import { TEST_API_KEY, freshConfigDir, runSenso, startMockApi, type MockApi } from "./helpers.js";
@@ -40,17 +40,20 @@ beforeEach(() => {
   api.reset();
 });
 
-describe("`senso login` without a terminal", () => {
+describe("`senso login --interactive` without a terminal", () => {
   it("fails fast with a usage error instead of waiting for a keypress that cannot come", async () => {
     // Five seconds, not the file's thirty. The whole point of this test is that
     // the command returns promptly; given the default budget, a regression that
     // reinstates the prompt would look like a slow suite rather than a bug, and
     // would cost half a minute on every CI run before saying so.
-    const res = await runSenso(["login"], { baseUrl: api.url, timeoutMs: 5_000 });
+    const res = await runSenso(["login", "--interactive"], {
+      baseUrl: api.url,
+      timeoutMs: 5_000,
+    });
 
     expect(res.code).toBe(2);
     // The message has to carry the way out. A caller in CI cannot answer a
-    // prompt, so naming the environment variable is the entire fix.
+    // prompt, so naming what needs no terminal is the entire fix.
     expect(res.stderr).toContain("interactive terminal");
     expect(res.stderr).toContain("SENSO_API_KEY");
     expect(res.stdout).toBe("");
@@ -59,9 +62,108 @@ describe("`senso login` without a terminal", () => {
   });
 
   it("stores no credential when it refuses", async () => {
-    const res = await runSenso(["login"], { baseUrl: api.url, timeoutMs: 5_000 });
+    const res = await runSenso(["login", "--interactive"], {
+      baseUrl: api.url,
+      timeoutMs: 5_000,
+    });
 
     expect(existsSync(res.configFile)).toBe(false);
+  });
+});
+
+describe("`senso login` without a terminal, which is the agent's path", () => {
+  const DEVICE_CODE = "an-opaque-43-character-device-code-goes-here";
+  const USER_CODE = "FXGQ-HKTG";
+  const VERIFY_URL = "https://app.senso.ai/cli/verify";
+  const MINTED_KEY = "tgr_minted_by_the_device_flow";
+
+  function apiOpensAFlow(): void {
+    api.respondWith("/device/authorize", {
+      status: 200,
+      body: {
+        device_code: DEVICE_CODE,
+        user_code: USER_CODE,
+        verification_uri: VERIFY_URL,
+        expires_in: 300,
+        // Tenths of a second: this is what stops a two-poll test taking ten.
+        interval: 0.1,
+      },
+    });
+  }
+
+  it("prints the code and returns, instead of blocking on a poll nobody can see", async () => {
+    // The reason the flow is two commands. A child process's stdout is not
+    // surfaced until it exits — which is exactly how an agent host behaves —
+    // so a single blocking process would hide the code for the whole five
+    // minutes it was good for.
+    apiOpensAFlow();
+    const configDir = freshConfigDir();
+
+    const res = await runSenso(["login"], { baseUrl: api.url, configDir, timeoutMs: 10_000 });
+
+    expect(res.code).toBe(0);
+    expect(res.stdout).toContain(USER_CODE);
+    expect(res.stdout).toContain(VERIFY_URL);
+    expect(res.stdout).toContain("senso login --complete");
+    // The secret stays in the state file. On stdout it is a bearer credential
+    // in a transcript, which is the thing this whole design exists to avoid.
+    expect(res.stdout).not.toContain(DEVICE_CODE);
+    expect(res.stderr).not.toContain(DEVICE_CODE);
+  });
+
+  it("completes in a second process and stores the key it is given", async () => {
+    // The handoff is the design: two invocations, one state file, and a
+    // credential that never crosses a stream.
+    apiOpensAFlow();
+    api.respondWith("/device/token", {
+      status: 400,
+      body: { status: 400, message: "not yet", error_code: "authorization_pending" },
+    });
+    api.respondWith("/device/token", {
+      status: 200,
+      body: {
+        api_key: MINTED_KEY,
+        org_id: ORG.org_id,
+        org_name: ORG.name,
+        expires_at: "2026-09-28T17:04:00Z",
+      },
+    });
+    api.respondWith("/org/me", { body: ORG });
+    const configDir = freshConfigDir();
+
+    const started = await runSenso(["login"], { baseUrl: api.url, configDir, timeoutMs: 10_000 });
+    expect(started.code).toBe(0);
+    expect(existsSync(join(configDir, "device-auth.json"))).toBe(true);
+
+    const completed = await runSenso(["login", "--complete"], {
+      baseUrl: api.url,
+      configDir,
+      timeoutMs: 10_000,
+    });
+
+    expect(completed.code).toBe(0);
+    expect(completed.stderr).toContain(ORG.name);
+    // The key reaches the config file and nothing else.
+    expect(completed.stdout).not.toContain(MINTED_KEY);
+    expect(completed.stderr).not.toContain(MINTED_KEY);
+    const stored = JSON.parse(readFileSync(join(configDir, "config.json"), "utf-8")) as {
+      apiKey?: string;
+    };
+    expect(stored.apiKey).toBe(MINTED_KEY);
+    // Nothing is left to complete, and the directory is clean enough for
+    // `senso uninstall` to remove it.
+    expect(existsSync(join(configDir, "device-auth.json"))).toBe(false);
+  });
+
+  it("exits 2 and names the path when there is nothing to complete", async () => {
+    const res = await runSenso(["login", "--complete"], {
+      baseUrl: api.url,
+      timeoutMs: 5_000,
+    });
+
+    expect(res.code).toBe(2);
+    expect(res.stderr).toContain("device-auth.json");
+    expect(api.requests).toEqual([]);
   });
 });
 

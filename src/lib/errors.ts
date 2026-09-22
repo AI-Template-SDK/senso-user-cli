@@ -51,6 +51,12 @@ export type ErrorCode =
   | "timeout"
   | "usage"
   | "invalid_json"
+  // The device-authorization flow. Both are terminal, and an agent reacts to
+  // them differently: denied means a human said no and re-running is the wrong
+  // move, expired means the five minutes ran out and starting over is the only
+  // move. Adding a code is additive; the existing ones keep their meanings.
+  | "device_denied"
+  | "device_expired"
   | "error";
 
 export interface CliErrorOptions {

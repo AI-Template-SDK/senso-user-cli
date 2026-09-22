@@ -9,6 +9,136 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
+### Added
+
+- **`senso login` now signs you in through a browser, and works without a
+  terminal.** It opens a device authorization against the Senso API, prints a
+  short code and the page to type it into, and stores the key an org admin's
+  approval mints. This closes the gap that made one-shot agent onboarding
+  impossible: `login` used to require a TTY and exit 2 without one, so the only
+  paths left for an agent were `SENSO_API_KEY` or `--api-key`, both of which
+  need the user to already hold a key and both of which put a live credential
+  into the agent's transcript.
+
+  Whether there is a terminal decides the process shape, not the mechanism —
+  browser approval is what humans and agents both do, so there is one flow to
+  maintain:
+
+  | stdin          | What happens                                                                   |
+  | -------------- | ------------------------------------------------------------------------------ |
+  | a terminal     | one process: prints the code, then waits for the approval                      |
+  | not a terminal | two: `senso login` prints the code and exits 0, `senso login --complete` waits |
+
+  The split exists because an agent host generally surfaces a command's stdout
+  only once it exits, so a single blocking process would hide the code until the
+  five minutes had run out. Between the two, the `device_code` lives in
+  `device-auth.json` beside `config.json`, mode `0600`, deleted the moment the
+  flow ends — never on stdout, where in an agent's shell it would outlive the
+  five minutes it is good for.
+
+  Exit codes are the contract, as everywhere else: **3** with `device_denied` if
+  the approval was refused, **1** with `device_expired` if the code ran out,
+  **2** if there is no login to complete, **5** if the API could not be reached.
+  A 5xx, a 429 or a dropped connection is _not_ an answer — the authorization is
+  untouched, so polling continues and the failure is reported only if the clock
+  runs out with nothing better to say.
+
+- **The approval page gets a device name a person can recognize.** `senso login`
+  sends `user@machine`, and falls back to `user (macOS)` when the hostname is an
+  address rather than a name — which is what macOS returns for a machine whose
+  name was never set, so the card would otherwise read `senso-cli
+82:5b:bd:cc:62:3d`. Nothing trusts this field; its only job is to help the
+  person approving decide whether the request is the terminal they just typed
+  in. `--device-name` overrides it.
+
+- **`senso login --api-key <key>` verifies and stores a key without a
+  terminal.** There was no way to do that before: `login` always prompted, so a
+  scripted setup or an agent told "here is my key" could only pass it per
+  command, which breaks silently the moment something forgets the flag. It runs
+  the same `/org/me` check and the same shadowing warning as every other path.
+
+- **`senso login --interactive`** keeps the old paste-a-key prompt, for anyone
+  who cannot open a browser. It still needs a terminal, and without one it still
+  exits 2 with the same message.
+
+### Changed
+
+- **`senso login` without a terminal no longer exits 2.** It starts the device
+  flow instead. `senso login --interactive` is now the command that requires a
+  TTY, and it fails the same way it always did. Anything scripted around "login
+  exits 2 without a terminal" should move to `--interactive` or `--api-key`.
+
+- **`config.json` has its permissions re-applied on every write.** Node applies
+  a file mode only when it creates the file, so a `config.json` that already
+  existed with looser permissions — an older version, a restored backup, a file
+  copied between machines — kept them and had a credential written into it
+  anyway. Both it and the new state file are now `chmod`ed explicitly after each
+  write, and the config directory is created `0700`. Best-effort, because POSIX
+  modes do not apply on Windows, where the protection is the ACL on `%APPDATA%`.
+
+- **`senso logout` also ends a login in progress**, deleting `device-auth.json`
+  along with the stored key. `senso uninstall` depends on it: it removes the
+  config directory, which fails while anything is left inside.
+
+### Fixed
+
+- **`senso login` no longer erases a stored `baseUrl`.** It built a fresh
+  config object and wrote it, so a `baseUrl` set by an earlier login or by hand
+  vanished unless `--base-url` was passed on that exact invocation. The login
+  had just _used_ that URL to verify the key, then deleted the pointer to it, and
+  the next command sent a key minted in one environment to another and got a 401
+  nobody could explain. `login` now merges into the file, and records the API
+  the key was actually verified against — flag, then `SENSO_BASE_URL`, then the
+  stored value — because a key belongs to the environment that minted it. The
+  default is stored as absence, so a login to the default API clears a stale
+  pointer rather than pinning today's default into the file. The update-check
+  cache survives a login too, which it never did.
+
+- **The credential file is replaced atomically, never rewritten in place.**
+  `config.json` and `device-auth.json` are now written to a fresh `0600` file
+  beside the target and renamed over it. That closes three holes at once: an
+  interrupted write no longer leaves a truncated file that reads as "not logged
+  in" — which for a device-minted key meant a credential lost for good, since it
+  is delivered exactly once; a symlink planted at the path no longer carries the
+  key to wherever it points; and a file left world-readable by an older version
+  no longer holds the secret for the instant before the permissions are fixed.
+  On Windows the rename is retried through the `EPERM` an antivirus scanner
+  produces, and a failure after that throws rather than falling back to an
+  in-place write.
+
+- **`senso content-types` help no longer teaches a broken template.** `--data`
+  on `create`, `update` and `patch` showed `"template": "..."` (and, on `patch`,
+  the prose value `"Updated template instruction"`), and the key list advertised
+  `template_spec` as settable. Both are traps. `template` is markdown: the server
+  derives the section structure from its headings and word budgets from
+  annotations like `(40-80 words)`. Prose that _describes_ a structure parses to
+  zero sections, and the create still returns 200 — a content type that generates
+  against no structure at all, with nothing to indicate it. Prose that reads like
+  one long instruction is worse: it derives a single section whose title is the
+  whole paragraph. `template_spec`, meanwhile, is validated field by field and
+  then discarded, so setting it costs a round trip per field and changes nothing.
+  All three examples are now a real markdown template that can be pasted as-is,
+  and the descriptions say what `template` is and that `template_spec` is
+  derived.
+
+- **`senso org set-industry` no longer says the choice is permanent.** Its
+  description claimed the industry could be set ONCE and that changing it
+  afterwards was not self-serve, and it translated a 409 into "contact Senso
+  support". The API does not work that way: the write overwrites whatever is
+  there, the handler has no conflict branch at all, and a repeat call returns 200. The claim came from the spec, which has since been corrected. The command
+  now describes what actually happens — an organization that already has an
+  industry can change it, prompts already imported stay, and the run history
+  copied onto them is kept; what changes is which industry's results the
+  organization reads from then on. The 409 special case is gone, so a conflict
+  that did appear would be reported by the generic handler rather than as advice
+  to contact support.
+
+- **`senso industries answers` says why the list is empty.** The endpoint answers
+  200 with an empty list and the reason in `notes` when there is nothing to
+  show; those notes were discarded, leaving a bare "No results." They are now
+  reported on stderr, where diagnostics belong, and suppressed under `--quiet`
+  and `--output json`, whose payload already carries them.
+
 ## [0.17.1] — 2026-09-18
 
 ### Added
