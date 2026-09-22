@@ -9,7 +9,7 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
-## [0.17.2] — 2026-09-22
+## [0.17.3] — 2026-09-22
 
 ### Added
 
@@ -23,46 +23,6 @@ mattered, and what you need to do differently.
   a `--no-imported` spelling would have made "everything" unsayable. An invalid
   value exits 2 without spending a request, and `org_prompt_id` is now a table
   column, so "do I already have this?" is answerable without `--output json`.
-
-- **`senso login` now signs you in through a browser, and works without a
-  terminal.** It opens a device authorization against the Senso API, prints a
-  short code and the page to type it into, and stores the key an org admin's
-  approval mints. This closes the gap that made one-shot agent onboarding
-  impossible: `login` used to require a TTY and exit 2 without one, so the only
-  paths left for an agent were `SENSO_API_KEY` or `--api-key`, both of which
-  need the user to already hold a key and both of which put a live credential
-  into the agent's transcript.
-
-  Whether there is a terminal decides the process shape, not the mechanism —
-  browser approval is what humans and agents both do, so there is one flow to
-  maintain:
-
-  | stdin          | What happens                                                                   |
-  | -------------- | ------------------------------------------------------------------------------ |
-  | a terminal     | one process: prints the code, then waits for the approval                      |
-  | not a terminal | two: `senso login` prints the code and exits 0, `senso login --complete` waits |
-
-  The split exists because an agent host generally surfaces a command's stdout
-  only once it exits, so a single blocking process would hide the code until the
-  five minutes had run out. Between the two, the `device_code` lives in
-  `device-auth.json` beside `config.json`, mode `0600`, deleted the moment the
-  flow ends — never on stdout, where in an agent's shell it would outlive the
-  five minutes it is good for.
-
-  Exit codes are the contract, as everywhere else: **3** with `device_denied` if
-  the approval was refused, **1** with `device_expired` if the code ran out,
-  **2** if there is no login to complete, **5** if the API could not be reached.
-  A 5xx, a 429 or a dropped connection is _not_ an answer — the authorization is
-  untouched, so polling continues and the failure is reported only if the clock
-  runs out with nothing better to say.
-
-- **The approval page gets a device name a person can recognize.** `senso login`
-  sends `user@machine`, and falls back to `user (macOS)` when the hostname is an
-  address rather than a name — which is what macOS returns for a machine whose
-  name was never set, so the card would otherwise read `senso-cli
-82:5b:bd:cc:62:3d`. Nothing trusts this field; its only job is to help the
-  person approving decide whether the request is the terminal they just typed
-  in. `--device-name` overrides it.
 
 - **`senso login` reuses a credential that still works, instead of minting
   another.** A bare `senso login` now verifies whatever key commands would
@@ -107,6 +67,50 @@ mattered, and what you need to do differently.
   `keyWillBeRevoked`. `login` deliberately does **not** revoke: replacing a
   working key is what `--api-key` does on request, and it warns that the key it
   displaced stays valid until it expires.
+
+## [0.17.2] — 2026-09-22
+
+### Added
+
+- **`senso login` now signs you in through a browser, and works without a
+  terminal.** It opens a device authorization against the Senso API, prints a
+  short code and the page to type it into, and stores the key an org admin's
+  approval mints. This closes the gap that made one-shot agent onboarding
+  impossible: `login` used to require a TTY and exit 2 without one, so the only
+  paths left for an agent were `SENSO_API_KEY` or `--api-key`, both of which
+  need the user to already hold a key and both of which put a live credential
+  into the agent's transcript.
+
+  Whether there is a terminal decides the process shape, not the mechanism —
+  browser approval is what humans and agents both do, so there is one flow to
+  maintain:
+
+  | stdin          | What happens                                                                   |
+  | -------------- | ------------------------------------------------------------------------------ |
+  | a terminal     | one process: prints the code, then waits for the approval                      |
+  | not a terminal | two: `senso login` prints the code and exits 0, `senso login --complete` waits |
+
+  The split exists because an agent host generally surfaces a command's stdout
+  only once it exits, so a single blocking process would hide the code until the
+  five minutes had run out. Between the two, the `device_code` lives in
+  `device-auth.json` beside `config.json`, mode `0600`, deleted the moment the
+  flow ends — never on stdout, where in an agent's shell it would outlive the
+  five minutes it is good for.
+
+  Exit codes are the contract, as everywhere else: **3** with `device_denied` if
+  the approval was refused, **1** with `device_expired` if the code ran out,
+  **2** if there is no login to complete, **5** if the API could not be reached.
+  A 5xx, a 429 or a dropped connection is _not_ an answer — the authorization is
+  untouched, so polling continues and the failure is reported only if the clock
+  runs out with nothing better to say.
+
+- **The approval page gets a device name a person can recognize.** `senso login`
+  sends `user@machine`, and falls back to `user (macOS)` when the hostname is an
+  address rather than a name — which is what macOS returns for a machine whose
+  name was never set, so the card would otherwise read `senso-cli
+82:5b:bd:cc:62:3d`. Nothing trusts this field; its only job is to help the
+  person approving decide whether the request is the terminal they just typed
+  in. `--device-name` overrides it.
 
 - **`senso login --api-key <key>` verifies and stores a key without a
   terminal.** There was no way to do that before: `login` always prompted, so a
@@ -795,7 +799,8 @@ get` showed the organization's locations and silently dropped its name, slug
 - First published release: authentication, search, content, ingestion,
   organization administration, and self-update.
 
-[Unreleased]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.17.2...HEAD
+[Unreleased]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.17.3...HEAD
+[0.17.3]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.17.2...v0.17.3
 [0.17.2]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.17.1...v0.17.2
 [0.17.1]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.17.0...v0.17.1
 [0.17.0]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.16.0...v0.17.0
