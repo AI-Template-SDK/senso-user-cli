@@ -116,6 +116,8 @@ credential and the organization fields; the update checker writes the last two.
 ```json
 {
   "apiKey": "tgr_...",
+  "apiKeyProvenance": "device-login",
+  "apiKeyExpiresAt": "2026-09-29T09:59:31.873Z",
   "baseUrl": "https://apiv2.senso.ai/api/v1",
   "orgName": "Acme",
   "orgId": "0d9b...",
@@ -125,6 +127,17 @@ credential and the organization fields; the update checker writes the last two.
   "latestVersion": "0.12.0"
 }
 ```
+
+`apiKeyExpiresAt` is what the API said when it minted the key — device keys last
+seven days. `senso login` reports how long a key it is reusing has left, and
+warns when that is under a day; a supplied key has no entry, because the CLI is
+never told when it dies.
+
+`apiKeyProvenance` is `device-login` for a key `senso login` minted through the
+browser flow and `supplied` for one the user pasted or passed with `--api-key`.
+`logout` and `uninstall` revoke the first kind before forgetting it and leave the
+second kind valid, because it may be in use elsewhere. A file without the field
+predates it and is treated as `supplied` — nothing is ever revoked on a guess.
 
 A missing file is the normal first-run state, and a corrupt one is not worth
 failing a command over: `readConfig()` returns `{}` for both, and the CLI behaves

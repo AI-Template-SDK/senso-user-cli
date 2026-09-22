@@ -812,3 +812,114 @@ describe("industries answers, on success", () => {
     expect(res.stderr).not.toContain("only your own organization's industry");
   });
 });
+
+describe("industries prompts, and the prompts you already hold", () => {
+  /**
+   * The filter that makes the import loop closeable: list what you have not
+   * taken, take it, list again and watch it disappear. It has three states and
+   * only two of them are spellable, which is why the flag takes a value —
+   * omitting it means "all", and that is not the same as `false`.
+   */
+  const PROMPTS = {
+    prompts: [
+      {
+        id: "ip-1",
+        text: "What is the best airline for families?",
+        funnel_stage: "consideration",
+        org_prompt_id: null,
+      },
+      {
+        id: "ip-2",
+        text: "Which airline has the best legroom?",
+        funnel_stage: "evaluation",
+        org_prompt_id: "5f0f8c3a-1111-2222-3333-444455556666",
+      },
+    ],
+    total: 2,
+    limit: 50,
+    offset: 0,
+  };
+
+  function promptsRespond(): { url: () => URL | undefined } {
+    let seen: Request | undefined;
+    server.use(
+      http.get(apiUrl("/org/industries/:id/prompts"), ({ request }) => {
+        seen = request;
+        return HttpResponse.json(PROMPTS);
+      }),
+    );
+    return { url: () => (seen ? new URL(seen.url) : undefined) };
+  }
+
+  it("exits 2 on a value that is not true or false, before spending a request", async () => {
+    // The API answers 400 for anything else. Catching it here is the repo's
+    // rule for a constrained flag, and it costs the user a round trip less.
+    let requested = false;
+    server.use(
+      http.get(apiUrl("/org/industries/:id/prompts"), () => {
+        requested = true;
+        return HttpResponse.json(PROMPTS);
+      }),
+    );
+
+    const res = await runCli(["industries", "prompts", INDUSTRY_UUID, "--imported", "yes"]);
+
+    expect(res.exitCode).toBe(2);
+    expect(res.stderr).toContain("--imported");
+    expect(requested).toBe(false);
+  });
+
+  it("asks for only the prompts not yet taken", async () => {
+    const seen = promptsRespond();
+
+    const res = await runCli(["industries", "prompts", INDUSTRY_UUID, "--imported", "false"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(seen.url()?.searchParams.get("imported")).toBe("false");
+  });
+
+  it("asks for only the prompts already held", async () => {
+    const seen = promptsRespond();
+
+    await runCli(["industries", "prompts", INDUSTRY_UUID, "--imported", "true"]);
+
+    expect(seen.url()?.searchParams.get("imported")).toBe("true");
+  });
+
+  it("sends nothing at all when the flag is omitted, which means every prompt", async () => {
+    // The third state. A default of `false` here would quietly hide half the
+    // catalogue from anyone who just wanted to see it.
+    const seen = promptsRespond();
+
+    await runCli(["industries", "prompts", INDUSTRY_UUID]);
+
+    expect(seen.url()?.searchParams.has("imported")).toBe(false);
+  });
+
+  it("accepts the flag whatever case it is typed in", async () => {
+    const seen = promptsRespond();
+
+    await runCli(["industries", "prompts", INDUSTRY_UUID, "--imported", "False"]);
+
+    expect(seen.url()?.searchParams.get("imported")).toBe("false");
+  });
+
+  it("shows whether each prompt is already yours, without needing --output json", async () => {
+    promptsRespond();
+
+    const res = await runCli(["industries", "prompts", INDUSTRY_UUID, "--output", "table"]);
+
+    expect(res.stdout).toContain("org_prompt_id");
+    expect(res.stdout).toContain("5f0f8c3a");
+  });
+
+  it("gives a JSON caller the field the filter is judged on", async () => {
+    promptsRespond();
+
+    const res = await runCli(["industries", "prompts", INDUSTRY_UUID, "--output", "json"]);
+
+    expect(res.json()).toMatchObject({
+      prompts: [{ id: "ip-1", org_prompt_id: null }, { id: "ip-2" }],
+    });
+  });
+});

@@ -24,10 +24,14 @@ other API keys.
 `SENSO_CONFIG_DIR` relocates the file. Nothing else is stored: no knowledge base
 content, no cache, no history, no telemetry.
 
-`senso logout` deletes the file. `senso uninstall` deletes it, removes the agent
-skills `senso skills install` put on the machine, and then removes the CLI
-package itself; a key supplied through `SENSO_API_KEY` is outside its reach,
-and it says so.
+`senso logout` deletes the file — and first revokes the key, if `senso login`
+minted it through the browser flow, so signing out does not leave a seven-day
+credential live. A key you supplied yourself is only forgotten, because it may be
+in use elsewhere; the CLI records which kind it stored and never revokes on a
+guess. `senso uninstall` does the same, removes the agent skills
+`senso skills install` put on the machine, and then removes the CLI package
+itself; a key supplied through `SENSO_API_KEY` is outside its reach, and it says
+so.
 
 ## What leaves your machine
 

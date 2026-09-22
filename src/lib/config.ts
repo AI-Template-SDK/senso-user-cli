@@ -38,6 +38,25 @@ const DEVICE_AUTH_FILE = join(CONFIG_DIR, "device-auth.json");
 
 export interface SensoConfig {
   apiKey?: string;
+  /**
+   * Where the stored key came from, which decides what `logout` may do to it.
+   *
+   * `device-login` is a key this CLI minted for itself through the browser
+   * flow: single-purpose, seven days long, and nobody else's — so `logout` and
+   * `uninstall` revoke it rather than leave it live until it expires.
+   * `supplied` is a key the user already held and handed over, possibly in use
+   * elsewhere; it is only forgotten. **Absent means supplied**: a config written
+   * before this field existed must never have its key revoked on a guess.
+   */
+  apiKeyProvenance?: "device-login" | "supplied";
+  /**
+   * ISO 8601, when the API said the stored key dies. Device-minted keys last
+   * seven days, so `senso login` can report how long the credential it is
+   * reusing has left, and an agent can see a session end coming rather than
+   * meet it mid-task. Absent for a supplied key, whose expiry the CLI is never
+   * told.
+   */
+  apiKeyExpiresAt?: string;
   baseUrl?: string;
   orgName?: string;
   orgId?: string;

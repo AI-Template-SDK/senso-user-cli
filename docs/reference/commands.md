@@ -7,7 +7,7 @@ Generated from the command tree of `@senso-ai/cli`. Every command accepts the [g
 ## Contents
 
 - [`senso login`](#senso-login) — Authenticate this device.
-- [`senso logout`](#senso-logout) — Remove stored API key and organization info from local config.
+- [`senso logout`](#senso-logout) — Remove the stored API key and organization info.
 - [`senso whoami`](#senso-whoami) — Show which organization you are authenticated as, including org ID, slug, tier, and API key prefix.
 - [`senso org`](#senso-org) — View and update organization profile and settings.
 - [`senso users`](#senso-users) — Manage users within the organization.
@@ -44,7 +44,7 @@ Generated from the command tree of `@senso-ai/cli`. Every command accepts the [g
 - [`senso industries`](#senso-industries) — Browse the public industry catalog and the competitive intelligence Senso collects for it — brand leaderboards, domain citations and the prompts each industry runs.
 - [`senso partner`](#senso-partner) — Partner-network commands.
 - [`senso update`](#senso-update) — Update CLI to the latest version
-- [`senso uninstall`](#senso-uninstall) — Remove this CLI, the Senso agent skills it installed, and the stored API key.
+- [`senso uninstall`](#senso-uninstall) — Remove this CLI, the Senso agent skills it installed, and the stored API key — revoking the key first if `senso login` minted it.
 
 ## Global options
 
@@ -74,7 +74,7 @@ These are accepted by every command.
 
 ## senso login
 
-Authenticate this device. Opens a Senso page where an org admin approves the request in a browser, then stores the key it mints. Use --api-key to store a key you already hold.
+Authenticate this device. Does nothing if the key you already have still works — run `senso logout` first to sign in as a different organization. Otherwise it opens a Senso page where an org admin approves this device in a browser, and stores the key that mints. Use --api-key to store a key you already hold.
 
 ```
 senso login [options]
@@ -89,7 +89,7 @@ senso login [options]
 
 ## senso logout
 
-Remove stored API key and organization info from local config.
+Remove the stored API key and organization info. A key that `senso login` minted through the browser is revoked first; a key you supplied yourself is only forgotten.
 
 ```
 senso logout [options]
@@ -2606,7 +2606,7 @@ senso industries answers [options] <industry>
 
 ### senso industries prompts
 
-List the prompts an industry runs. These are the industry's own prompts, not your organization's (`senso prompts list`) — their ids are what `industries import-prompts` and `senso generate industry-draft` accept.
+List the prompts an industry runs. These are the industry's own prompts, not your organization's (`senso prompts list`) — their ids are what `industries import-prompts` and `senso generate industry-draft` accept. Use --imported false to see only what you have not taken yet; each prompt carries `org_prompt_id`, your own prompt with the same text, or null.
 
 ```
 senso industries prompts [options] <industry>
@@ -2614,6 +2614,7 @@ senso industries prompts [options] <industry>
 
 | Option | Description | Default |
 |---|---|---|
+| `--imported <true\|false>` | Keep only the prompts you already have (true) or do not have yet (false). Omit for all. |  |
 | `--limit <n>` | Page size, 1-100 (default 50) |  |
 | `--offset <n>` | Number of prompts to skip (default 0) |  |
 
@@ -2803,7 +2804,7 @@ senso update [options]
 
 ## senso uninstall
 
-Remove this CLI, the Senso agent skills it installed, and the stored API key. Asks first unless --yes is passed.
+Remove this CLI, the Senso agent skills it installed, and the stored API key — revoking the key first if `senso login` minted it. Asks first unless --yes is passed.
 
 ```
 senso uninstall [options]

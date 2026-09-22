@@ -27,6 +27,7 @@
 
 import { execFile } from "node:child_process";
 import { ApiError, apiRequest } from "./api-client.js";
+import { readConfig } from "./config.js";
 import { CliError, EXIT, toCliError } from "./errors.js";
 
 /** Where the flow lives, under the same `/api/v1` prefix as everything else. */
@@ -329,5 +330,66 @@ export function openBrowser(url: string): void {
     child.unref();
   } catch {
     // Spawning failed outright. The URL is already on screen.
+  }
+}
+
+// ── Ending a key this CLI minted ─────────────────────────────────────────────
+
+/** A key may revoke itself, and only itself: no id, the credential is the key. */
+const SELF_REVOKE_PATH = "/org/api-keys/self/revoke";
+
+/**
+ * What became of the stored key on the way out.
+ *
+ * Three shapes rather than a boolean, because `logout` says different things
+ * for each: nothing to do, done, or done-locally-but-the-key-is-still-live.
+ */
+export type StoredKeyRevocation =
+  | { attempted: false; reason: "no-key" | "supplied" }
+  | { attempted: true; revoked: true; alreadyInvalid: boolean }
+  | { attempted: true; revoked: false; reason: string };
+
+/**
+ * Revokes the stored key, if this CLI minted it, before it is forgotten.
+ *
+ * Two rules, both about which key gets revoked:
+ *
+ *   - **Only a device-minted key.** A key the user supplied may be in use
+ *     elsewhere — in CI, in another tool — and `logout` revoking it would be a
+ *     nasty surprise. Provenance is recorded when the key is stored; absent
+ *     means supplied, so a config from before that field existed is safe.
+ *   - **The stored key, never the resolved one.** `resolveApiKey` prefers the
+ *     flag and the environment, so `SENSO_API_KEY=<dashboard key> senso logout`
+ *     would otherwise revoke the dashboard key while deleting a different key's
+ *     file. The request carries `config.apiKey` explicitly, and goes to the API
+ *     that key belongs to — `config.baseUrl` if `login` recorded one — rather
+ *     than wherever the environment happens to point right now.
+ *
+ * Best-effort by design. Logging out is a local act the user is entitled to
+ * offline; a revoke that cannot be delivered leaves a key that dies on its own
+ * within seven days, and the caller says so out loud. A 401 is success: the
+ * key is already invalid, which is the end state.
+ */
+export async function revokeStoredDeviceKey(opts: {
+  baseUrl?: string;
+}): Promise<StoredKeyRevocation> {
+  const config = readConfig();
+  const apiKey = typeof config.apiKey === "string" ? config.apiKey.trim() : "";
+  if (!apiKey) return { attempted: false, reason: "no-key" };
+  if (config.apiKeyProvenance !== "device-login") return { attempted: false, reason: "supplied" };
+
+  try {
+    await apiRequest({
+      method: "POST",
+      path: SELF_REVOKE_PATH,
+      apiKey,
+      baseUrl: opts.baseUrl ?? config.baseUrl,
+    });
+    return { attempted: true, revoked: true, alreadyInvalid: false };
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) {
+      return { attempted: true, revoked: true, alreadyInvalid: true };
+    }
+    return { attempted: true, revoked: false, reason: toCliError(err).message };
   }
 }

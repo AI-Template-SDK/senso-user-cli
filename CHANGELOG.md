@@ -13,6 +13,17 @@ mattered, and what you need to do differently.
 
 ### Added
 
+- **`senso industries prompts --imported <true|false>` filters by what you
+  already have.** The API gained the parameter and a matching `org_prompt_id`
+  on every prompt — your own prompt with the same trimmed text, or `null`,
+  judged by the same rule the import applies. `--imported false` lists what you
+  have not taken yet, which is the natural call after importing, and
+  `--imported true` lists what you have. The flag takes a value rather than
+  being a bare boolean because omitting it means "all", which is a third state:
+  a `--no-imported` spelling would have made "everything" unsayable. An invalid
+  value exits 2 without spending a request, and `org_prompt_id` is now a table
+  column, so "do I already have this?" is answerable without `--output json`.
+
 - **`senso login` now signs you in through a browser, and works without a
   terminal.** It opens a device authorization against the Senso API, prints a
   short code and the page to type it into, and stores the key an org admin's
@@ -52,6 +63,50 @@ mattered, and what you need to do differently.
 82:5b:bd:cc:62:3d`. Nothing trusts this field; its only job is to help the
   person approving decide whether the request is the terminal they just typed
   in. `--device-name` overrides it.
+
+- **`senso login` reuses a credential that still works, instead of minting
+  another.** A bare `senso login` now verifies whatever key commands would
+  actually send — `SENSO_API_KEY` included, since it outranks the stored file —
+  and, if the API accepts it, reports `Already authenticated as "…"` and stops.
+  Nothing is minted, nobody is asked to approve anything, and the JSON payload
+  carries `reused: true` so a caller can tell "a human just approved something"
+  from "nothing happened". That makes `login` safe for an agent to run at the
+  start of every session. A rejected key falls through to the browser flow as
+  before; a network failure is reported rather than answered by starting a flow
+  that needs the same network. Signing in as a different organization is
+  `senso logout` then `senso login` — deliberately explicit, because giving up a
+  working credential should be something you asked for. `--api-key`,
+  `--interactive` and `--complete` are instructions and still do exactly what
+  they say.
+
+- **`senso login` run twice mid-flow re-prints the same code.** It used to open
+  a second authorization and show a second code, orphaning the one the user was
+  at that moment typing into the browser. A pending login that is still live —
+  and was opened against the same API — is now reused, with the time it has
+  actually got left rather than a fresh five minutes.
+
+- **The key's expiry is stored, as `apiKeyExpiresAt`.** `login` prints how long
+  a reused key has left and warns when that is under a day, which is the
+  difference between an agent seeing a session end coming and meeting it
+  mid-task.
+
+- **`senso logout` and `senso uninstall` revoke the key that `senso login`
+  minted.** A device-flow key is single-purpose and lasts seven days; before
+  today, signing out deleted the local file and left the key live until it
+  expired — one orphan per login, accumulating on the api-keys page. Both
+  commands now call `POST /org/api-keys/self/revoke` with the stored key first,
+  then delete the file. Only a key the CLI minted is revoked: `login` records
+  `apiKeyProvenance` when it stores a key, a key you pasted or passed with
+  `--api-key` is `supplied` and only forgotten (it may be in use elsewhere), and
+  a config written before the field existed is treated the same way. The
+  request carries the _stored_ key, never the one `SENSO_API_KEY` or `--api-key`
+  would resolve to, and goes to the API the key belongs to. Revocation is
+  best-effort: a network failure still logs you out, with a warning that the key
+  stays valid until it expires and `keyRevoked: false` in the JSON payload.
+  `uninstall --keep-config` skips it, and `--dry-run` reports
+  `keyWillBeRevoked`. `login` deliberately does **not** revoke: replacing a
+  working key is what `--api-key` does on request, and it warns that the key it
+  displaced stays valid until it expires.
 
 - **`senso login --api-key <key>` verifies and stores a key without a
   terminal.** There was no way to do that before: `login` always prompted, so a
