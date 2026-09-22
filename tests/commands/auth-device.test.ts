@@ -28,6 +28,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node
 import { server, TEST_BASE_URL } from "../setup.js";
 import { apiUrl, runCli } from "../helpers.js";
 import {
+  getBaseUrl,
   getConfigPath,
   getDeviceAuthPath,
   type DeviceAuthState,
@@ -58,7 +59,25 @@ const os = vi.hoisted(() => ({
   hostname: vi.fn(() => "tenz-macbook"),
   userInfo: vi.fn(() => ({ username: "tenz" })),
 }));
-vi.mock("node:os", () => os);
+vi.mock("node:os", async (importOriginal) => ({
+  // Everything else stays real. Replacing the whole module would hand
+  // `undefined` to any other `node:os` import the CLI grows later.
+  ...(await importOriginal<typeof import("node:os")>()),
+  hostname: os.hostname,
+  userInfo: os.userInfo,
+}));
+
+/**
+ * `process.platform`, pinned.
+ *
+ * The third input to the device name. Left to the machine, a test that expects
+ * "macOS" passes on the developer's laptop and fails on the ubuntu runner — which
+ * is exactly what happened. Every test that depends on it says which one.
+ */
+const REAL_PLATFORM = process.platform;
+function onPlatform(platform: string): void {
+  Object.defineProperty(process, "platform", { value: platform, configurable: true });
+}
 
 const ORG = {
   org_id: "org-device",
@@ -183,6 +202,7 @@ beforeEach(() => {
 
 afterEach(() => {
   withTerminal(originalIsTTY);
+  onPlatform(REAL_PLATFORM);
   vi.clearAllMocks();
 });
 
@@ -534,11 +554,44 @@ describe("the name this device is approved under", () => {
     // person approving it nothing at all — and telling them something is the
     // field's only job.
     os.hostname.mockReturnValue("82:5b:bd:cc:62:3d");
+    onPlatform("darwin");
     authorizeRecordingBody();
 
     await runCli(["login"], { withKey: false });
 
     expect(sentAuthorizeBody.device_name).toBe("tenz (macOS)");
+  });
+
+  it.each([
+    ["linux", "tenz (Linux)"],
+    ["win32", "tenz (Windows)"],
+    // A platform the label table does not know is still better said than
+    // hidden: the raw identifier goes through.
+    ["freebsd", "tenz (freebsd)"],
+  ])(
+    "labels the platform for a person when the hostname is useless — %s",
+    async (platform, expected) => {
+      os.hostname.mockReturnValue("10.0.0.7");
+      onPlatform(platform);
+      authorizeRecordingBody();
+
+      await runCli(["login"], { withKey: false });
+
+      expect(sentAuthorizeBody.device_name).toBe(expected);
+    },
+  );
+
+  it("falls back to the platform alone when neither the host nor the user can be named", async () => {
+    os.hostname.mockReturnValue("82:5b:bd:cc:62:3d");
+    os.userInfo.mockImplementation(() => {
+      throw new Error("uid not found");
+    });
+    onPlatform("linux");
+    authorizeRecordingBody();
+
+    await runCli(["login"], { withKey: false });
+
+    expect(sentAuthorizeBody.device_name).toBe("Linux");
   });
 
   it("drops the mDNS suffix nobody calls their machine by", async () => {
@@ -569,5 +622,88 @@ describe("the name this device is approved under", () => {
     await runCli(["login", "--device-name", "CI runner 4"], { withKey: false });
 
     expect(sentAuthorizeBody.device_name).toBe("CI runner 4");
+  });
+});
+
+describe("what login writes to the config file", () => {
+  /**
+   * The bug these pin: login built a fresh object and wrote it, so everything
+   * it did not name vanished — a stored baseUrl above all. The login had just
+   * USED that URL to verify the key, then erased the pointer to it, and the
+   * next command carried a key from one environment to another.
+   */
+  function givenStoredConfig(config: SensoConfig): void {
+    mkdirSync(CONFIG_DIR, { recursive: true });
+    writeFileSync(getConfigPath(), JSON.stringify(config));
+  }
+
+  const orgAt = (baseUrl: string): void => {
+    server.use(http.get(`${baseUrl}/org/me`, () => HttpResponse.json(ORG)));
+  };
+
+  beforeEach(() => {
+    withTerminal(false);
+  });
+
+  it("keeps a stored baseUrl, and everything else it did not set", async () => {
+    // No flag, no environment: the stored URL is what the login resolves to,
+    // verifies against, and must still be pointing at afterwards.
+    givenStoredConfig({
+      apiKey: "tgr_old",
+      baseUrl: TEST_BASE_URL,
+      lastUpdateCheck: "2026-09-20T00:00:00.000Z",
+      latestVersion: "0.99.0",
+    });
+    orgAt(TEST_BASE_URL);
+
+    const res = await runCli(["login", "--api-key", "tgr_new"], { withKey: false, baseUrl: false });
+
+    expect(res.exitCode).toBe(0);
+    expect(storedConfig()).toMatchObject({
+      apiKey: "tgr_new",
+      baseUrl: TEST_BASE_URL,
+      lastUpdateCheck: "2026-09-20T00:00:00.000Z",
+      latestVersion: "0.99.0",
+      orgName: ORG.name,
+    });
+  });
+
+  it("records the API the key was verified against, not only the flag", async () => {
+    // `SENSO_BASE_URL=staging senso login` mints a staging key. A later command
+    // in a shell without the variable must reach staging, not production.
+    process.env.SENSO_BASE_URL = TEST_BASE_URL;
+    orgAt(TEST_BASE_URL);
+    try {
+      await runCli(["login", "--api-key", "tgr_env_bound"], { withKey: false, baseUrl: false });
+    } finally {
+      delete process.env.SENSO_BASE_URL;
+    }
+
+    expect(storedConfig().baseUrl).toBe(TEST_BASE_URL);
+  });
+
+  it("does not pin the default API into the file", async () => {
+    // Written explicitly, today's default would outlive a future change to it
+    // and strand the user on the old endpoint. Absence means "the default".
+    const DEFAULT = getBaseUrl();
+    orgAt(DEFAULT);
+
+    await runCli(["login", "--api-key", "tgr_default"], { withKey: false, baseUrl: false });
+
+    expect(storedConfig().apiKey).toBe("tgr_default");
+    expect(storedConfig().baseUrl).toBeUndefined();
+  });
+
+  it("clears a stale baseUrl when logging in to the default API", async () => {
+    // The mirror image: a pointer at staging must not survive a login to the
+    // default, or the new key is sent to the old environment.
+    const DEFAULT = getBaseUrl();
+    givenStoredConfig({ apiKey: "tgr_old", baseUrl: "https://stale.example/api/v1" });
+    orgAt(DEFAULT);
+
+    await runCli(["login", "--api-key", "tgr_new"], { withKey: false, baseUrl: DEFAULT });
+
+    expect(storedConfig().apiKey).toBe("tgr_new");
+    expect(storedConfig().baseUrl).toBeUndefined();
   });
 });

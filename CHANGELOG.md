@@ -82,6 +82,30 @@ mattered, and what you need to do differently.
 
 ### Fixed
 
+- **`senso login` no longer erases a stored `baseUrl`.** It built a fresh
+  config object and wrote it, so a `baseUrl` set by an earlier login or by hand
+  vanished unless `--base-url` was passed on that exact invocation. The login
+  had just _used_ that URL to verify the key, then deleted the pointer to it, and
+  the next command sent a key minted in one environment to another and got a 401
+  nobody could explain. `login` now merges into the file, and records the API
+  the key was actually verified against — flag, then `SENSO_BASE_URL`, then the
+  stored value — because a key belongs to the environment that minted it. The
+  default is stored as absence, so a login to the default API clears a stale
+  pointer rather than pinning today's default into the file. The update-check
+  cache survives a login too, which it never did.
+
+- **The credential file is replaced atomically, never rewritten in place.**
+  `config.json` and `device-auth.json` are now written to a fresh `0600` file
+  beside the target and renamed over it. That closes three holes at once: an
+  interrupted write no longer leaves a truncated file that reads as "not logged
+  in" — which for a device-minted key meant a credential lost for good, since it
+  is delivered exactly once; a symlink planted at the path no longer carries the
+  key to wherever it points; and a file left world-readable by an older version
+  no longer holds the secret for the instant before the permissions are fixed.
+  On Windows the rename is retried through the `EPERM` an antivirus scanner
+  produces, and a failure after that throws rather than falling back to an
+  in-place write.
+
 - **`senso content-types` help no longer teaches a broken template.** `--data`
   on `create`, `update` and `patch` showed `"template": "..."` (and, on `patch`,
   the prose value `"Updated template instruction"`), and the key list advertised

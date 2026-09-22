@@ -167,18 +167,33 @@ there.
 
 ### Permissions
 
-The file is created with mode `0600` — owner read/write, nothing else. Node
-applies a mode only when it creates the file, which is why every write goes
-through the single `writeSecretFile()` helper: it creates the directory `0700`,
-writes with the mode, and then `chmod`s both explicitly. Funneling writes through
-one function is not enough on its own — a `config.json` that already exists with
-looser permissions (an older version, a restored backup, a file copied between
-machines) would otherwise have a credential written into it and keep them.
+Every write goes through one helper, `writeSecretFile()`, which never writes
+the target in place. It creates a fresh file beside it — `wx`, mode `0600` —
+and renames it over the top. One mechanism, three properties:
 
-Both `chmod`s are best-effort. POSIX modes are effectively ignored on Windows,
-where the protection is the per-user ACL on `%APPDATA%`, and a config directory
-on a filesystem without POSIX permissions should not fail a write that is as
-safe as that filesystem allows.
+- **Atomic.** A plain write truncates first and fills second, so an interrupted
+  one leaves a file that reads as `{}`. For a key the device flow minted that is
+  unrecoverable: the authorization was consumed to produce it and the response
+  was the only copy. A rename replaces the whole file or nothing.
+- **Never through a symlink.** `wx` (`O_CREAT|O_EXCL`) refuses to open a link,
+  and `rename` replaces a link at the destination rather than following it.
+- **Never on disk with loose permissions.** `mode` applies only when a file is
+  created, so rewriting a `config.json` left `0644` by an older version kept
+  those bits for the duration of the write. The new file is `0600` from its
+  first byte, and the directory is created — and re-`chmod`ed — `0700`.
+
+The directory `chmod` is best-effort: POSIX modes are effectively ignored on
+Windows, where the protection is the per-user ACL on `%APPDATA%`, and a config
+directory on a filesystem without them should not fail a write that is as safe
+as that filesystem allows. On Windows the rename is retried briefly, because an
+antivirus scanner holding the file open makes it fail with `EPERM`.
+
+**`login` merges into this file; it does not replace it.** It records the API
+the key was verified against — `--base-url`, then `SENSO_BASE_URL`, then the
+stored value — because a key belongs to the environment that minted it, and a
+later command without the flag or the variable must still reach that
+environment. The default is represented as absence, so a login to the default
+API clears a stale `baseUrl` rather than pinning today's default into the file.
 
 `updateConfig()` re-reads immediately before writing, in one synchronous block.
 The update checker runs concurrently with the command that started it, and that

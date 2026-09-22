@@ -16,8 +16,10 @@ import {
   getBaseUrl,
   getConfigDir,
   getConfigPath,
+  isDefaultBaseUrl,
   API_KEY_SOURCE_LABELS,
   type ApiKeySource,
+  type SensoConfig,
 } from "../lib/config.js";
 import {
   clampInterval,
@@ -170,6 +172,12 @@ async function storeVerifiedKey(
 }
 
 interface PersistOptions {
+  /**
+   * The API the key was verified against, when it was not the `--base-url`
+   * flag: the device flow pins its poll to the URL the authorization was opened
+   * on, and that — not whatever the flag says now — is where the key works.
+   */
+  baseUrl?: string;
   /** When the minted key dies. Device-flow keys expire; pasted ones may not. */
   keyExpiresAt?: string;
   /** Adds the line that makes a confused-deputy approval visible. */
@@ -188,14 +196,35 @@ function persistVerifiedKey(
   org: OrgMeResponse,
   opts: PersistOptions = {},
 ): void {
-  writeConfig({
+  // Merge, never replace. The old write built a fresh object, which silently
+  // dropped everything it did not name — a stored `baseUrl` most of all. The
+  // login itself had just used that URL to verify the key, then erased the
+  // pointer to it, so the next command went to production carrying a key from
+  // somewhere else. (It also reset the update-check cache, which was harmless
+  // but pointless.)
+  //
+  // What login records about the API is the URL the key was *verified against*,
+  // resolved the same way the request was, not the `--base-url` flag alone. A
+  // key belongs to the environment that minted it: `SENSO_BASE_URL=staging
+  // senso login` stores a staging key, and a later command without the variable
+  // must not send it to production. The default is represented as absence, so
+  // logging in to the default API clears a stale pointer rather than pinning
+  // the current default into the file for good.
+  const verifiedAgainst = getBaseUrl({ baseUrl: opts.baseUrl ?? ctx.baseUrl });
+  const next: SensoConfig = {
+    ...readConfig(),
     apiKey,
-    ...(ctx.baseUrl ? { baseUrl: ctx.baseUrl } : {}),
     orgName: org.name,
     orgId: org.org_id,
     orgSlug: org.slug,
     isFreeTier: org.is_free_tier,
-  });
+  };
+  if (isDefaultBaseUrl(verifiedAgainst)) {
+    delete next.baseUrl;
+  } else {
+    next.baseUrl = verifiedAgainst;
+  }
+  writeConfig(next);
 
   log.success(`Authenticated as ${pc.bold(`"${org.name}"`)} (${pc.dim(org.org_id)})`);
   log.success(`Config saved to ${pc.dim(getConfigPath())}`);

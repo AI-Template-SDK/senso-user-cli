@@ -7,8 +7,9 @@
  * have to change to use the OS keychain instead.
  */
 
-import { readFileSync, writeFileSync, mkdirSync, unlinkSync, chmodSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync, writeFileSync, mkdirSync, unlinkSync, chmodSync, renameSync } from "node:fs";
+import { basename, join } from "node:path";
+import { randomBytes } from "node:crypto";
 import envPaths from "env-paths";
 
 /**
@@ -71,34 +72,81 @@ export function readConfig(): SensoConfig {
 }
 
 /**
- * Writes a file in the config directory so that only its owner can read it.
+ * Writes a file in the config directory so that only its owner can ever read it.
  *
- * The `mode` option on `writeFileSync` and `mkdirSync` applies **only when the
- * entry is created**. A config.json that already exists with a looser mode — an
- * older CLI version, a restored backup, a file copied between machines, a stray
- * `touch` — gets the secret written into it and keeps its permissions. So the
- * mode is also applied explicitly after the write, every time.
+ * Not `writeFileSync(path)`. That has three problems for a file holding a
+ * credential, and one mechanism fixes all of them: write a fresh file beside
+ * the target, then rename it over the top.
  *
- * The chmods are best-effort: POSIX modes are effectively ignored on Windows,
- * where protection comes from the per-user ACL on %APPDATA% instead, and a
- * config directory on a filesystem without POSIX permissions (a FAT volume, an
- * SMB share) would otherwise fail a write that is as safe as that filesystem
- * allows. SECURITY.md states this rather than implying a guarantee the platform
- * does not give.
+ *   1. **It is atomic.** A plain write truncates first and fills second, so a
+ *      Ctrl-C, an OOM kill or a full disk in between leaves a truncated file
+ *      that reads as `{}`. For a pasted key that costs a re-login. For a key
+ *      the device flow minted it is unrecoverable — the authorization was
+ *      consumed to produce it and that response was the only copy. `rename`
+ *      replaces the whole file or nothing.
+ *   2. **It never follows a symlink.** `writeFileSync` on a path that is a
+ *      symlink writes through it, so a link planted at `config.json` captures
+ *      the key wherever it points. The temp file is created with `wx`
+ *      (`O_CREAT|O_EXCL`), which refuses to open a symlink at all, and `rename`
+ *      replaces a symlink at the destination rather than writing through it.
+ *   3. **The secret is never on disk with loose permissions.** `mode` on
+ *      `writeFileSync` applies only when the file is *created*, so a
+ *      `config.json` left `0644` by an older version kept those bits for the
+ *      write and only a later `chmod` fixed them — a window, however brief.
+ *      The temp file is new, so its mode applies from the first byte.
+ *
+ * The rename is atomic only within one filesystem, which is why the temp file
+ * lives in the same directory. On Windows a rename over a file an antivirus
+ * scanner has open can fail with EPERM or EBUSY; that is retried briefly, and a
+ * failure after that throws rather than falling back to a non-atomic write.
+ *
+ * POSIX modes are effectively ignored on Windows, where protection comes from
+ * the per-user ACL on %APPDATA% instead. SECURITY.md states this rather than
+ * implying a guarantee the platform does not give.
  */
 function writeSecretFile(path: string, contents: string): void {
   mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
   try {
+    // `mode` on mkdirSync applies only to directories it creates. One from an
+    // older version is 0755 and would stay that way.
     chmodSync(CONFIG_DIR, 0o700);
   } catch {
-    // Not ours to chmod, or a filesystem without modes. The file mode below is
-    // what actually protects the secret.
+    // Not ours to chmod, or a filesystem without modes. The file mode is what
+    // actually protects the secret.
   }
-  writeFileSync(path, contents, { mode: 0o600 });
+
+  const tmp = join(CONFIG_DIR, `.${basename(path)}.${randomBytes(6).toString("hex")}.tmp`);
+  writeFileSync(tmp, contents, { mode: 0o600, flag: "wx" });
   try {
-    chmodSync(path, 0o600);
-  } catch {
-    // As above.
+    renameWithRetry(tmp, path);
+  } catch (err) {
+    try {
+      unlinkSync(tmp);
+    } catch {
+      // The rename failed and so did the cleanup; the original error is the
+      // one worth reporting.
+    }
+    throw err;
+  }
+}
+
+/**
+ * `renameSync`, tolerating the transient EPERM/EBUSY Windows produces when
+ * another process — typically an antivirus scanner — has the destination open.
+ */
+function renameWithRetry(from: string, to: string): void {
+  const attempts = 5;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      renameSync(from, to);
+      return;
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      const transient = code === "EPERM" || code === "EBUSY";
+      if (!transient || attempt === attempts) throw err;
+      // A synchronous pause. This runs once per login, not in a hot path.
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 40 * attempt);
+    }
   }
 }
 
@@ -235,6 +283,16 @@ export function getBaseUrl(opts?: { baseUrl?: string }): string {
 }
 
 /* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
+
+/**
+ * Whether a URL is the built-in default, which `login` represents in the config
+ * file as *absence*: a stored `baseUrl` means "this key belongs to a non-default
+ * API", and writing the default in explicitly would pin a user to whatever it
+ * happens to be today.
+ */
+export function isDefaultBaseUrl(url: string): boolean {
+  return url === DEFAULT_BASE_URL;
+}
 
 export function getConfigPath(): string {
   return CONFIG_FILE;

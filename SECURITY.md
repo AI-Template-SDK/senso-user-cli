@@ -14,12 +14,12 @@ One credential: an organization API key, which can read and write everything in
 that Senso organization — knowledge base content, generated content, members and
 other API keys.
 
-| Where                                                      | What                                                                                                                                 |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `~/.config/senso/config.json` (or the platform equivalent) | The API key, the organization name and id, and the last update check. Written with mode `0600`.                                      |
-| `device-auth.json`, beside it                              | Only while a `senso login` is in flight: the `device_code` for that login, mode `0600`, deleted the moment the flow ends or expires. |
-| `SENSO_API_KEY`                                            | The same key, when supplied by environment instead                                                                                   |
-| `--api-key`                                                | The same key, when supplied per command                                                                                              |
+| Where                                                      | What                                                                                                                                                                |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `~/.config/senso/config.json` (or the platform equivalent) | The API key, the organization name and id, and the last update check. Mode `0600`, replaced atomically — never rewritten in place, never written through a symlink. |
+| `device-auth.json`, beside it                              | Only while a `senso login` is in flight: the `device_code` for that login, mode `0600`, deleted the moment the flow ends or expires.                                |
+| `SENSO_API_KEY`                                            | The same key, when supplied by environment instead                                                                                                                  |
+| `--api-key`                                                | The same key, when supplied per command                                                                                                                             |
 
 `SENSO_CONFIG_DIR` relocates the file. Nothing else is stored: no knowledge base
 content, no cache, no history, no telemetry.

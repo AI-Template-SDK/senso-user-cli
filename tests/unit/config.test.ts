@@ -15,9 +15,32 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync, mkdirSync } from "node:fs";
+import {
+  chmodSync,
+  lstatSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+  mkdirSync,
+} from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+
+/**
+ * Tests that read a file mode, plant a symlink or compare inodes.
+ *
+ * Windows has none of the three in the POSIX sense — `stat` reports 0666 or
+ * 0444 whatever was asked for, and creating a symlink needs a privilege — so
+ * on that platform they are skipped, visibly, rather than failing or being
+ * quietly satisfied. The same pattern guards the executable bit in
+ * tests/e2e/cli.test.ts. CI runs the unit suite on ubuntu, so this is about
+ * the tests telling the truth wherever they are run, not about CI.
+ */
+const posixOnly = it.skipIf(process.platform === "win32");
 
 let dir: string;
 
@@ -68,7 +91,7 @@ describe("writing the config", () => {
     expect(readConfig()).toEqual({ apiKey: "tgr_abc", orgName: "Acme" });
   });
 
-  it("writes the file owner-readable only", async () => {
+  posixOnly("writes the file owner-readable only", async () => {
     const { writeConfig, getConfigPath } = await loadConfig();
 
     writeConfig({ apiKey: "tgr_abc" });
@@ -484,7 +507,7 @@ describe("the in-flight device authorization", () => {
     expect(readDeviceAuthState()).toEqual(PENDING);
   });
 
-  it("is readable by its owner only, like the credential it will become", async () => {
+  posixOnly("is readable by its owner only, like the credential it will become", async () => {
     const { writeDeviceAuthState, getDeviceAuthPath } = await loadConfig();
 
     writeDeviceAuthState(PENDING);
@@ -492,7 +515,7 @@ describe("the in-flight device authorization", () => {
     expect(statSync(getDeviceAuthPath()).mode & 0o777).toBe(0o600);
   });
 
-  it("tightens a file that already existed with a looser mode", async () => {
+  posixOnly("tightens a file that already existed with a looser mode", async () => {
     // The bug this covers: `mode` on writeFileSync applies only when the file is
     // created. A file left world-readable by an older version, a restored backup
     // or a stray `touch` would otherwise keep those permissions and have a
@@ -610,5 +633,151 @@ describe("logging out", () => {
 
     expect(readConfig()).toEqual({});
     expect(readDeviceAuthState()).toBeUndefined();
+  });
+});
+
+describe("writing a secret to disk", () => {
+  /**
+   * These are about the mechanism, not the contents. A credential file has
+   * three ways to go wrong that an ordinary `writeFileSync` does nothing about,
+   * and the tests below each pin one of them.
+   */
+  const stored = (): string => readFileSync(join(dir, "config.json"), "utf-8");
+
+  posixOnly("replaces a symlink at the path instead of writing the secret through it", async () => {
+    // A link planted at config.json would otherwise carry the key to wherever
+    // it points — a shared SENSO_CONFIG_DIR is enough to make that plausible.
+    mkdirSync(dir, { recursive: true });
+    const elsewhere = join(dir, "captured.json");
+    symlinkSync(elsewhere, join(dir, "config.json"));
+    const { writeConfig } = await loadConfig();
+
+    writeConfig({ apiKey: "tgr_secret" });
+
+    expect(lstatSync(join(dir, "config.json")).isSymbolicLink()).toBe(false);
+    expect(() => statSync(elsewhere)).toThrow();
+    expect(JSON.parse(stored())).toEqual({ apiKey: "tgr_secret" });
+  });
+
+  posixOnly("never has the secret on disk under the old file's looser permissions", async () => {
+    // `mode` applies only when a file is created. Rewriting a 0644 file in
+    // place left the key world-readable until a later chmod — a window. A new
+    // inode proves the old file was replaced, never written into.
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "config.json"), "{}");
+    chmodSync(join(dir, "config.json"), 0o644);
+    const before = statSync(join(dir, "config.json"));
+    const { writeConfig } = await loadConfig();
+
+    writeConfig({ apiKey: "tgr_secret" });
+
+    const after = statSync(join(dir, "config.json"));
+    expect(after.mode & 0o777).toBe(0o600);
+    expect(after.ino).not.toBe(before.ino);
+  });
+
+  it("leaves nothing behind but the file itself", async () => {
+    const { writeConfig, writeDeviceAuthState } = await loadConfig();
+
+    writeConfig({ apiKey: "tgr_secret" });
+    writeDeviceAuthState({
+      deviceCode: "dc",
+      userCode: "AAAA-BBBB",
+      verificationUri: "https://app.senso.ai/cli/verify",
+      interval: 5,
+      expiresAt: new Date(Date.now() + 300_000).toISOString(),
+    });
+
+    expect(readdirSync(dir).sort()).toEqual(["config.json", "device-auth.json"]);
+  });
+
+  /**
+   * A config module whose `renameSync` fails as scripted, everything else real.
+   *
+   * The directory cannot simply be made unwritable: the helper re-chmods it to
+   * 0700 as its first act, which an owner is always allowed to do. Failing the
+   * rename itself is both deterministic and the honest test — it is the one
+   * step whose failure has to leave the old file exactly as it was.
+   */
+  async function loadConfigWithRename(renameSync: (from: string, to: string) => void) {
+    vi.resetModules();
+    process.env.SENSO_CONFIG_DIR = dir;
+    vi.doMock("node:fs", async (importOriginal) => ({
+      ...(await importOriginal<typeof import("node:fs")>()),
+      renameSync,
+    }));
+    try {
+      return await import("../../src/lib/config.js");
+    } finally {
+      vi.doUnmock("node:fs");
+    }
+  }
+
+  const errno = (code: string): NodeJS.ErrnoException => Object.assign(new Error(code), { code });
+
+  it("keeps the previous credential intact when the replacement cannot land", async () => {
+    // The interrupted-write case, made deterministic: the new file is written,
+    // the swap fails, and the credential that worked a moment ago must still
+    // work — with nothing half-written left beside it.
+    const { writeConfig } = await loadConfig();
+    writeConfig({ apiKey: "tgr_the_key_that_works" });
+    const failing = await loadConfigWithRename(() => {
+      throw errno("ENOSPC");
+    });
+
+    expect(() => {
+      failing.writeConfig({ apiKey: "tgr_never_lands" });
+    }).toThrow(/ENOSPC/);
+
+    expect(JSON.parse(stored())).toEqual({ apiKey: "tgr_the_key_that_works" });
+    expect(readdirSync(dir)).toEqual(["config.json"]);
+  });
+
+  it("rides out the transient EPERM a Windows antivirus scanner produces", async () => {
+    // Two refusals, then the real rename. The write must succeed rather than
+    // report a failed login on a machine where nothing is actually wrong.
+    const { renameSync: realRename } = await import("node:fs");
+    let attempts = 0;
+    const flaky = await loadConfigWithRename((from, to) => {
+      attempts += 1;
+      if (attempts <= 2) throw errno("EPERM");
+      realRename(from, to);
+    });
+
+    flaky.writeConfig({ apiKey: "tgr_eventually" });
+
+    expect(JSON.parse(stored())).toEqual({ apiKey: "tgr_eventually" });
+    expect(attempts).toBe(3);
+  });
+
+  it("gives up on a failure that is not transient, rather than retrying it", async () => {
+    let calls = 0;
+    const broken = await loadConfigWithRename(() => {
+      calls += 1;
+      throw errno("EACCES");
+    });
+
+    expect(() => {
+      broken.writeConfig({ apiKey: "tgr_x" });
+    }).toThrow(/EACCES/);
+    expect(calls).toBe(1);
+  });
+
+  posixOnly("protects the in-flight device code the same way", async () => {
+    mkdirSync(dir, { recursive: true });
+    const elsewhere = join(dir, "captured-code.json");
+    symlinkSync(elsewhere, join(dir, "device-auth.json"));
+    const { writeDeviceAuthState } = await loadConfig();
+
+    writeDeviceAuthState({
+      deviceCode: "the-secret-device-code",
+      userCode: "AAAA-BBBB",
+      verificationUri: "https://app.senso.ai/cli/verify",
+      interval: 5,
+      expiresAt: new Date(Date.now() + 300_000).toISOString(),
+    });
+
+    expect(lstatSync(join(dir, "device-auth.json")).isSymbolicLink()).toBe(false);
+    expect(() => statSync(elsewhere)).toThrow();
   });
 });
