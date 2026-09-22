@@ -76,6 +76,14 @@ function withWindowOptions(cmd: Command): Command {
     );
 }
 
+/**
+ * The three states of `--imported`, of which only two are spellable.
+ *
+ * Omitting the flag is the third — every prompt, imported or not — and it is
+ * why this is a value flag rather than `--imported` / `--no-imported`.
+ */
+const IMPORTED_FILTER = ["true", "false"] as const;
+
 const ENTITY_TYPES = [
   "brand",
   "regulator",
@@ -387,25 +395,44 @@ export function registerIndustriesCommands(program: Command): void {
   industries
     .command("prompts <industry>")
     .description(
-      "List the prompts an industry runs. These are the industry's own prompts, not your organization's (`senso prompts list`) — their ids are what `industries import-prompts` and `senso generate industry-draft` accept.",
+      "List the prompts an industry runs. These are the industry's own prompts, not your organization's (`senso prompts list`) — their ids are what `industries import-prompts` and `senso generate industry-draft` accept. Use --imported false to see only what you have not taken yet; each prompt carries `org_prompt_id`, your own prompt with the same text, or null.",
+    )
+    .option(
+      "--imported <true|false>",
+      "Keep only the prompts you already have (true) or do not have yet (false). Omit for all.",
     )
     .option("--limit <n>", "Page size, 1-100 (default 50)")
     .option("--offset <n>", "Number of prompts to skip (default 0)")
     .action(
       runAction(
         program,
-        async (ctx: Ctx, industry: string, cmdOpts: { limit?: string; offset?: string }) => {
+        async (
+          ctx: Ctx,
+          industry: string,
+          cmdOpts: { imported?: string; limit?: string; offset?: string },
+        ) => {
+          // A value rather than a bare `--imported`, because the filter has
+          // three states and a Commander boolean has two: absent means "all",
+          // which is not the same as `false`. Validated here so a typo exits 2
+          // instead of spending a round trip to be told 400.
+          const imported = parseEnumFlag("--imported", cmdOpts.imported, IMPORTED_FILTER);
           const limit = parseIntFlag("--limit", cmdOpts.limit, { min: 1, max: 100 });
           const offset = parseIntFlag("--offset", cmdOpts.offset, { min: 0 });
           const industryId = await resolveIndustryId(industry, ctx);
 
           const data = await apiRequest({
             path: `/org/industries/${industryId}/prompts`,
-            params: { limit: limit?.toString(), offset: offset?.toString() },
+            params: {
+              imported,
+              limit: limit?.toString(),
+              offset: offset?.toString(),
+            },
             apiKey: ctx.apiKey,
             baseUrl: ctx.baseUrl,
           });
-          emit(ctx, data, { columns: ["id", "text", "funnel_stage"] });
+          // `org_prompt_id` is in the table because it is the answer to "do I
+          // have this already" — without it that question needs --output json.
+          emit(ctx, data, { columns: ["id", "text", "funnel_stage", "org_prompt_id"] });
         },
       ),
     );

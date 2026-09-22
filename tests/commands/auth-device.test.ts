@@ -135,6 +135,9 @@ function authorizeReturns(body: Record<string, unknown>, status = 200): void {
 /** The body the CLI sent to open the flow, for asserting on device_name. */
 let sentAuthorizeBody: { device_name?: string };
 
+/** How many times the CLI opened a NEW authorization. */
+let authorizeCalls: number;
+
 function authorizeRecordingBody(): void {
   server.use(
     http.post(apiUrl("/device/authorize"), async ({ request }) => {
@@ -151,13 +154,19 @@ function authorizeRecordingBody(): void {
 }
 
 function authorizeOk(): void {
-  authorizeReturns({
-    device_code: DEVICE_CODE,
-    user_code: USER_CODE,
-    verification_uri: VERIFY_URL,
-    expires_in: 300,
-    interval: 0.1,
-  });
+  authorizeCalls = 0;
+  server.use(
+    http.post(apiUrl("/device/authorize"), () => {
+      authorizeCalls += 1;
+      return HttpResponse.json({
+        device_code: DEVICE_CODE,
+        user_code: USER_CODE,
+        verification_uri: VERIFY_URL,
+        expires_in: 300,
+        interval: 0.1,
+      });
+    }),
+  );
 }
 
 /** Answers the poll with each response in turn, repeating the last one. */
@@ -376,6 +385,16 @@ describe("login --complete, on success", () => {
     expect(stateExists()).toBe(false);
   });
 
+  it("records that this CLI minted the key, so logout may revoke it", async () => {
+    givenPendingLogin();
+    tokenAnswers(AUTHORIZED);
+    orgMeOk();
+
+    await runCli(["login", "--complete"], { withKey: false });
+
+    expect(storedConfig().apiKeyProvenance).toBe("device-login");
+  });
+
   it("names the organization it authenticated to", async () => {
     // Load-bearing, not cosmetic: an admin who guesses a pending user_code can
     // approve it against their own org, and this line is the only thing that
@@ -518,6 +537,15 @@ describe("login --api-key, for someone who already holds one", () => {
     expect(storedConfig().apiKey).toBe("tgr_handed_over");
     // No authorization was opened: nothing needed approving.
     expect(stateExists()).toBe(false);
+  });
+
+  it("records that the key was supplied, so logout will leave it valid", async () => {
+    withTerminal(false);
+    orgMeOk();
+
+    await runCli(["login", "--api-key", "tgr_handed_over"], { withKey: false });
+
+    expect(storedConfig().apiKeyProvenance).toBe("supplied");
   });
 
   it("does not store a key the API rejects", async () => {
@@ -705,5 +733,261 @@ describe("what login writes to the config file", () => {
 
     expect(storedConfig().apiKey).toBe("tgr_new");
     expect(storedConfig().baseUrl).toBeUndefined();
+  });
+});
+
+describe("login, when a working key is already in hand", () => {
+  /**
+   * `senso login` has to be safe to run twice. An agent that opens every
+   * session with it, or re-runs a command it is not sure finished, must not
+   * cost the user a second browser trip, a second code to type, and a second
+   * seven-day key that nothing revokes. Signing in again is `logout` then
+   * `login` — deliberately explicit, because that is the act that gives up a
+   * credential.
+   */
+  function givenStoredKey(config: Partial<SensoConfig> = {}): void {
+    mkdirSync(CONFIG_DIR, { recursive: true });
+    writeFileSync(
+      getConfigPath(),
+      JSON.stringify({
+        apiKey: "tgr_the_key_already_here",
+        apiKeyProvenance: "device-login",
+        ...config,
+      }),
+    );
+  }
+
+  beforeEach(() => {
+    withTerminal(false);
+    authorizeCalls = 0;
+  });
+
+  it("does nothing, and says so, rather than opening a second flow", async () => {
+    givenStoredKey();
+    orgMeOk();
+    authorizeOk();
+
+    const res = await runCli(["login"], { withKey: false });
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stderr).toContain("Already authenticated");
+    expect(res.stderr).toContain(ORG.name);
+    // The point of the whole feature: no authorization was opened, so nobody
+    // was asked to approve anything.
+    expect(authorizeCalls).toBe(0);
+    expect(stateExists()).toBe(false);
+  });
+
+  it("tells a JSON caller it was a reuse, not a fresh sign-in", async () => {
+    // An agent has to be able to tell "a human just approved something" from
+    // "nothing happened", because only one of those needs reporting upward.
+    givenStoredKey();
+    orgMeOk();
+
+    const res = await runCli(["login", "--output", "json"], { withKey: false });
+
+    expect(res.json()).toMatchObject({
+      orgName: ORG.name,
+      orgId: ORG.org_id,
+      apiKeySource: "config",
+      reused: true,
+    });
+  });
+
+  it("points at logout as the way to sign in as someone else", async () => {
+    givenStoredKey();
+    orgMeOk();
+
+    const res = await runCli(["login"], { withKey: false });
+
+    expect(res.stderr).toContain("senso logout");
+  });
+
+  it("checks the key commands would really send, not only the stored one", async () => {
+    // SENSO_API_KEY outranks the file. Minting a new key while the environment
+    // shadows it would help nobody — the new key would never be sent.
+    givenStoredKey();
+    process.env.SENSO_API_KEY = "tgr_from_the_environment";
+    let sawKey: string | null = null;
+    server.use(
+      http.get(apiUrl("/org/me"), ({ request }) => {
+        sawKey = request.headers.get("x-api-key");
+        return HttpResponse.json(ORG);
+      }),
+    );
+    authorizeOk();
+    try {
+      const res = await runCli(["login", "--output", "json"], { withKey: false });
+      expect(res.json()).toMatchObject({ apiKeySource: "env", reused: true });
+    } finally {
+      delete process.env.SENSO_API_KEY;
+    }
+
+    expect(sawKey).toBe("tgr_from_the_environment");
+    expect(authorizeCalls).toBe(0);
+  });
+
+  it("opens a flow when the key is no longer accepted", async () => {
+    // Revoked, expired, or belonging to another API. This is exactly when a
+    // new login is the right answer.
+    givenStoredKey();
+    server.use(
+      http.get(apiUrl("/org/me"), () => HttpResponse.json({ error: "nope" }, { status: 401 })),
+    );
+    authorizeOk();
+
+    const res = await runCli(["login"], { withKey: false });
+
+    expect(res.exitCode).toBe(0);
+    expect(authorizeCalls).toBe(1);
+    expect(res.stdout).toContain(USER_CODE);
+  });
+
+  it("reports a network failure instead of starting a flow that needs the same network", async () => {
+    givenStoredKey();
+    server.use(http.get(apiUrl("/org/me"), () => HttpResponse.error()));
+    authorizeOk();
+
+    const res = await runCli(["login"], { withKey: false });
+
+    expect(res.exitCode).toBe(5);
+    expect(authorizeCalls).toBe(0);
+  });
+
+  it("says how long the key has left", async () => {
+    // Six days and an hour, not six days exactly. The remaining time is
+    // floored — a deadline should never be overstated — so a fixture sitting on
+    // the boundary would read as five the moment any time passed.
+    givenStoredKey({
+      apiKeyExpiresAt: new Date(Date.now() + 6 * 86_400_000 + 3_600_000).toISOString(),
+    });
+    orgMeOk();
+
+    const res = await runCli(["login"], { withKey: false });
+
+    expect(res.stderr).toContain("expires in 6 days");
+  });
+
+  it("warns when the key expires within a day, which an agent will otherwise meet mid-task", async () => {
+    givenStoredKey({
+      apiKeyExpiresAt: new Date(Date.now() + 4 * 3_600_000 + 60_000).toISOString(),
+    });
+    orgMeOk();
+
+    const res = await runCli(["login"], { withKey: false });
+
+    expect(res.stderr).toContain("expires in 4 hours");
+    expect(res.stderr).toContain("expires within a day");
+    expect(res.stderr).toContain("senso logout");
+  });
+
+  it("refreshes the cached organization, so a rename does not read stale forever", async () => {
+    givenStoredKey({ orgName: "The Old Name", orgSlug: "old" });
+    orgMeOk();
+
+    await runCli(["login"], { withKey: false });
+
+    expect(storedConfig()).toMatchObject({ orgName: ORG.name, orgSlug: ORG.slug });
+  });
+
+  it("leaves an explicit --api-key to do what it says", async () => {
+    // A flag is an instruction, not a hint. It replaces the stored key even
+    // though that key works.
+    givenStoredKey();
+    orgMeOk();
+
+    const res = await runCli(["login", "--api-key", "tgr_a_different_key"], { withKey: false });
+
+    expect(res.exitCode).toBe(0);
+    expect(storedConfig().apiKey).toBe("tgr_a_different_key");
+    expect(res.stderr).not.toContain("Already authenticated");
+  });
+
+  it("warns that the key it just replaced is still live", async () => {
+    // Only `logout` revokes. A device key replaced by a pasted one is
+    // abandoned rather than ended, and saying so is the difference between a
+    // decision and an accident.
+    givenStoredKey();
+    orgMeOk();
+
+    const res = await runCli(["login", "--api-key", "tgr_a_different_key"], { withKey: false });
+
+    expect(res.stderr).toContain("stays valid until it expires");
+    expect(res.stderr).toContain("senso api-keys revoke");
+  });
+
+  it("says nothing about a replaced key that was the user's own", async () => {
+    givenStoredKey({ apiKeyProvenance: "supplied" });
+    orgMeOk();
+
+    const res = await runCli(["login", "--api-key", "tgr_a_different_key"], { withKey: false });
+
+    expect(res.stderr).not.toContain("stays valid until it expires");
+  });
+
+  it("does not leave a supplied key wearing the expiry of the device key it replaced", async () => {
+    givenStoredKey({ apiKeyExpiresAt: new Date(Date.now() + 86_400_000).toISOString() });
+    orgMeOk();
+
+    await runCli(["login", "--api-key", "tgr_a_different_key"], { withKey: false });
+
+    expect(storedConfig().apiKeyExpiresAt).toBeUndefined();
+  });
+});
+
+describe("login, when a login is already waiting for approval", () => {
+  /**
+   * The other half of "safe to run twice": before any key exists. An agent that
+   * re-runs `senso login` mid-flow used to open a second authorization and show
+   * a second code, orphaning the one the user was at that moment typing in.
+   */
+  beforeEach(() => {
+    withTerminal(false);
+    authorizeCalls = 0;
+  });
+
+  it("re-prints the same code instead of opening another flow", async () => {
+    givenPendingLogin();
+    authorizeOk();
+
+    const res = await runCli(["login"], { withKey: false });
+
+    expect(res.exitCode).toBe(0);
+    expect(authorizeCalls).toBe(0);
+    expect(res.stdout).toContain(USER_CODE);
+    expect(res.stderr).toContain("already waiting for approval");
+    expect(storedState().deviceCode).toBe(DEVICE_CODE);
+  });
+
+  it("reports the time the code has left, not a fresh five minutes", async () => {
+    givenPendingLogin({ expiresAt: new Date(Date.now() + 120_000).toISOString() });
+    authorizeOk();
+
+    const res = await runCli(["login", "--output", "json"], { withKey: false });
+
+    const payload = res.json<{ expiresIn: number }>();
+    expect(payload.expiresIn).toBeLessThanOrEqual(120);
+    expect(payload.expiresIn).toBeGreaterThan(60);
+  });
+
+  it("opens a new flow when the pending one has run out", async () => {
+    givenPendingLogin({ expiresAt: new Date(Date.now() - 1000).toISOString() });
+    authorizeOk();
+
+    const res = await runCli(["login"], { withKey: false });
+
+    expect(authorizeCalls).toBe(1);
+    expect(res.stdout).toContain(USER_CODE);
+  });
+
+  it("ignores a pending login opened against a different API", async () => {
+    // A code issued elsewhere cannot be completed here, so it is no reason to
+    // skip opening one that can be.
+    givenPendingLogin({ baseUrl: "https://somewhere-else.test/api/v1" });
+    authorizeOk();
+
+    await runCli(["login"], { withKey: false });
+
+    expect(authorizeCalls).toBe(1);
   });
 });

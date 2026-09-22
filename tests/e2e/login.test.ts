@@ -219,6 +219,30 @@ describe("`senso logout`", () => {
     expect(res.stderr).toContain("Credentials removed");
   });
 
+  it("revokes a key the device flow minted before removing the file", async () => {
+    // The subprocess is what proves the header: the stored key travels as
+    // X-API-Key on a POST to the self-revoke endpoint, and nothing else.
+    const configDir = freshConfigDir();
+    mkdirSync(configDir, { recursive: true });
+    const MINTED = "tgr_minted_by_the_device_flow";
+    writeFileSync(
+      join(configDir, "config.json"),
+      JSON.stringify({ apiKey: MINTED, apiKeyProvenance: "device-login", orgName: "Acme" }),
+      { mode: 0o600 },
+    );
+    api.respondWith("/org/api-keys/self/revoke", { status: 204 });
+
+    const res = await runSenso(["logout"], { configDir, baseUrl: api.url });
+
+    expect(res.code).toBe(0);
+    const revoke = api.requests.find((r) => r.path === "/org/api-keys/self/revoke");
+    expect(revoke?.method).toBe("POST");
+    expect(revoke?.headers["x-api-key"]).toBe(MINTED);
+    expect(existsSync(join(configDir, "config.json"))).toBe(false);
+    expect(res.stderr).toContain("revoked");
+    expect(res.stdout).toBe("");
+  });
+
   it("succeeds when there was nothing stored, because logging out twice is not an error", async () => {
     const res = await runSenso(["logout"], { baseUrl: api.url });
 

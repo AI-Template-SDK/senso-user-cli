@@ -5,3 +5,9 @@ package-lock.json
 # Generated from the command tree by scripts/gen-reference.ts. Formatting it
 # here would fight the generator, and the policy test compares bytes.
 docs/reference/commands.md
+
+# Vendored verbatim from senso-api's docs/specs/sdk-api.yaml. Formatting it here
+# would mean every refresh arrives as a whole-file diff and `cmp` against the
+# source of truth stops answering "is this copy current?". It is a reference
+# artifact — nothing builds or tests against its formatting.
+src/senso-api-spec/

@@ -286,6 +286,15 @@ describe("login, on success", () => {
     });
   });
 
+  it("records that the key was supplied, so logout will not revoke it", async () => {
+    orgResponds();
+    clack.prompt.mockResolvedValue(PASTED_KEY);
+
+    await runCli(["login", "--interactive"]);
+
+    expect(storedConfig().apiKeyProvenance).toBe("supplied");
+  });
+
   it("trims what was pasted", async () => {
     // A key copied out of a dashboard arrives with a trailing newline more
     // often than not, and it would be sent verbatim in a header.
@@ -980,5 +989,129 @@ describe("logout", () => {
     expect(res.exitCode).toBe(0);
     expect(res.json()).toMatchObject({ ok: true, message: "Credentials removed." });
     expect(res.stderr).toBe("");
+  });
+});
+
+describe("logout, and the key this CLI minted", () => {
+  /**
+   * A device-flow key is single-purpose and seven days long. Deleting the file
+   * and leaving it live is one orphan per login. What is worth protecting here
+   * is WHICH key gets revoked: only one the CLI minted, and only the stored one
+   * — never whatever the flag or the environment would resolve to.
+   */
+  const MINTED = "tgr_minted_by_the_device_flow";
+  let revokedWith: (string | null)[];
+
+  function revokeEndpoint(status = 204, body?: Record<string, unknown>): void {
+    revokedWith = [];
+    server.use(
+      http.post(apiUrl("/org/api-keys/self/revoke"), ({ request }) => {
+        revokedWith.push(request.headers.get("x-api-key"));
+        return body ? HttpResponse.json(body, { status }) : new HttpResponse(null, { status });
+      }),
+    );
+  }
+
+  it("revokes a device-minted key before forgetting it", async () => {
+    writeConfig({ apiKey: MINTED, apiKeyProvenance: "device-login" });
+    revokeEndpoint();
+
+    const res = await runCli(["logout"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(revokedWith).toEqual([MINTED]);
+    expect(configExists()).toBe(false);
+    expect(res.stderr).toContain("revoked");
+  });
+
+  it("revokes the STORED key, not the one on the command line or in the environment", async () => {
+    // runCli passes --api-key TEST_API_KEY on every call, and here the
+    // environment holds a third key. `SENSO_API_KEY=<dashboard key> senso
+    // logout` must not revoke the dashboard key while deleting another key's
+    // file.
+    writeConfig({ apiKey: MINTED, apiKeyProvenance: "device-login" });
+    process.env.SENSO_API_KEY = "tgr_the_dashboard_key";
+    revokeEndpoint();
+
+    await runCli(["logout"]);
+
+    expect(revokedWith).toEqual([MINTED]);
+    expect(MINTED).not.toBe(TEST_API_KEY);
+  });
+
+  it("sends the revoke to the API the key belongs to, not wherever the environment points", async () => {
+    // The key was minted against the stored baseUrl. A shell that currently
+    // exports SENSO_BASE_URL for some other environment must not receive it.
+    writeConfig({ apiKey: MINTED, apiKeyProvenance: "device-login", baseUrl: TEST_BASE_URL });
+    process.env.SENSO_BASE_URL = "https://somewhere-else.test/api/v1";
+    revokeEndpoint();
+    try {
+      await runCli(["logout"], { baseUrl: false });
+    } finally {
+      delete process.env.SENSO_BASE_URL;
+    }
+
+    expect(revokedWith).toEqual([MINTED]);
+  });
+
+  it("leaves a key the user supplied alone, because it may be in use elsewhere", async () => {
+    writeConfig({ apiKey: "tgr_from_the_dashboard", apiKeyProvenance: "supplied" });
+    revokeEndpoint();
+
+    const res = await runCli(["logout"]);
+
+    expect(revokedWith).toEqual([]);
+    expect(configExists()).toBe(false);
+    expect(res.stderr).toContain("Credentials removed.");
+    expect(res.stderr).not.toContain("revoked");
+  });
+
+  it("never revokes on a guess: a config from before provenance existed is treated as supplied", async () => {
+    writeConfig({ apiKey: "tgr_stored_by_an_older_version" });
+    revokeEndpoint();
+
+    await runCli(["logout"]);
+
+    expect(revokedWith).toEqual([]);
+  });
+
+  it("still logs out when the revoke fails, and says the key is live", async () => {
+    // Logging out is a local act the user is entitled to offline. The leak is
+    // bounded by the seven-day expiry, and the warning says so.
+    writeConfig({ apiKey: MINTED, apiKeyProvenance: "device-login" });
+    revokeEndpoint(500, { status: 500, message: "boom" });
+
+    const res = await runCli(["logout", "--output", "json"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(configExists()).toBe(false);
+    expect(res.json()).toMatchObject({ ok: true, keyRevoked: false });
+    expect(res.stderr).toContain("could not be revoked");
+    expect(res.stderr).toContain("seven days");
+  });
+
+  it("treats a key the API no longer recognizes as already revoked", async () => {
+    // 401 is the end state we were trying to reach.
+    writeConfig({ apiKey: MINTED, apiKeyProvenance: "device-login" });
+    revokeEndpoint(401, { status: 401, message: "invalid key" });
+
+    const res = await runCli(["logout", "--output", "json"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(res.json()).toMatchObject({ ok: true, keyRevoked: true });
+    expect(res.stderr).toBe("");
+  });
+
+  it("reports the revocation to a JSON caller under a stable name", async () => {
+    writeConfig({ apiKey: MINTED, apiKeyProvenance: "device-login" });
+    revokeEndpoint();
+
+    const res = await runCli(["logout", "--output", "json"]);
+
+    expect(res.json()).toMatchObject({
+      ok: true,
+      message: "Key revoked and credentials removed.",
+      keyRevoked: true,
+    });
   });
 });

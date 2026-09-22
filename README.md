@@ -198,6 +198,22 @@ after it exits, so one blocking process would hide the code until it expired.
 Approval happens on the page the first command prints: sign in, type the code,
 confirm. The code lasts five minutes and the key it mints lasts seven days.
 
+**`senso login` is safe to run twice.** If the key you already have still works,
+it says so and stops — no second code, no second key. That makes it harmless for
+an agent to run at the start of every session. To sign in as a different
+organization, or to replace a key before it expires:
+
+```bash
+senso logout    # revokes the key it minted, then forgets it
+senso login
+```
+
+`senso logout` revokes a key that `login` minted this way before forgetting it,
+so signing out does not leave a live credential behind. A key you supplied
+yourself is only forgotten — it may be in use elsewhere. Revoking is `logout`'s
+job alone: `login` never revokes anything, so a key you are still using cannot
+disappear under you.
+
 Two other ways in, for anyone who already holds a key:
 
 | Command                       | Stores it? | Needs a terminal? |

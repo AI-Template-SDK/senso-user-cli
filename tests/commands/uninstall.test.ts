@@ -31,7 +31,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runCli } from "../helpers.js";
+import { http, HttpResponse } from "msw";
+import { server } from "../setup.js";
+import { apiUrl, runCli } from "../helpers.js";
 import { UPDATE_CHECK_EXEMPT } from "../../src/program.js";
 import { getConfigDir, getConfigPath, readConfig, writeConfig } from "../../src/lib/config.js";
 
@@ -335,7 +337,13 @@ describe("uninstall --dry-run", () => {
     expect(res.json()).toEqual({
       dryRun: true,
       skills: [{ name: "search", package: "senso-ai/senso-search", scope: "global" }],
-      config: { path: getConfigPath(), present: true, apiKeyInEnvironment: false },
+      config: {
+        path: getConfigPath(),
+        present: true,
+        // The harness stores a key with no provenance, which means supplied.
+        keyWillBeRevoked: false,
+        apiKeyInEnvironment: false,
+      },
       cli: { package: "@senso-ai/cli" },
     });
     expect(res.stderr).toBe("");
@@ -459,7 +467,12 @@ describe("uninstall, in full", () => {
         removed: [{ name: "search", package: "senso-ai/senso-search", scope: "global" }],
         skipped: [],
       },
-      config: { removed: true, path: getConfigPath(), apiKeyInEnvironment: false },
+      config: {
+        removed: true,
+        keyRevoked: false,
+        path: getConfigPath(),
+        apiKeyInEnvironment: false,
+      },
       cli: { removed: true, package: "@senso-ai/cli" },
     });
     expect(res.stderr).toBe("");
@@ -507,5 +520,83 @@ describe("uninstall and the update check", () => {
     // deleted. The exemption is the only thing standing between "removed" and
     // a config file that is quietly back.
     expect(UPDATE_CHECK_EXEMPT.has("uninstall")).toBe(true);
+  });
+});
+
+describe("uninstall, and the key this CLI minted", () => {
+  /**
+   * Same rule as logout, on the way out the door: revoke a device-flow key
+   * before the file that holds it is deleted, leave a supplied key alone, and
+   * never let the network hold the uninstall hostage.
+   */
+  const MINTED = "tgr_minted_by_the_device_flow";
+  let revokedWith: (string | null)[];
+
+  function revokeEndpoint(status = 204): void {
+    revokedWith = [];
+    server.use(
+      http.post(apiUrl("/org/api-keys/self/revoke"), ({ request }) => {
+        revokedWith.push(request.headers.get("x-api-key"));
+        return status === 204
+          ? new HttpResponse(null, { status })
+          : HttpResponse.json({ status, message: "boom" }, { status });
+      }),
+    );
+  }
+
+  it("revokes a device-minted key before removing the config", async () => {
+    writeConfig({ apiKey: MINTED, apiKeyProvenance: "device-login" });
+    revokeEndpoint();
+
+    const res = await runCli(["uninstall", "--yes", "--output", "json"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(revokedWith).toEqual([MINTED]);
+    expect(existsSync(getConfigPath())).toBe(false);
+    expect(res.json()).toMatchObject({ config: { removed: true, keyRevoked: true } });
+  });
+
+  it("leaves a supplied key alone", async () => {
+    // The harness stores a key with no provenance, which is the pre-field
+    // state and means supplied.
+    revokeEndpoint();
+
+    const res = await runCli(["uninstall", "--yes", "--output", "json"]);
+
+    expect(revokedWith).toEqual([]);
+    expect(res.json()).toMatchObject({ config: { removed: true, keyRevoked: false } });
+  });
+
+  it("does not let a failed revoke stop the uninstall", async () => {
+    writeConfig({ apiKey: MINTED, apiKeyProvenance: "device-login" });
+    revokeEndpoint(500);
+
+    const res = await runCli(["uninstall", "--yes"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(existsSync(getConfigPath())).toBe(false);
+    expect(child.execSync).toHaveBeenCalledWith(NPM_UNINSTALL, expect.anything());
+    expect(res.stderr).toContain("could not be revoked");
+  });
+
+  it("--keep-config keeps the key valid as well as on disk", async () => {
+    writeConfig({ apiKey: MINTED, apiKeyProvenance: "device-login" });
+    revokeEndpoint();
+
+    await runCli(["uninstall", "--yes", "--keep-config"]);
+
+    expect(revokedWith).toEqual([]);
+    expect(readConfig().apiKey).toBe(MINTED);
+  });
+
+  it("--dry-run says the key would be revoked, and revokes nothing", async () => {
+    writeConfig({ apiKey: MINTED, apiKeyProvenance: "device-login" });
+    revokeEndpoint();
+
+    const res = await runCli(["uninstall", "--dry-run", "--output", "json"]);
+
+    expect(revokedWith).toEqual([]);
+    expect(res.json()).toMatchObject({ dryRun: true, config: { keyWillBeRevoked: true } });
+    expect(readConfig().apiKey).toBe(MINTED);
   });
 });

@@ -26,7 +26,8 @@ import { join } from "node:path";
 import { Command } from "commander";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import { clearConfig, getConfigDir, getConfigPath } from "../lib/config.js";
+import { clearConfig, getConfigDir, getConfigPath, readConfig } from "../lib/config.js";
+import { revokeStoredDeviceKey } from "../lib/device-auth.js";
 import { CliError, EXIT } from "../lib/errors.js";
 import { emitConfirmation } from "../lib/output.js";
 import { runAction } from "../lib/run-action.js";
@@ -141,7 +142,7 @@ export function registerUninstallCommand(program: Command): void {
   program
     .command("uninstall")
     .description(
-      "Remove this CLI, the Senso agent skills it installed, and the stored API key. Asks first unless --yes is passed.",
+      "Remove this CLI, the Senso agent skills it installed, and the stored API key — revoking the key first if `senso login` minted it. Asks first unless --yes is passed.",
     )
     .option("-y, --yes", "Skip the confirmation prompt (required when there is no terminal)")
     .option("--dry-run", "Report what would be removed without removing anything")
@@ -153,6 +154,10 @@ export function registerUninstallCommand(program: Command): void {
         const configPath = getConfigPath();
         const configPresent = !cmdOpts.keepConfig && existsSync(configPath);
         const apiKeyInEnvironment = Boolean(process.env.SENSO_API_KEY);
+        // Only a key this CLI minted for itself is its to revoke. A supplied
+        // key may be in use elsewhere and is left valid — see
+        // revokeStoredDeviceKey.
+        const keyWillBeRevoked = configPresent && readConfig().apiKeyProvenance === "device-login";
 
         if (!ctx.quiet) {
           log.info("This will remove:");
@@ -163,7 +168,9 @@ export function registerUninstallCommand(program: Command): void {
             log.raw(`    ${pc.dim("no agent skills are installed")}`);
           }
           if (configPresent) {
-            log.raw(`    ${configPath}`);
+            log.raw(
+              `    ${configPath}${keyWillBeRevoked ? pc.dim(" (and revoke the key in it, which this CLI minted)") : ""}`,
+            );
           } else if (!cmdOpts.keepConfig) {
             log.raw(`    ${pc.dim("no stored credentials")}`);
           }
@@ -185,7 +192,12 @@ export function registerUninstallCommand(program: Command): void {
               package: s.name,
               scope: s.scope,
             })),
-            config: { path: configPath, present: configPresent, apiKeyInEnvironment },
+            config: {
+              path: configPath,
+              present: configPresent,
+              keyWillBeRevoked,
+              apiKeyInEnvironment,
+            },
             cli: { package: NPM_PACKAGE },
           });
           return;
@@ -253,8 +265,21 @@ export function registerUninstallCommand(program: Command): void {
           );
         }
 
-        // 2. Credentials.
+        // 2. Credentials. The revoke goes first, while the key is still on
+        // disk to send — and it is best-effort: an uninstall must not be held
+        // hostage by the network, and a device key that could not be revoked
+        // dies on its own within seven days.
+        let keyRevoked = false;
         if (!cmdOpts.keepConfig) {
+          const revocation = await revokeStoredDeviceKey({ baseUrl: ctx.baseUrl });
+          keyRevoked = revocation.attempted && revocation.revoked;
+          if (revocation.attempted && !revocation.revoked) {
+            log.warn(
+              `The stored key could not be revoked: ${revocation.reason} It stays valid until it expires — device keys last seven days — so revoke it from the dashboard if that matters.`,
+            );
+          } else if (keyRevoked && !ctx.quiet) {
+            log.success("Revoked the API key this CLI minted");
+          }
           removeConfig();
           if (!ctx.quiet && configPresent) log.success(`Removed ${configPath}`);
         }
@@ -299,6 +324,7 @@ export function registerUninstallCommand(program: Command): void {
           },
           config: {
             removed: !cmdOpts.keepConfig && configPresent,
+            keyRevoked,
             path: configPath,
             apiKeyInEnvironment,
           },

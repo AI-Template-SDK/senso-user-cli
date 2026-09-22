@@ -7,6 +7,7 @@ import { apiRequest } from "../lib/api-client.js";
 import {
   readConfig,
   writeConfig,
+  updateConfig,
   clearConfig,
   clearDeviceAuthState,
   readDeviceAuthState,
@@ -19,12 +20,14 @@ import {
   isDefaultBaseUrl,
   API_KEY_SOURCE_LABELS,
   type ApiKeySource,
+  type DeviceAuthState,
   type SensoConfig,
 } from "../lib/config.js";
 import {
   clampInterval,
   openBrowser,
   pollDeviceToken,
+  revokeStoredDeviceKey,
   startDeviceAuthorization,
   type DeviceKey,
 } from "../lib/device-auth.js";
@@ -211,9 +214,14 @@ function persistVerifiedKey(
   // logging in to the default API clears a stale pointer rather than pinning
   // the current default into the file for good.
   const verifiedAgainst = getBaseUrl({ baseUrl: opts.baseUrl ?? ctx.baseUrl });
+  const previous = readConfig();
   const next: SensoConfig = {
-    ...readConfig(),
+    ...previous,
     apiKey,
+    // Recorded here because this is the only place a key is ever written, and
+    // it is the one moment the CLI knows where the key came from. `logout`
+    // reads it to decide whether the key is its to revoke.
+    apiKeyProvenance: opts.fromDeviceFlow ? "device-login" : "supplied",
     orgName: org.name,
     orgId: org.org_id,
     orgSlug: org.slug,
@@ -224,32 +232,19 @@ function persistVerifiedKey(
   } else {
     next.baseUrl = verifiedAgainst;
   }
+  // Absence means "not known to expire". A supplied key inheriting the expiry
+  // of the device key it replaced would report a deadline that is not its own.
+  if (opts.keyExpiresAt) {
+    next.apiKeyExpiresAt = opts.keyExpiresAt;
+  } else {
+    delete next.apiKeyExpiresAt;
+  }
   writeConfig(next);
 
-  log.success(`Authenticated as ${pc.bold(`"${org.name}"`)} (${pc.dim(org.org_id)})`);
-  log.success(`Config saved to ${pc.dim(getConfigPath())}`);
-
-  // Not decoration. An admin who guesses a pending user_code can approve it
-  // against their OWN organization, and the victim's CLI would then hold a key
-  // to a stranger's org without anything looking wrong. The name on screen is
-  // the only thing that shows it, which is why it is printed even when nothing
-  // is suspicious.
-  if (opts.fromDeviceFlow) {
-    log.dim(`If "${org.name}" is not your organization, revoke that key now: senso api-keys list`);
-  }
-  if (opts.keyExpiresAt) {
-    log.info(
-      `This key expires ${formatExpiry(opts.keyExpiresAt)}. Run \`senso login\` again to renew.`,
-    );
-  }
-
-  warnIfEnvKeyShadows(apiKey);
-
-  // Not `emit`: in plain and table output this command has no payload, and a
-  // caller piping it should get an empty stream rather than a sentence. Under
-  // --output json the same facts are the payload, because that caller is a
-  // program that has to know which organization it just authenticated to.
-  emitConfirmation(ctx, `Authenticated as "${org.name}"`, {
+  // The single confirmation: the ✓ line in plain output, the payload under
+  // --output json. Everything after it is prose for a person, and is suppressed
+  // when nobody is reading prose.
+  emitConfirmation(ctx, `Authenticated as "${org.name}" (${org.org_id})`, {
     orgId: org.org_id,
     orgName: org.name,
     orgSlug: org.slug,
@@ -257,6 +252,153 @@ function persistVerifiedKey(
     ...(opts.keyExpiresAt ? { apiKeyExpiresAt: opts.keyExpiresAt } : {}),
     configPath: getConfigPath(),
   });
+
+  if (!ctx.quiet) {
+    log.dim(`Config saved to ${getConfigPath()}`);
+
+    // Not decoration. An admin who guesses a pending user_code can approve it
+    // against their OWN organization, and the victim's CLI would then hold a
+    // key to a stranger's org without anything looking wrong. The name on
+    // screen is the only thing that shows it, which is why it is printed even
+    // when nothing is suspicious.
+    if (opts.fromDeviceFlow) {
+      log.dim(
+        `If "${org.name}" is not your organization, revoke that key now: senso api-keys list`,
+      );
+    }
+    if (opts.keyExpiresAt) {
+      log.info(
+        `This key expires ${formatExpiry(opts.keyExpiresAt)}. Run \`senso logout\`, then \`senso login\`, to renew it.`,
+      );
+    }
+  }
+
+  // Replacing a key this CLI minted, without going through the flow that would
+  // have reused it — so nothing revoked the old one. Only `logout` revokes, by
+  // design, and a key nobody holds any more is exactly the kind that
+  // accumulates unnoticed.
+  if (
+    !opts.fromDeviceFlow &&
+    previous.apiKeyProvenance === "device-login" &&
+    previous.apiKey !== apiKey
+  ) {
+    log.warn(
+      "This replaced a key that `senso login` had minted. That key stays valid until it expires — revoke it with `senso api-keys revoke <id>` if you want it gone now.",
+    );
+  }
+
+  // Warnings, not commentary: both survive --quiet, because each describes a
+  // problem the caller has to act on rather than progress it can ignore.
+  warnIfEnvKeyShadows(apiKey);
+}
+
+/**
+ * `senso login` when a working credential is already in hand.
+ *
+ * The reason this exists is that `login` should be safe to run twice. An agent
+ * that opens every session with it, or one that re-runs a command it is not
+ * sure finished, should get "you are already signed in" — not a second browser
+ * trip, a second code for the user to type, and a second seven-day key that
+ * nothing revokes. `login` is for re-authenticating and for switching
+ * organizations; everything else is already done.
+ *
+ * The key it checks is the one commands would actually send — `SENSO_API_KEY`
+ * outranks the stored file — because minting a key the environment would then
+ * shadow is the one outcome that helps nobody.
+ *
+ * @returns whether the CLI is already authenticated and there is nothing to do.
+ */
+async function reuseWorkingKey(ctx: Ctx): Promise<boolean> {
+  const { key, source } = resolveApiKey();
+  if (!key || !source) return false;
+
+  let org: OrgMeResponse;
+  try {
+    org = await verifyApiKey(key, ctx.baseUrl);
+  } catch (err) {
+    const mapped = toCliError(err);
+    // Rejected: the key is dead, revoked, or belongs to another API. That is
+    // exactly when a new login is the right answer, so fall through to it.
+    if (mapped.exitCode === EXIT.AUTH) return false;
+    // Anything else — offline, a 500 — is not evidence about the key, and a
+    // device flow needs the same network this check just failed on. Say what
+    // happened instead of starting something that cannot finish.
+    throw mapped;
+  }
+
+  const config = readConfig();
+  const expiresAt = typeof config.apiKeyExpiresAt === "string" ? config.apiKeyExpiresAt : undefined;
+  // Only for the stored key: these fields describe what `login` put there, and
+  // a key from the environment is not ours to write a cache for. Refreshed so a
+  // renamed organization does not read stale in `whoami` forever.
+  if (source === "config") {
+    updateConfig({
+      orgName: org.name,
+      orgId: org.org_id,
+      orgSlug: org.slug,
+      isFreeTier: org.is_free_tier,
+    });
+  }
+
+  // The confirmation first, and only once. It is the ✓ line in plain output and
+  // the payload under --output json, so a second log.success saying the same
+  // thing is duplication a reader has to parse twice.
+  emitConfirmation(ctx, `Already authenticated as "${org.name}" (${org.org_id})`, {
+    orgId: org.org_id,
+    orgName: org.name,
+    orgSlug: org.slug,
+    isFreeTier: org.is_free_tier,
+    apiKeySource: source,
+    ...(expiresAt ? { apiKeyExpiresAt: expiresAt } : {}),
+    configPath: getConfigPath(),
+    // The one field that distinguishes this from a fresh login, for a caller
+    // that needs to know whether a human was just asked to approve something.
+    reused: true,
+  });
+
+  // Prose for a person. Suppressed under --quiet and --output json, which
+  // implies it: everything below is in the payload above, and an agent told to
+  // ignore three lines of commentary is three lines of commentary too many.
+  if (!ctx.quiet) {
+    log.dim(
+      `Key from ${API_KEY_SOURCE_LABELS[source]}${expiresAt ? `, ${remaining(expiresAt)}` : ""}`,
+    );
+    log.dim(
+      source === "env"
+        ? "Unset SENSO_API_KEY to use a different credential."
+        : "To sign in as a different organization, run `senso logout` first.",
+    );
+  }
+
+  // A warning, not commentary, so it survives --quiet: an agent starting a long
+  // task on a key with hours left will meet the expiry mid-way, and the fix
+  // takes a human. The exact timestamp is in the payload either way.
+  if (expiresAt && expiringSoon(expiresAt)) {
+    log.warn(
+      "That key expires within a day. Run `senso logout`, then `senso login`, to replace it before it does.",
+    );
+  }
+  return true;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function expiringSoon(iso: string): boolean {
+  const ms = Date.parse(iso);
+  return !Number.isNaN(ms) && ms - Date.now() < DAY_MS;
+}
+
+/** "expires in 6 days", in the largest unit that is still honest. */
+function remaining(iso: string): string {
+  const ms = Date.parse(iso) - Date.now();
+  if (Number.isNaN(ms)) return `expires ${iso}`;
+  if (ms <= 0) return "expired";
+  const days = Math.floor(ms / DAY_MS);
+  if (days >= 1) return `expires in ${String(days)} day${days === 1 ? "" : "s"}`;
+  const hours = Math.floor(ms / (60 * 60 * 1000));
+  if (hours >= 1) return `expires in ${String(hours)} hour${hours === 1 ? "" : "s"}`;
+  const minutes = Math.max(1, Math.floor(ms / 60_000));
+  return `expires in ${String(minutes)} minute${minutes === 1 ? "" : "s"}`;
 }
 
 /** An ISO timestamp as a date, or as itself if the server sent something else. */
@@ -445,23 +587,44 @@ async function startDeviceLogin(ctx: Ctx, opts: LoginOptions): Promise<void> {
   assertConfigDirWritable();
 
   const baseUrl = getBaseUrl({ baseUrl: ctx.baseUrl });
-  const auth = await startDeviceAuthorization({
-    deviceName: opts.deviceName ?? defaultDeviceName(),
-    baseUrl: ctx.baseUrl,
-  });
-  const expiresAt = new Date(Date.now() + auth.expiresIn * 1000).toISOString();
 
-  // The resolved base URL, not the flag: `--complete` is a different process
-  // and may not be given the same flag or environment, and a poll sent to a
-  // different API than the one that issued the code finds nothing there.
-  writeDeviceAuthState({
-    deviceCode: auth.deviceCode,
-    userCode: auth.userCode,
-    verificationUri: auth.verificationUri,
-    interval: auth.interval,
-    expiresAt,
-    baseUrl,
-  });
+  // A login already waiting for approval is reused rather than replaced.
+  // Without this, an agent that runs `senso login` twice — because it is not
+  // sure the first one finished — orphans the code the user is at that moment
+  // typing into the browser, and shows them a second one with no explanation.
+  const pending = livePendingAuthorization(baseUrl);
+  const auth = pending
+    ? {
+        deviceCode: pending.deviceCode,
+        userCode: pending.userCode,
+        verificationUri: pending.verificationUri,
+        interval: clampInterval(pending.interval),
+        // What is left of the five minutes, not five minutes again.
+        expiresIn: Math.max(1, Math.round((Date.parse(pending.expiresAt) - Date.now()) / 1000)),
+      }
+    : await startDeviceAuthorization({
+        deviceName: opts.deviceName ?? defaultDeviceName(),
+        baseUrl: ctx.baseUrl,
+      });
+  const expiresAt = pending
+    ? pending.expiresAt
+    : new Date(Date.now() + auth.expiresIn * 1000).toISOString();
+
+  if (pending) {
+    log.dim("A login is already waiting for approval. This is the same code.");
+  } else {
+    // The resolved base URL, not the flag: `--complete` is a different process
+    // and may not be given the same flag or environment, and a poll sent to a
+    // different API than the one that issued the code finds nothing there.
+    writeDeviceAuthState({
+      deviceCode: auth.deviceCode,
+      userCode: auth.userCode,
+      verificationUri: auth.verificationUri,
+      interval: auth.interval,
+      expiresAt,
+      baseUrl,
+    });
+  }
 
   if (!process.stdin.isTTY) {
     // Here the code IS the payload — it is the entire result of this
@@ -505,6 +668,22 @@ async function startDeviceLogin(ctx: Ctx, opts: LoginOptions): Promise<void> {
     keyExpiresAt: key.expiresAt,
     fromDeviceFlow: true,
   });
+}
+
+/**
+ * The pending authorization this `login` should reuse, if there is one.
+ *
+ * Live by the local clock, and opened against the API this login would use — a
+ * code issued somewhere else cannot be completed here, so it is not a reason to
+ * skip opening one that can be.
+ */
+function livePendingAuthorization(baseUrl: string): DeviceAuthState | undefined {
+  const state = readDeviceAuthState();
+  if (!state) return undefined;
+  if (!state.userCode || !state.verificationUri) return undefined;
+  if (Date.parse(state.expiresAt) <= Date.now()) return undefined;
+  if ((state.baseUrl ?? baseUrl) !== baseUrl) return undefined;
+  return state;
 }
 
 /** The half of the flow that waits, when `login` and the wait are two commands. */
@@ -560,7 +739,7 @@ export function registerAuthCommands(program: Command): void {
   program
     .command("login")
     .description(
-      "Authenticate this device. Opens a Senso page where an org admin approves the request in a browser, then stores the key it mints. Use --api-key to store a key you already hold.",
+      "Authenticate this device. Does nothing if the key you already have still works — run `senso logout` first to sign in as a different organization. Otherwise it opens a Senso page where an org admin approves this device in a browser, and stores the key that mints. Use --api-key to store a key you already hold.",
     )
     .option(
       "--complete",
@@ -577,17 +756,46 @@ export function registerAuthCommands(program: Command): void {
         if (opts.complete) return completeDeviceLogin(ctx);
         if (opts.interactive) return interactiveLogin(ctx);
         if (ctx.apiKey) return storeVerifiedKey(ctx, ctx.apiKey);
+        // Reuse before minting. A bare `senso login` with a credential that
+        // already works is a no-op, so running it twice costs nothing and
+        // asks the user for nothing. An explicit flag above says otherwise and
+        // is obeyed; `logout` is how you give the current key up.
+        if (await reuseWorkingKey(ctx)) return;
         return startDeviceLogin(ctx, opts);
       }),
     );
 
   program
     .command("logout")
-    .description("Remove stored API key and organization info from local config.")
+    .description(
+      "Remove the stored API key and organization info. A key that `senso login` minted through the browser is revoked first; a key you supplied yourself is only forgotten.",
+    )
     .action(
-      runAction(program, (ctx) => {
+      runAction(program, async (ctx) => {
+        // Revoke before delete: once the file is gone the key cannot be
+        // revoked, and a device-minted key nobody can reach is exactly the
+        // "fifty dead keys a year" the seven-day expiry was meant to bound.
+        const revocation = await revokeStoredDeviceKey({ baseUrl: ctx.baseUrl });
         clearConfig();
-        emitConfirmation(ctx, "Credentials removed.");
+
+        if (revocation.attempted && !revocation.revoked) {
+          log.warn(
+            `The key was removed from this machine but could not be revoked: ${revocation.reason} It stays valid until it expires — device keys last seven days — so revoke it from the dashboard if that matters.`,
+          );
+        }
+
+        const revoked = revocation.attempted && revocation.revoked;
+        const message = !revoked
+          ? "Credentials removed."
+          : revocation.alreadyInvalid
+            ? "Credentials removed. The key was already invalid."
+            : "Key revoked and credentials removed.";
+        emitConfirmation(ctx, message, {
+          ok: true,
+          message,
+          keyRevoked: revoked,
+          ...(revocation.attempted && !revocation.revoked ? { reason: revocation.reason } : {}),
+        });
       }),
     );
 
