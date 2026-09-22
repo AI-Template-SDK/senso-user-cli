@@ -14,11 +14,12 @@ One credential: an organization API key, which can read and write everything in
 that Senso organization — knowledge base content, generated content, members and
 other API keys.
 
-| Where                                                      | What                                                                                            |
-| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `~/.config/senso/config.json` (or the platform equivalent) | The API key, the organization name and id, and the last update check. Written with mode `0600`. |
-| `SENSO_API_KEY`                                            | The same key, when supplied by environment instead                                              |
-| `--api-key`                                                | The same key, when supplied per command                                                         |
+| Where                                                      | What                                                                                                                                 |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `~/.config/senso/config.json` (or the platform equivalent) | The API key, the organization name and id, and the last update check. Written with mode `0600`.                                      |
+| `device-auth.json`, beside it                              | Only while a `senso login` is in flight: the `device_code` for that login, mode `0600`, deleted the moment the flow ends or expires. |
+| `SENSO_API_KEY`                                            | The same key, when supplied by environment instead                                                                                   |
+| `--api-key`                                                | The same key, when supplied per command                                                                                              |
 
 `SENSO_CONFIG_DIR` relocates the file. Nothing else is stored: no knowledge base
 content, no cache, no history, no telemetry.
@@ -32,10 +33,11 @@ and it says so.
 
 Two destinations, both over HTTPS, and nothing else.
 
-| To                                 | When                | Carrying                                                                            |
-| ---------------------------------- | ------------------- | ----------------------------------------------------------------------------------- |
-| `apiv2.senso.ai` (or `--base-url`) | Every command       | `X-API-Key`, a `User-Agent` naming the CLI version, and whatever that command sends |
-| `registry.npmjs.org`               | Once every 24 hours | Nothing but the request for this package's version metadata                         |
+| To                                 | When                | Carrying                                                                                                               |
+| ---------------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `apiv2.senso.ai` (or `--base-url`) | Every command       | `X-API-Key`, a `User-Agent` naming the CLI version, and whatever that command sends                                    |
+| `apiv2.senso.ai`, unauthenticated  | `senso login` only  | The two device-flow calls, which carry no key because none exists yet: an optional device name, then the `device_code` |
+| `registry.npmjs.org`               | Once every 24 hours | Nothing but the request for this package's version metadata                                                            |
 
 The update check sends no key and no identifier. `SENSO_NO_UPDATE_CHECK=1`
 disables it.
@@ -85,6 +87,19 @@ Recorded here so they are decisions rather than oversights.
   upstream — an `--env-from-env NAME` flag, or reading `process.env[name]` when
   no value is supplied. Until then, prefer `senso skills install` on a machine
   you control.
+
+- **POSIX file modes do not apply on Windows.** `config.json` and
+  `device-auth.json` are written `0600`, which Windows effectively ignores;
+  protection there comes from the per-user ACL on `%APPDATA%` instead. That is
+  reasonable, but it is not the same guarantee.
+
+- **A `device_code` is on disk while a login is in flight.** It is a bearer
+  secret: anyone who can read it within five minutes can redeem the approval
+  that login is waiting for. It is owner-readable, single-use, and deleted on
+  success, denial, expiry, Ctrl-C, `senso logout` and by a sweep on any later
+  command. The alternative was passing it through stdout between the two halves
+  of the flow, which in an agent's shell means a live credential in a transcript
+  that outlives it.
 
 - **No certificate pinning.** The CLI trusts the system certificate store, so an
   interception proxy with a trusted root can read traffic. That is also what

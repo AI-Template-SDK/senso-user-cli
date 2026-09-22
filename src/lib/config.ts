@@ -7,7 +7,7 @@
  * have to change to use the OS keychain instead.
  */
 
-import { readFileSync, writeFileSync, mkdirSync, unlinkSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, unlinkSync, chmodSync } from "node:fs";
 import { join } from "node:path";
 import envPaths from "env-paths";
 
@@ -25,6 +25,15 @@ import envPaths from "env-paths";
  */
 const CONFIG_DIR = process.env.SENSO_CONFIG_DIR ?? envPaths("senso", { suffix: "" }).config;
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
+/**
+ * The in-flight device authorization, written by `senso login` and read by
+ * `senso login --complete`.
+ *
+ * Beside config.json because it is the same kind of thing — a short-lived
+ * secret in the directory SENSO_CONFIG_DIR already relocates — and because
+ * `logout` and `uninstall` then clear it for free.
+ */
+const DEVICE_AUTH_FILE = join(CONFIG_DIR, "device-auth.json");
 
 export interface SensoConfig {
   apiKey?: string;
@@ -61,12 +70,40 @@ export function readConfig(): SensoConfig {
   }
 }
 
+/**
+ * Writes a file in the config directory so that only its owner can read it.
+ *
+ * The `mode` option on `writeFileSync` and `mkdirSync` applies **only when the
+ * entry is created**. A config.json that already exists with a looser mode — an
+ * older CLI version, a restored backup, a file copied between machines, a stray
+ * `touch` — gets the secret written into it and keeps its permissions. So the
+ * mode is also applied explicitly after the write, every time.
+ *
+ * The chmods are best-effort: POSIX modes are effectively ignored on Windows,
+ * where protection comes from the per-user ACL on %APPDATA% instead, and a
+ * config directory on a filesystem without POSIX permissions (a FAT volume, an
+ * SMB share) would otherwise fail a write that is as safe as that filesystem
+ * allows. SECURITY.md states this rather than implying a guarantee the platform
+ * does not give.
+ */
+function writeSecretFile(path: string, contents: string): void {
+  mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
+  try {
+    chmodSync(CONFIG_DIR, 0o700);
+  } catch {
+    // Not ours to chmod, or a filesystem without modes. The file mode below is
+    // what actually protects the secret.
+  }
+  writeFileSync(path, contents, { mode: 0o600 });
+  try {
+    chmodSync(path, 0o600);
+  } catch {
+    // As above.
+  }
+}
+
 export function writeConfig(config: SensoConfig): void {
-  mkdirSync(CONFIG_DIR, { recursive: true });
-  // 0600: this file holds a credential, so it is readable by its owner only.
-  // Passing the mode to writeFileSync only applies it when the file is created,
-  // which is why login writes through this single function.
-  writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2) + "\n", { mode: 0o600 });
+  writeSecretFile(CONFIG_FILE, JSON.stringify(config, null, 2) + "\n");
 }
 
 /**
@@ -87,6 +124,10 @@ export function clearConfig(): void {
   } catch {
     // Already absent. `logout` when logged out is not an error.
   }
+  // A half-finished login is a credential in progress, so `logout` ends it too.
+  // `uninstall` also depends on this: it rmdir's the config directory, which
+  // fails if anything is left in it.
+  clearDeviceAuthState();
 }
 
 /**
@@ -201,4 +242,117 @@ export function getConfigPath(): string {
 
 export function getConfigDir(): string {
   return CONFIG_DIR;
+}
+
+// ── The in-flight device authorization ──────────────────────────────────────
+//
+// `senso login` and `senso login --complete` are two processes, and the second
+// needs the device_code the first was given. It goes in a file rather than on
+// stdout because stdout in an agent's shell is a transcript: a live bearer
+// secret printed there outlives the five minutes it is good for, possibly in a
+// model provider's logs. The file is 0600 and deleted the moment the flow ends.
+
+/**
+ * What `senso login` hands to `senso login --complete`.
+ *
+ * `deviceCode` is the secret. Everything else is there so `--complete` can act
+ * alone: `interval` paces the poll, `expiresAt` tells it when to stop, and
+ * `baseUrl` pins it to the API the authorization was opened against — reading
+ * the flag or the environment again could point the second process somewhere
+ * the code was never issued.
+ *
+ * `userCode` is stored to be *displayed*, not sent: two logins race on one path
+ * and the second wins, so `--complete` printing the code it is waiting for is
+ * what makes "this is not the code on my screen" visible rather than mystifying.
+ */
+export interface DeviceAuthState {
+  deviceCode: string;
+  userCode: string;
+  verificationUri: string;
+  interval: number;
+  /** ISO 8601. A hint for when to stop polling, never a gate on starting. */
+  expiresAt: string;
+  baseUrl?: string;
+}
+
+export function getDeviceAuthPath(): string {
+  return DEVICE_AUTH_FILE;
+}
+
+/**
+ * The pending authorization, or undefined.
+ *
+ * Every field is checked rather than trusted. This file is as editable as
+ * config.json, and a half-written or hand-edited one must read as "nothing
+ * pending" — the next `senso login` then starts a clean flow, which is the
+ * right answer — instead of throwing a TypeError out of `--complete` or
+ * polling with `undefined` as the device code.
+ */
+export function readDeviceAuthState(): DeviceAuthState | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(DEVICE_AUTH_FILE, "utf-8"));
+  } catch {
+    return undefined;
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return undefined;
+
+  const raw = parsed as Record<string, unknown>;
+  const str = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
+
+  const deviceCode = str(raw.deviceCode);
+  const expiresAt = str(raw.expiresAt);
+  // Without these two there is nothing to poll with and no way to know when to
+  // give up. The rest have workable fallbacks.
+  if (!deviceCode || !expiresAt || Number.isNaN(Date.parse(expiresAt))) return undefined;
+
+  const interval = typeof raw.interval === "number" && raw.interval > 0 ? raw.interval : 5;
+  const baseUrl = str(raw.baseUrl);
+
+  return {
+    deviceCode,
+    userCode: str(raw.userCode),
+    verificationUri: str(raw.verificationUri),
+    interval,
+    expiresAt,
+    ...(baseUrl ? { baseUrl } : {}),
+  };
+}
+
+export function writeDeviceAuthState(state: DeviceAuthState): void {
+  writeSecretFile(DEVICE_AUTH_FILE, JSON.stringify(state, null, 2) + "\n");
+}
+
+export function clearDeviceAuthState(): void {
+  try {
+    unlinkSync(DEVICE_AUTH_FILE);
+  } catch {
+    // Nothing pending. Deleting what is not there is the desired end state.
+  }
+}
+
+/**
+ * Deletes an abandoned authorization, on any command.
+ *
+ * Ctrl-C during a poll, an agent that never ran `--complete`, a flow the user
+ * walked away from: each leaves a file whose code is already dead. Nothing
+ * dangerous — the code is single-use and five minutes old — but the next
+ * `--complete` would report a pending authorization that cannot be completed.
+ * Sweeping on every invocation collects them without a daemon, at the cost of
+ * one read on commands that have no state file at all.
+ *
+ * The grace period is the point of the design. Expiry is the server's to
+ * decide, and a local clock running fast would otherwise let `senso whoami`
+ * delete a flow that is still live — so this reaps only what is past expiry by
+ * a full TTL, and `senso login` is exempt from the sweep entirely.
+ *
+ * @returns whether a file was deleted, which only the tests care about.
+ */
+export function sweepDeviceAuthState(nowMs = Date.now()): boolean {
+  const state = readDeviceAuthState();
+  if (!state) return false;
+  const graceMs = 5 * 60 * 1000;
+  if (nowMs <= Date.parse(state.expiresAt) + graceMs) return false;
+  clearDeviceAuthState();
+  return true;
 }

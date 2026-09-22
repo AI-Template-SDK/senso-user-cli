@@ -9,6 +9,77 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
+### Added
+
+- **`senso login` now signs you in through a browser, and works without a
+  terminal.** It opens a device authorization against the Senso API, prints a
+  short code and the page to type it into, and stores the key an org admin's
+  approval mints. This closes the gap that made one-shot agent onboarding
+  impossible: `login` used to require a TTY and exit 2 without one, so the only
+  paths left for an agent were `SENSO_API_KEY` or `--api-key`, both of which
+  need the user to already hold a key and both of which put a live credential
+  into the agent's transcript.
+
+  Whether there is a terminal decides the process shape, not the mechanism —
+  browser approval is what humans and agents both do, so there is one flow to
+  maintain:
+
+  | stdin          | What happens                                                                   |
+  | -------------- | ------------------------------------------------------------------------------ |
+  | a terminal     | one process: prints the code, then waits for the approval                      |
+  | not a terminal | two: `senso login` prints the code and exits 0, `senso login --complete` waits |
+
+  The split exists because an agent host generally surfaces a command's stdout
+  only once it exits, so a single blocking process would hide the code until the
+  five minutes had run out. Between the two, the `device_code` lives in
+  `device-auth.json` beside `config.json`, mode `0600`, deleted the moment the
+  flow ends — never on stdout, where in an agent's shell it would outlive the
+  five minutes it is good for.
+
+  Exit codes are the contract, as everywhere else: **3** with `device_denied` if
+  the approval was refused, **1** with `device_expired` if the code ran out,
+  **2** if there is no login to complete, **5** if the API could not be reached.
+  A 5xx, a 429 or a dropped connection is _not_ an answer — the authorization is
+  untouched, so polling continues and the failure is reported only if the clock
+  runs out with nothing better to say.
+
+- **The approval page gets a device name a person can recognize.** `senso login`
+  sends `user@machine`, and falls back to `user (macOS)` when the hostname is an
+  address rather than a name — which is what macOS returns for a machine whose
+  name was never set, so the card would otherwise read `senso-cli
+82:5b:bd:cc:62:3d`. Nothing trusts this field; its only job is to help the
+  person approving decide whether the request is the terminal they just typed
+  in. `--device-name` overrides it.
+
+- **`senso login --api-key <key>` verifies and stores a key without a
+  terminal.** There was no way to do that before: `login` always prompted, so a
+  scripted setup or an agent told "here is my key" could only pass it per
+  command, which breaks silently the moment something forgets the flag. It runs
+  the same `/org/me` check and the same shadowing warning as every other path.
+
+- **`senso login --interactive`** keeps the old paste-a-key prompt, for anyone
+  who cannot open a browser. It still needs a terminal, and without one it still
+  exits 2 with the same message.
+
+### Changed
+
+- **`senso login` without a terminal no longer exits 2.** It starts the device
+  flow instead. `senso login --interactive` is now the command that requires a
+  TTY, and it fails the same way it always did. Anything scripted around "login
+  exits 2 without a terminal" should move to `--interactive` or `--api-key`.
+
+- **`config.json` has its permissions re-applied on every write.** Node applies
+  a file mode only when it creates the file, so a `config.json` that already
+  existed with looser permissions — an older version, a restored backup, a file
+  copied between machines — kept them and had a credential written into it
+  anyway. Both it and the new state file are now `chmod`ed explicitly after each
+  write, and the config directory is created `0700`. Best-effort, because POSIX
+  modes do not apply on Windows, where the protection is the ACL on `%APPDATA%`.
+
+- **`senso logout` also ends a login in progress**, deleting `device-auth.json`
+  along with the stored key. `senso uninstall` depends on it: it removes the
+  config directory, which fails while anything is left inside.
+
 ### Fixed
 
 - **`senso content-types` help no longer teaches a broken template.** `--data`

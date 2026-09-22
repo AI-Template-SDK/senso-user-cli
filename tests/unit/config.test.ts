@@ -460,3 +460,155 @@ describe("SENSO_CONFIG_DIR", () => {
     expect(getConfigPath()).toBe(join(dir, "config.json"));
   });
 });
+
+describe("the in-flight device authorization", () => {
+  const PENDING = {
+    deviceCode: "a-43-char-opaque-device-code-goes-right-here",
+    userCode: "FXGQ-HKTG",
+    verificationUri: "https://app.senso.ai/cli/verify",
+    interval: 5,
+    expiresAt: new Date(Date.now() + 300_000).toISOString(),
+    baseUrl: "https://apiv2.senso.ai/api/v1",
+  };
+
+  function writeRawState(contents: string): void {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "device-auth.json"), contents);
+  }
+
+  it("round-trips what --complete needs to act alone", async () => {
+    const { writeDeviceAuthState, readDeviceAuthState } = await loadConfig();
+
+    writeDeviceAuthState(PENDING);
+
+    expect(readDeviceAuthState()).toEqual(PENDING);
+  });
+
+  it("is readable by its owner only, like the credential it will become", async () => {
+    const { writeDeviceAuthState, getDeviceAuthPath } = await loadConfig();
+
+    writeDeviceAuthState(PENDING);
+
+    expect(statSync(getDeviceAuthPath()).mode & 0o777).toBe(0o600);
+  });
+
+  it("tightens a file that already existed with a looser mode", async () => {
+    // The bug this covers: `mode` on writeFileSync applies only when the file is
+    // created. A file left world-readable by an older version, a restored backup
+    // or a stray `touch` would otherwise keep those permissions and have a
+    // secret written into it.
+    writeRawState("{}");
+    const { writeDeviceAuthState, getDeviceAuthPath } = await loadConfig();
+    const { chmodSync } = await import("node:fs");
+    chmodSync(getDeviceAuthPath(), 0o644);
+
+    writeDeviceAuthState(PENDING);
+
+    expect(statSync(getDeviceAuthPath()).mode & 0o777).toBe(0o600);
+  });
+
+  it("reads a missing file as nothing pending", async () => {
+    const { readDeviceAuthState } = await loadConfig();
+
+    expect(readDeviceAuthState()).toBeUndefined();
+  });
+
+  it("reads a half-written or hand-edited file as nothing pending", async () => {
+    // A truncated write must not throw out of `--complete`. "Nothing pending"
+    // sends the user to `senso login`, which is the right answer anyway.
+    const { readDeviceAuthState } = await loadConfig();
+
+    for (const contents of ["{ truncated", "null", "[]", '"a string"']) {
+      writeRawState(contents);
+      expect(readDeviceAuthState()).toBeUndefined();
+    }
+  });
+
+  it("refuses a file with no device code, which is the only thing it cannot do without", async () => {
+    writeRawState(JSON.stringify({ userCode: "FXGQ-HKTG", expiresAt: PENDING.expiresAt }));
+    const { readDeviceAuthState } = await loadConfig();
+
+    expect(readDeviceAuthState()).toBeUndefined();
+  });
+
+  it("refuses a file whose expiry is not a date", async () => {
+    // Without a readable expiry there is no backstop on the poll loop.
+    writeRawState(JSON.stringify({ deviceCode: "dc", expiresAt: "some time on Tuesday" }));
+    const { readDeviceAuthState } = await loadConfig();
+
+    expect(readDeviceAuthState()).toBeUndefined();
+  });
+
+  it("falls back to the protocol interval when the stored one is unusable", async () => {
+    writeRawState(JSON.stringify({ deviceCode: "dc", expiresAt: PENDING.expiresAt, interval: 0 }));
+    const { readDeviceAuthState } = await loadConfig();
+
+    expect(readDeviceAuthState()?.interval).toBe(5);
+  });
+});
+
+describe("sweeping an abandoned device authorization", () => {
+  const stateAt = (expiresAt: string): string =>
+    JSON.stringify({ deviceCode: "dc", userCode: "AAAA-BBBB", interval: 5, expiresAt });
+
+  function writeStateExpiring(expiresAt: string): void {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "device-auth.json"), stateAt(expiresAt));
+  }
+
+  it("leaves a live authorization alone", async () => {
+    writeStateExpiring(new Date(Date.now() + 120_000).toISOString());
+    const { sweepDeviceAuthState, readDeviceAuthState } = await loadConfig();
+
+    expect(sweepDeviceAuthState()).toBe(false);
+    expect(readDeviceAuthState()).toBeDefined();
+  });
+
+  it("leaves one alone that only just expired", async () => {
+    // The grace period is the point. Expiry is the server's to decide, and a
+    // local clock running fast must not let `senso whoami` delete a login the
+    // user is in the middle of approving.
+    writeStateExpiring(new Date(Date.now() - 60_000).toISOString());
+    const { sweepDeviceAuthState, readDeviceAuthState } = await loadConfig();
+
+    expect(sweepDeviceAuthState()).toBe(false);
+    expect(readDeviceAuthState()).toBeDefined();
+  });
+
+  it("collects one that is long dead", async () => {
+    writeStateExpiring(new Date(Date.now() - 3_600_000).toISOString());
+    const { sweepDeviceAuthState, readDeviceAuthState } = await loadConfig();
+
+    expect(sweepDeviceAuthState()).toBe(true);
+    expect(readDeviceAuthState()).toBeUndefined();
+  });
+
+  it("does nothing, cheaply, when there is no state file at all", async () => {
+    const { sweepDeviceAuthState } = await loadConfig();
+
+    expect(sweepDeviceAuthState()).toBe(false);
+  });
+});
+
+describe("logging out", () => {
+  it("ends a login in progress as well as one already stored", async () => {
+    // A pending authorization is a credential in flight. It also has to go for
+    // `senso uninstall` to work at all: it rmdir's the config directory, which
+    // fails while anything is left in it.
+    const { writeConfig, writeDeviceAuthState, clearConfig, readConfig, readDeviceAuthState } =
+      await loadConfig();
+    writeConfig({ apiKey: "tgr_abc" });
+    writeDeviceAuthState({
+      deviceCode: "dc",
+      userCode: "AAAA-BBBB",
+      verificationUri: "https://app.senso.ai/cli/verify",
+      interval: 5,
+      expiresAt: new Date(Date.now() + 300_000).toISOString(),
+    });
+
+    clearConfig();
+
+    expect(readConfig()).toEqual({});
+    expect(readDeviceAuthState()).toBeUndefined();
+  });
+});

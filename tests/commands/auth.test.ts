@@ -10,9 +10,10 @@
  *      every subsequent command fail with a 401 the user cannot explain.
  *   2. A canceled prompt changes nothing. Ctrl-C at the paste step must leave
  *      whatever was already stored exactly as it was.
- *   3. Without a terminal, `login` fails immediately instead of waiting on a
- *      keypress nobody will make. It used to hang forever in CI and in an
- *      agent's shell.
+ *   3. Without a terminal, `login --interactive` fails immediately instead of
+ *      waiting on a keypress nobody will make. It used to hang forever in CI
+ *      and in an agent's shell. (A bare `login` no longer prompts at all — it
+ *      opens the device flow, covered in auth-device.test.ts.)
  *   4. `whoami` answers offline. "Which organization am I pointed at" is
  *      answerable from the cache, and failing on it would be a worse answer
  *      than a slightly stale one.
@@ -122,13 +123,17 @@ describe("the tests own the config file they are about to write", () => {
   });
 });
 
-describe("login, without a terminal to prompt on", () => {
+describe("login --interactive, without a terminal to prompt on", () => {
   it("exits 2 immediately instead of waiting for a keypress", async () => {
-    // The regression: clack waits on a TTY that is not there, so `senso login`
-    // in CI or in an agent's shell hung until something killed it.
+    // The regression: clack waits on a TTY that is not there, so this hung in
+    // CI and in an agent's shell until something killed it.
+    //
+    // Only --interactive fails this way now. A bare `senso login` reads the
+    // missing TTY as "split into two processes" and starts the device flow,
+    // which is the point of tests/commands/auth-device.test.ts.
     withTerminal(false);
 
-    const res = await runCli(["login"]);
+    const res = await runCli(["login", "--interactive"]);
 
     expect(res.exitCode).toBe(2);
     expect(res.stdout).toBe("");
@@ -138,7 +143,7 @@ describe("login, without a terminal to prompt on", () => {
   it("names the two ways to authenticate that need no terminal", async () => {
     withTerminal(false);
 
-    const res = await runCli(["login"]);
+    const res = await runCli(["login", "--interactive"]);
 
     expect(res.stderr).toContain("SENSO_API_KEY");
     expect(res.stderr).toContain("--api-key");
@@ -147,7 +152,7 @@ describe("login, without a terminal to prompt on", () => {
   it("never reaches the prompt, and writes nothing", async () => {
     withTerminal(false);
 
-    await runCli(["login"]);
+    await runCli(["login", "--interactive"]);
 
     expect(clack.prompt).not.toHaveBeenCalled();
     expect(configExists()).toBe(false);
@@ -158,7 +163,7 @@ describe("login, when the prompt is canceled", () => {
   it("exits 0 — Ctrl-C is not a failure", async () => {
     clack.prompt.mockResolvedValue(clack.CANCEL);
 
-    const res = await runCli(["login"]);
+    const res = await runCli(["login", "--interactive"]);
 
     expect(res.exitCode).toBe(0);
     expect(clack.cancel).toHaveBeenCalledWith("Login canceled.");
@@ -167,7 +172,7 @@ describe("login, when the prompt is canceled", () => {
   it("writes no config at all", async () => {
     clack.prompt.mockResolvedValue(clack.CANCEL);
 
-    await runCli(["login"]);
+    await runCli(["login", "--interactive"]);
 
     expect(configExists()).toBe(false);
   });
@@ -178,7 +183,7 @@ describe("login, when the prompt is canceled", () => {
     writeConfig({ apiKey: "tgr_already_stored", orgName: "Previous Org" });
     clack.prompt.mockResolvedValue(clack.CANCEL);
 
-    await runCli(["login"]);
+    await runCli(["login", "--interactive"]);
 
     expect(storedConfig()).toMatchObject({
       apiKey: "tgr_already_stored",
@@ -199,7 +204,7 @@ describe("login, when the key does not verify", () => {
     );
     clack.prompt.mockResolvedValue("tgr_not_a_real_key");
 
-    const res = await runCli(["login"]);
+    const res = await runCli(["login", "--interactive"]);
 
     expect(res.exitCode).toBe(3);
     expect(configExists()).toBe(false);
@@ -211,7 +216,7 @@ describe("login, when the key does not verify", () => {
     server.use(http.get(apiUrl("/org/me"), () => new HttpResponse(null, { status: 401 })));
     clack.prompt.mockResolvedValue("tgr_not_a_real_key");
 
-    await runCli(["login"]);
+    await runCli(["login", "--interactive"]);
 
     expect(clack.spinner.stop).toHaveBeenCalledWith("Verification failed");
   });
@@ -220,7 +225,7 @@ describe("login, when the key does not verify", () => {
     server.use(http.get(apiUrl("/org/me"), () => HttpResponse.error()));
     clack.prompt.mockResolvedValue("tgr_offline_attempt");
 
-    const res = await runCli(["login"]);
+    const res = await runCli(["login", "--interactive"]);
 
     expect(res.exitCode).toBe(5);
     expect(res.stdout).toBe("");
@@ -232,7 +237,7 @@ describe("login, when the key does not verify", () => {
     writeConfig({ apiKey: "tgr_already_stored", orgName: "Previous Org" });
     clack.prompt.mockResolvedValue("tgr_not_a_real_key");
 
-    const res = await runCli(["login"]);
+    const res = await runCli(["login", "--interactive"]);
 
     expect(res.exitCode).toBe(3);
     expect(storedConfig().apiKey).toBe("tgr_already_stored");
@@ -257,7 +262,7 @@ describe("login, on success", () => {
     const { seen } = orgResponds();
     clack.prompt.mockResolvedValue(PASTED_KEY);
 
-    await runCli(["login"]);
+    await runCli(["login", "--interactive"]);
 
     expect(seen()?.headers.get("x-api-key")).toBe(PASTED_KEY);
   });
@@ -266,7 +271,7 @@ describe("login, on success", () => {
     orgResponds();
     clack.prompt.mockResolvedValue(PASTED_KEY);
 
-    const res = await runCli(["login"]);
+    const res = await runCli(["login", "--interactive"]);
 
     expect(res.exitCode).toBe(0);
     expect(storedConfig()).toMatchObject({
@@ -287,7 +292,7 @@ describe("login, on success", () => {
     orgResponds();
     clack.prompt.mockResolvedValue(`  ${PASTED_KEY}\n`);
 
-    await runCli(["login"]);
+    await runCli(["login", "--interactive"]);
 
     expect(storedConfig().apiKey).toBe(PASTED_KEY);
   });
@@ -296,7 +301,7 @@ describe("login, on success", () => {
     orgResponds();
     clack.prompt.mockResolvedValue(PASTED_KEY);
 
-    const res = await runCli(["login"]);
+    const res = await runCli(["login", "--interactive"]);
 
     expect(res.stderr).toContain(ORG.name);
     expect(res.stderr).toContain(ORG.org_id);
@@ -473,7 +478,7 @@ describe("login, when SENSO_API_KEY is set in the environment", () => {
     process.env.SENSO_API_KEY = "tgr_a_different_key";
     clack.prompt.mockResolvedValue(PASTED_KEY);
 
-    const res = await runCli(["login"]);
+    const res = await runCli(["login", "--interactive"]);
 
     expect(res.stderr).toContain("SENSO_API_KEY");
     expect(res.stderr).toContain("overrides the key just stored");
@@ -488,7 +493,7 @@ describe("login, when SENSO_API_KEY is set in the environment", () => {
     process.env.SENSO_API_KEY = "tgr_a_different_key";
     clack.prompt.mockResolvedValue(PASTED_KEY);
 
-    const res = await runCli(["login"]);
+    const res = await runCli(["login", "--interactive"]);
 
     expect(res.stderr).toContain("senso whoami");
   });
@@ -498,7 +503,7 @@ describe("login, when SENSO_API_KEY is set in the environment", () => {
     process.env.SENSO_API_KEY = "tgr_a_different_key";
     clack.prompt.mockResolvedValue(PASTED_KEY);
 
-    const res = await runCli(["login"]);
+    const res = await runCli(["login", "--interactive"]);
 
     expect(res.exitCode).toBe(0);
     expect(storedConfig().apiKey).toBe(PASTED_KEY);
@@ -512,7 +517,7 @@ describe("login, when SENSO_API_KEY is set in the environment", () => {
     process.env.SENSO_API_KEY = `${PASTED_KEY}\n`;
     clack.prompt.mockResolvedValue(PASTED_KEY);
 
-    const res = await runCli(["login"]);
+    const res = await runCli(["login", "--interactive"]);
 
     expect(res.exitCode).toBe(0);
     expect(res.stderr).not.toContain("overrides the key just stored");
@@ -524,7 +529,7 @@ describe("login, when SENSO_API_KEY is set in the environment", () => {
     process.env.SENSO_API_KEY = PASTED_KEY;
     clack.prompt.mockResolvedValue(PASTED_KEY);
 
-    const res = await runCli(["login"]);
+    const res = await runCli(["login", "--interactive"]);
 
     expect(res.stderr).not.toContain("overrides the key just stored");
   });
@@ -536,7 +541,7 @@ describe("login, when SENSO_API_KEY is set in the environment", () => {
     process.env.SENSO_API_KEY = "";
     clack.prompt.mockResolvedValue(PASTED_KEY);
 
-    const res = await runCli(["login"]);
+    const res = await runCli(["login", "--interactive"]);
 
     expect(res.stderr).not.toContain("overrides the key just stored");
   });
@@ -545,7 +550,7 @@ describe("login, when SENSO_API_KEY is set in the environment", () => {
     orgResponds();
     clack.prompt.mockResolvedValue(PASTED_KEY);
 
-    const res = await runCli(["login"]);
+    const res = await runCli(["login", "--interactive"]);
 
     expect(res.stderr).not.toContain("overrides the key just stored");
   });
@@ -846,7 +851,7 @@ describe("whoami never prints the key itself, whatever the source or format", ()
     process.env.SENSO_API_KEY = ENV_KEY;
     clack.prompt.mockResolvedValue(FULL_KEY);
 
-    const res = await runCli(["login"]);
+    const res = await runCli(["login", "--interactive"]);
 
     expect(res.stderr).toContain("overrides the key just stored");
     expect(res.stderr).not.toContain(ENV_KEY);

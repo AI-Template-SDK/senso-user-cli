@@ -6,7 +6,7 @@ Generated from the command tree of `@senso-ai/cli`. Every command accepts the [g
 
 ## Contents
 
-- [`senso login`](#senso-login) — Authenticate with Senso.
+- [`senso login`](#senso-login) — Authenticate this device.
 - [`senso logout`](#senso-logout) — Remove stored API key and organization info from local config.
 - [`senso whoami`](#senso-whoami) — Show which organization you are authenticated as, including org ID, slug, tier, and API key prefix.
 - [`senso org`](#senso-org) — View and update organization profile and settings.
@@ -74,11 +74,18 @@ These are accepted by every command.
 
 ## senso login
 
-Authenticate with Senso. Paste your API key and it will be validated against your organization, then stored locally.
+Authenticate this device. Opens a Senso page where an org admin approves the request in a browser, then stores the key it mints. Use --api-key to store a key you already hold.
 
 ```
 senso login [options]
 ```
+
+| Option | Description | Default |
+|---|---|---|
+| `--complete` | Finish a login started earlier: wait for the browser approval and store the key. |  |
+| `--interactive` | Paste an existing API key at a prompt instead. Needs a terminal. |  |
+| `--device-name <name>` | How this device is labeled on the approval page. |  |
+| `--no-browser` | Do not try to open the approval page automatically. |  |
 
 ## senso logout
 
