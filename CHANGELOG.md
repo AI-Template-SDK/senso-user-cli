@@ -9,6 +9,17 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
+### Changed
+
+- **`senso website-import` now imports up to 20 pages, chosen for what people
+  ask about the business.** The API reads the site's sitemap as well as the
+  home page's links, and when there are more candidates than it imports, an AI
+  model picks the pages most likely to answer common questions (what you offer,
+  pricing, who it is for, how it works, FAQs) instead of the first ten nav
+  links. `start` now says how the pages were chosen, and runs carry the new
+  `selection_method`, `candidates_found`, `candidates_considered` and
+  `sitemap_found` fields. Nothing to change on your side.
+
 ## [0.17.4] — 2026-09-23
 
 ### Added

@@ -30,6 +30,10 @@ interface WebsiteImportRun {
   pages_ingested: number;
   brand_kit_generated: boolean;
   brand_kit_skip_reason?: string;
+  selection_method?: "all" | "llm" | "heuristic";
+  candidates_found?: number;
+  candidates_considered?: number;
+  sitemap_found?: boolean;
   error_code?: string;
   error_message?: string;
   created_at: string;
@@ -124,6 +128,9 @@ function describeOutcome(run: WebsiteImportRun, quiet: boolean): void {
     `Imported ${String(run.pages_ingested)} of ${String(run.pages_fetched)} page(s) from ${run.source_url}.`,
   );
 
+  const chosenBy = describeSelection(run);
+  if (chosenBy) log.info(chosenBy);
+
   if (run.brand_kit_generated) {
     log.success("A brand kit was generated from the site.");
   } else if (run.brand_kit_skip_reason === "already_populated") {
@@ -134,6 +141,25 @@ function describeOutcome(run: WebsiteImportRun, quiet: boolean): void {
 
   if (run.pages_ingested < run.pages_fetched) {
     log.info("Pages already in the knowledge base unchanged are fetched but not re-ingested.");
+  }
+}
+
+/**
+ * One line on how the pages beyond the home page were chosen, or undefined for
+ * a run from an API that does not report it.
+ */
+function describeSelection(run: WebsiteImportRun): string | undefined {
+  const found = run.candidates_found;
+  const source = run.sitemap_found ? "home page links and sitemap" : "home page links";
+  switch (run.selection_method) {
+    case "all":
+      return `Took every candidate page (${String(found ?? 0)} found in the ${source}).`;
+    case "llm":
+      return `Picked the most informative pages from ${String(found ?? 0)} candidates in the ${source}.`;
+    case "heuristic":
+      return `Picked pages by URL ranking from ${String(found ?? 0)} candidates in the ${source} (AI selection was unavailable).`;
+    default:
+      return undefined;
   }
 }
 
@@ -154,7 +180,7 @@ export function registerWebsiteImportCommands(program: Command): void {
   const websiteImport = program
     .command("website-import")
     .description(
-      "Import your organization's website into the knowledge base. Fetches the home page plus up to 10 linked pages, ingests each as a document under a folder named 'Website', and drafts a brand kit if the organization does not have one yet.",
+      "Import your organization's website into the knowledge base. Fetches the home page plus up to 19 more of its pages — picked from the home page's links and the sitemap, favouring the ones that answer what people most often ask about the business — ingests each as a document under a folder named 'Website', and drafts a brand kit if the organization does not have one yet.",
     );
 
   websiteImport

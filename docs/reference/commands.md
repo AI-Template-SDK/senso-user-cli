@@ -453,7 +453,7 @@ senso ingest reprocess [options] <nodeId> <file>
 
 ## senso website-import
 
-Import your organization's website into the knowledge base. Fetches the home page plus up to 10 linked pages, ingests each as a document under a folder named 'Website', and drafts a brand kit if the organization does not have one yet.
+Import your organization's website into the knowledge base. Fetches the home page plus up to 19 more of its pages — picked from the home page's links and the sitemap, favouring the ones that answer what people most often ask about the business — ingests each as a document under a folder named 'Website', and drafts a brand kit if the organization does not have one yet.
 
 ```
 senso website-import [options] [command]
