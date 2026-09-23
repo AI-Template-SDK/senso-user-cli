@@ -28,6 +28,7 @@ Generated from the command tree of `@senso-ai/cli`. Every command accepts the [g
 - [`senso prompts`](#senso-prompts) — Manage prompts (GEO questions).
 - [`senso run-config`](#senso-run-config) — Configure which AI models are used for question runs and on which days they run.
 - [`senso skills`](#senso-skills) — Install and manage Senso agent skills.
+- [`senso setup`](#senso-setup) — Install every official Senso skill globally, so any AI coding agent on this machine knows how to use Senso.
 - [`senso members`](#senso-members) — View the organization member directory.
 - [`senso credits`](#senso-credits) — View your organization's credit balance.
 - [`senso questions`](#senso-questions) — Manage org-scoped geo questions.
@@ -1539,7 +1540,7 @@ senso skills [options] [command]
 
 ### senso skills install
 
-Install Senso agent skills. Use --all for every official skill, or pass individual short names (search, ingest, content-gen, brand-setup, kb-organize, review-publish, onboarding).
+Install Senso agent skills. Use --all for every official skill, or pass individual short names (quickstart, context-layer, evaluate-remediate, generate-verify, publish). `senso setup` installs the full set globally in one step.
 
 ```
 senso skills install [options] [names...]
@@ -1573,7 +1574,7 @@ senso skills list-available [options]
 
 ### senso skills remove
 
-Remove an installed Senso skill. Use the short name (e.g., search, ingest, content-gen).
+Remove an installed Senso skill. Use the short name (e.g., quickstart, context-layer, publish).
 
 ```
 senso skills remove [options] <name>
@@ -1582,6 +1583,20 @@ senso skills remove [options] <name>
 | Option | Description | Default |
 |---|---|---|
 | `--global` | Remove from global install |  |
+
+## senso setup
+
+Install every official Senso skill globally, so any AI coding agent on this machine knows how to use Senso. Equivalent to 'senso skills install --all --global'. Use --local to scope the install to the current project instead.
+
+```
+senso setup [options]
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--agent <name>` | Target a specific agent: claude, cursor, codex, copilot, gemini, cline |  |
+| `--global` | Install globally (the default; accepted so the flag is never an error) |  |
+| `--local` | Install into the current project instead of globally |  |
 
 ## senso members
 

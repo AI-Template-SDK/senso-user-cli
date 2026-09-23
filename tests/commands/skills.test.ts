@@ -104,7 +104,7 @@ function argv(n = 0): string[] {
   return invocations()[n]?.args ?? [];
 }
 
-const SKILL_COUNT = 7;
+const SKILL_COUNT = 5;
 
 beforeEach(() => {
   child.state.calls = [];
@@ -132,16 +132,20 @@ describe("skills list-available, which answers for itself", () => {
 
     const listed = res.json<{ package: string; shortName: string }[]>();
     expect(listed).toHaveLength(SKILL_COUNT);
-    expect(listed).toContainEqual({ package: "senso-ai/senso-search", shortName: "search" });
+    expect(listed).toContainEqual({
+      package: "senso-ai/senso-quickstart",
+      shortName: "quickstart",
+    });
     expect(res.stderr).toBe("");
   });
 
   it("renders the short names and the install hint in plain", async () => {
     const res = await runCli(["skills", "list-available"]);
 
-    expect(res.stdout).toContain("search");
-    expect(res.stdout).toContain("senso-ai/senso-onboarding");
+    expect(res.stdout).toContain("quickstart");
+    expect(res.stdout).toContain("senso-ai/senso-publish");
     expect(res.stdout).toContain("senso skills install --all");
+    expect(res.stdout).toContain("senso setup");
   });
 
   it("renders a row per skill under --output table", async () => {
@@ -149,7 +153,7 @@ describe("skills list-available, which answers for itself", () => {
 
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain("shortName");
-    expect(res.stdout).toContain("content-gen");
+    expect(res.stdout).toContain("context-layer");
   });
 });
 
@@ -176,7 +180,7 @@ describe("skills install, on the argv", () => {
 
     expect(res.exitCode).toBe(0);
     expect(invocations()).toHaveLength(SKILL_COUNT);
-    expect(invocations().map(({ args }) => args[1])).toContain("senso-ai/senso-onboarding");
+    expect(invocations().map(({ args }) => args[1])).toContain("senso-ai/senso-quickstart");
   });
 
   it("targets every agent with --all when none was named", async () => {

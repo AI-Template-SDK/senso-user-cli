@@ -9,6 +9,31 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
+### Added
+
+- **`senso setup` installs the handful of skills a new user needs to get
+  started**, globally, in one command: `quickstart`, `context-layer`,
+  `evaluate-remediate`, `generate-verify` and `publish`. That is the starter
+  set, not the whole registry — anything else is still one
+  `senso skills install` away. `--local` scopes the install to the current
+  project and `--agent <name>` narrows it to one agent; `--global` is accepted
+  as a no-op so spelling out the default is never a usage error. Passing
+  `--global` and `--local` together exits 2 rather than picking a winner — a
+  wrongly-scoped install reports success either way, so guessing would be
+  unrecoverable in practice.
+
+### Changed
+
+- **The starter skill set is now the five workflow skills**, not the seven
+  task-shaped ones: `quickstart`, `context-layer`, `evaluate-remediate`,
+  `generate-verify`, `publish`. `senso skills install --all` and
+  `senso skills list-available` follow the new list. The old packages
+  (`search`, `ingest`, `content-gen`, `brand-setup`, `kb-organize`,
+  `review-publish`, `onboarding`) are still in the registry and still install
+  by name — `senso skills install search` works unchanged — they are simply no
+  longer what `--all` means. If you relied on `--all` to get the old seven,
+  name them explicitly.
+
 ## [0.17.3] — 2026-09-22
 
 ### Added

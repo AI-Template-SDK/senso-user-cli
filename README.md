@@ -104,11 +104,14 @@ interface.
 | `NO_COLOR`                | Disable color (any value)                                    |
 
 **Teaching an agent to use Senso.** The official agent skills install in one
-command:
+command, globally, so every agent on the machine can use them:
 
 ```bash
-senso skills install --all
+senso setup
 ```
+
+That is `senso skills install --all --global`. Pass `--local` to scope the
+install to the current project, or `--agent <name>` to target one agent.
 
 ## Commands
 
@@ -131,7 +134,7 @@ argument and flag, generated from the CLI itself.
 | `gaps`                                                                   | What the knowledge base could not answer or back up, and what was done about it |
 | `org` `users` `members` `roles` `permissions` `api-keys` `credits`       | Organization administration                                                     |
 | `run-config`                                                             | Which models run, and on which days                                             |
-| `skills`                                                                 | Install the Senso agent skills                                                  |
+| `setup` `skills`                                                         | Install the Senso agent skills                                                  |
 | `update`                                                                 | Update this CLI                                                                 |
 | `uninstall`                                                              | Remove this CLI, the skills it installed, and the stored API key                |
 

@@ -36,6 +36,7 @@ import { registerContentTypeCommands } from "./commands/content-types.js";
 import { registerPromptCommands } from "./commands/prompts.js";
 import { registerRunConfigCommands } from "./commands/run-config.js";
 import { registerSkillsCommands } from "./commands/skills.js";
+import { registerSetupCommands } from "./commands/setup.js";
 import { registerMemberCommands } from "./commands/members.js";
 import { registerCreditsCommands } from "./commands/credits.js";
 import { registerQuestionsCommands } from "./commands/questions.js";
@@ -178,6 +179,7 @@ export function createProgram(): Command {
   registerPromptCommands(program);
   registerRunConfigCommands(program);
   registerSkillsCommands(program);
+  registerSetupCommands(program);
   registerMemberCommands(program);
   registerCreditsCommands(program);
   registerQuestionsCommands(program);
