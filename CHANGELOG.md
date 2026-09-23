@@ -9,6 +9,8 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
+## [0.17.5] — 2026-09-23
+
 ### Changed
 
 - **`senso website-import` now imports up to 20 pages, chosen for what people
@@ -837,7 +839,8 @@ get` showed the organization's locations and silently dropped its name, slug
 - First published release: authentication, search, content, ingestion,
   organization administration, and self-update.
 
-[Unreleased]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.17.4...HEAD
+[Unreleased]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.17.5...HEAD
+[0.17.5]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.17.4...v0.17.5
 [0.17.4]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.17.3...v0.17.4
 [0.17.3]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.17.2...v0.17.3
 [0.17.2]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.17.1...v0.17.2
