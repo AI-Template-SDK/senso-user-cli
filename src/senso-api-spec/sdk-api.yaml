@@ -74,7 +74,7 @@ tags:
       Set it once, and it applies to all content generation calls. Without a brand kit, generated content has no identity guidance.
   - name: Website Import
     description: |
-      One call that seeds your organization from its own public website: it fetches your home page plus the pages linked from it, ingests them into your knowledge base as documents, and — if you have no brand kit yet — drafts one from what it read.
+      One call that seeds your organization from its own public website: it fetches your home page plus up to 19 more of your most informative pages (chosen from its links and your sitemap), ingests them into your knowledge base as documents, and — if you have no brand kit yet — drafts one from what it read.
 
       The site it imports is the website on file for your organization (`GET /org/me`), not something you pass in. Set it with `PUT /org/me` before the first import.
 
@@ -5032,9 +5032,13 @@ paths:
       summary: Import your website
       description: >-
         Starts an import of your organization's website: it fetches your home page plus
-        up to 10 pages linked from it, ingests each one into your knowledge base as a
+        up to 19 more of your pages, ingests each one into your knowledge base as a
         document under a folder named `Website`, and generates a brand kit from what it
-        read if your organization does not have one yet. A brand kit that already has
+        read if your organization does not have one yet. Pages are chosen from the ones
+        your home page links to and the ones in your sitemap: when there are more than 19,
+        an AI model picks the pages most likely to answer what people most often ask about
+        a business like yours — what you offer, pricing, who it is for, how it works, and
+        common questions — and skips blog posts and near-duplicates. A brand kit that already has
         content is never overwritten — the import still runs, and reports
         `brand_kit_generated: false` with `brand_kit_skip_reason: already_populated`.
 
@@ -17855,6 +17859,31 @@ components:
             Whether this import wrote a brand kit. `false` both while the import is still
             running and when generation was deliberately skipped — `brand_kit_skip_reason`
             distinguishes the two.
+        selection_method:
+          type: string
+          description: >-
+            How the pages beyond the home page were chosen. `all`: the site had 19 or
+            fewer candidate pages, so every one was imported. `llm`: an AI model chose the
+            most valuable pages. `heuristic`: the AI selection failed and a keyword ranker
+            chose instead. Absent until page selection has run.
+          enum:
+            - all
+            - llm
+            - heuristic
+        candidates_found:
+          type: integer
+          description: >-
+            Candidate pages found across your home page's links and your sitemap, after
+            excluding login, legal, cart, asset and translated pages. Absent until page
+            selection has run.
+        candidates_considered:
+          type: integer
+          description: >-
+            How many candidates the selector considered, after trimming large sites to at
+            most 5 pages per section and 150 overall. Absent until page selection has run.
+        sitemap_found:
+          type: boolean
+          description: Whether a sitemap was found and read. Absent until page selection has run.
         brand_kit_skip_reason:
           type: string
           description: >-
