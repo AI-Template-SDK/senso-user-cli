@@ -104,7 +104,7 @@ function argv(n = 0): string[] {
   return invocations()[n]?.args ?? [];
 }
 
-const SKILL_COUNT = 5;
+const SKILL_COUNT = 9;
 
 beforeEach(() => {
   child.state.calls = [];
@@ -130,13 +130,26 @@ describe("skills list-available, which answers for itself", () => {
   it("lists every official skill by short name and package under --output json", async () => {
     const res = await runCli(["skills", "list-available", "--output", "json"]);
 
-    const listed = res.json<{ package: string; shortName: string }[]>();
+    const listed = res.json<{ package: string; shortName: string; kind: string }[]>();
     expect(listed).toHaveLength(SKILL_COUNT);
     expect(listed).toContainEqual({
-      package: "senso-ai/senso-quickstart",
       shortName: "quickstart",
+      package: "senso-ai/senso-quickstart",
+      kind: "flow",
+    });
+    expect(listed).toContainEqual({
+      shortName: "gap-report",
+      package: "senso-ai/senso-gap-report",
+      kind: "module",
     });
     expect(res.stderr).toBe("");
+  });
+
+  it("does not offer the retired evaluate-remediate", async () => {
+    const res = await runCli(["skills", "list-available", "--output", "json"]);
+
+    const names = res.json<{ shortName: string }[]>().map((s) => s.shortName);
+    expect(names).not.toContain("evaluate-remediate");
   });
 
   it("renders the short names and the install hint in plain", async () => {
@@ -153,7 +166,8 @@ describe("skills list-available, which answers for itself", () => {
 
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain("shortName");
-    expect(res.stdout).toContain("context-layer");
+    expect(res.stdout).toContain("kind");
+    expect(res.stdout).toContain("verification-loop-setup");
   });
 });
 
@@ -201,6 +215,32 @@ describe("skills install, on the argv", () => {
     expect(argv()).toContain("--global");
   });
 
+  it("names every supported agent for a global install, instead of --all", async () => {
+    // shipables' --all means the agents it detects, and it detects Copilot by
+    // a .vscode directory in the current directory. A global install must not
+    // depend on where it was run from.
+    await runCli(["skills", "install", "search", "--global"]);
+
+    expect(argv()).not.toContain("--all");
+    for (const flag of ["--claude", "--cursor", "--codex", "--copilot", "--gemini", "--cline"]) {
+      expect(argv()).toContain(flag);
+    }
+  });
+
+  it("drops the @ from a Senso package, so shipables records one spelling", async () => {
+    // shipables records an install under the name it was given; the @ spelling
+    // would be a second record for the same directory.
+    await runCli(["skills", "install", "@senso-ai/senso-gap-report"]);
+
+    expect(argv()[1]).toBe("senso-ai/senso-gap-report");
+  });
+
+  it("passes a bare Senso package name through rather than prefixing it again", async () => {
+    await runCli(["skills", "install", "senso-ai/senso-gap-report"]);
+
+    expect(argv()[1]).toBe("senso-ai/senso-gap-report");
+  });
+
   it("omits --env entirely when there is no key to pass", async () => {
     // The key travels in the child's argv, where `ps` can read it — a known
     // limitation recorded in SECURITY.md. The least this can do is not invent
@@ -234,6 +274,37 @@ describe("skills install, on the argv", () => {
     expect(res.stderr).toContain("shipables: wrote .claude/skills");
     expect(res.stderr).toContain("npm notice");
     expect(res.stdout).not.toContain("npm notice");
+  });
+});
+
+describe("skills install, on a partial or retired set", () => {
+  it("warns on one line that the set is meant to be installed together", async () => {
+    const res = await runCli(["skills", "install", "gap-report"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(invocations()).toHaveLength(1);
+    expect(res.stderr).toContain("meant to be installed together");
+  });
+
+  it("does not warn when the whole set is installed", async () => {
+    const res = await runCli(["skills", "install", "--all"]);
+
+    expect(res.stderr).not.toContain("meant to be installed together");
+  });
+
+  it("does not warn about a skill outside the official set", async () => {
+    const res = await runCli(["skills", "install", "search"]);
+
+    expect(res.stderr).not.toContain("meant to be installed together");
+  });
+
+  it("still installs evaluate-remediate by name, and says it is retired", async () => {
+    const res = await runCli(["skills", "install", "evaluate-remediate"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(argv()[1]).toBe("senso-ai/senso-evaluate-remediate");
+    expect(res.stderr).toContain("evaluate-remediate is retired");
+    expect(res.stderr).toContain("senso setup");
   });
 });
 
@@ -368,6 +439,17 @@ describe("skills list, reading what the child printed", () => {
     expect(res.stderr).toContain("No skills installed");
   });
 
+  it("says so for the empty object shipables actually prints", async () => {
+    // shipables 0.1.2 prints `{}` for an empty scope. The check used to accept
+    // only `[]`, so the hint never appeared.
+    shipablesRuns(() => ({ stdout: "{}", stderr: "" }));
+
+    const res = await runCli(["skills", "list"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stderr).toContain("No skills installed");
+  });
+
   it("exits 1 with a diagnosis when the child does not answer with JSON", async () => {
     // A missing binary, an npx banner, a proxy's error page: all of them arrive
     // here as text. JSON.parse throwing a SyntaxError at the user diagnoses
@@ -422,6 +504,13 @@ describe("skills remove", () => {
     await runCli(["skills", "remove", "search", "--global"]);
 
     expect(argv()).toEqual(["uninstall", "senso-ai/senso-search", "--global"]);
+  });
+
+  it("still removes the retired evaluate-remediate by short name", async () => {
+    const res = await runCli(["skills", "remove", "evaluate-remediate", "--global"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(argv()).toEqual(["uninstall", "senso-ai/senso-evaluate-remediate", "--global"]);
   });
 
   it("puts the confirmation on stderr, leaving stdout empty", async () => {

@@ -32,7 +32,7 @@ import { CliError, EXIT } from "../lib/errors.js";
 import { emitConfirmation } from "../lib/output.js";
 import { runAction } from "../lib/run-action.js";
 import * as log from "../utils/logger.js";
-import { SENSO_SKILL_PREFIX, runShipables, shortName } from "./skills.js";
+import { isSensoPackage, runShipables, shortName } from "./skills.js";
 
 const NPM_PACKAGE = "@senso-ai/cli";
 
@@ -62,6 +62,13 @@ function shipablesInstalledPath(): string {
 /**
  * Every Senso skill shipables has a record of, in every scope.
  *
+ * EVERYTHING IN THE NAMESPACE, not only the official set. Uninstalling the CLI
+ * is the last chance to clean up, and a skill retired from the set — the old
+ * task-shaped seven, evaluate-remediate — is exactly what nothing else will
+ * ever remove. Both spellings count: shipables records an install under the
+ * name it was given, so `@senso-ai/x` and `senso-ai/x` are separate records,
+ * and each is uninstalled under its own spelling.
+ *
  * A missing or unreadable file means shipables has never installed anything
  * here, which is the normal case on a machine that only ever used the CLI.
  */
@@ -76,7 +83,7 @@ export function findInstalledSensoSkills(): InstalledSkill[] {
   const found: InstalledSkill[] = [];
   for (const [projectPath, skills] of Object.entries(parsed.installations ?? {})) {
     for (const name of Object.keys(skills)) {
-      if (!name.startsWith(SENSO_SKILL_PREFIX)) continue;
+      if (!isSensoPackage(name)) continue;
       found.push({
         name,
         scope: projectPath === SHIPABLES_GLOBAL_SCOPE ? "global" : projectPath,
