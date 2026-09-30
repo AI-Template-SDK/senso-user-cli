@@ -1,11 +1,15 @@
 {
-  "_comment": "The official Senso agent skills, as published to the Shipables registry from the senso-skills repository. src/commands/skills.ts must list exactly these. Refreshed by .github/workflows/spec-drift.yml; a mismatch means either the registry moved or the CLI's list did. These five superseded the seven task-shaped skills (search, ingest, content-gen, brand-setup, kb-organize, review-publish, onboarding), which remain installable by name but are no longer what --all means.",
+  "_comment": "The official Senso agent skills, as published to the Shipables registry from the senso-skills repository. src/commands/skills.ts must list exactly these. Maintained by hand: a mismatch means either the registry moved or the CLI's list did. These nine superseded the five workflow skills; senso-evaluate-remediate is retired (a tombstone in the registry) and `senso setup` removes it.",
   "_source": "https://github.com/tenzin-senso/senso-skills",
-  "_captured": "2026-09-23",
+  "_captured": "2026-09-29",
   "skills": [
     "senso-ai/senso-quickstart",
+    "senso-ai/senso-verification-loop-setup",
+    "senso-ai/senso-verification-loop",
+    "senso-ai/senso-shared-context-setup",
+    "senso-ai/senso-shared-context",
     "senso-ai/senso-context-layer",
-    "senso-ai/senso-evaluate-remediate",
+    "senso-ai/senso-gap-report",
     "senso-ai/senso-generate-verify",
     "senso-ai/senso-publish"
   ]

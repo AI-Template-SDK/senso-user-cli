@@ -378,6 +378,41 @@ describe("uninstall, in full", () => {
     ]);
   });
 
+  it("removes everything in the senso-ai namespace, in either spelling, under its own spelling", async () => {
+    // shipables records an install under the name it was given and looks it
+    // up by exact match, so an @ record uninstalled as the bare name would be
+    // "not installed". The namespace, not the `senso-` prefix, is what counts:
+    // retired and not-yet-official skills are exactly what nothing else will
+    // clean up.
+    shipablesRecords({
+      __global__: {
+        "@senso-ai/senso-gap-report": record(),
+        "senso-ai/senso-evaluate-remediate": record(),
+        "senso-ai/kb-builder": record(),
+        "@senso-ai-lookalike/senso-search": record(),
+        "not-senso-ai/senso-search": record(),
+      },
+    });
+
+    const res = await runCli(["uninstall", "--yes", "--output", "json"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(shipablesCalls().map((c) => c.args[1])).toEqual([
+      "@senso-ai/senso-gap-report",
+      "senso-ai/senso-evaluate-remediate",
+      "senso-ai/kb-builder",
+    ]);
+    expect(res.json()).toMatchObject({
+      skills: {
+        removed: [
+          { name: "gap-report", package: "@senso-ai/senso-gap-report" },
+          { name: "evaluate-remediate", package: "senso-ai/senso-evaluate-remediate" },
+          { name: "kb-builder", package: "senso-ai/kb-builder" },
+        ],
+      },
+    });
+  });
+
   it("does not spawn shipables at all when it has no record of a skill", async () => {
     // Most machines. Downloading shipables through npx to learn there is
     // nothing to remove is a minute of the user's time for no reason.

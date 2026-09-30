@@ -9,6 +9,53 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
+### Changed
+
+- **The official skill set is now nine skills, and `evaluate-remediate` is
+  retired.** `senso skills install --all`, `senso setup` and
+  `senso skills list-available` now mean `quickstart`,
+  `verification-loop-setup`, `verification-loop`, `shared-context-setup`,
+  `shared-context`, `context-layer`, `gap-report`, `generate-verify` and
+  `publish`. They reference each other, so install them as a set; naming a
+  single one still works and warns on stderr. `evaluate-remediate` split into
+  `verification-loop-setup`, `verification-loop` and `gap-report`; installing
+  it by name now installs a pointer to those and warns, and
+  `senso skills remove evaluate-remediate` still removes it.
+  `list-available` gained a `kind` column (`flow` or `module`).
+
+- **`senso setup` keeps a machine current instead of reinstalling.** It checks
+  what is installed against the registry in one call and installs only the
+  skills that are missing, out of date, or missing for an agent. On a machine
+  that is current it installs nothing and reports "up to date", so an agent can
+  run it every session. The payload gained `upToDate` and `removed` beside
+  `installed`. After every install succeeds, it removes `evaluate-remediate` —
+  through shipables, and from each agent's skills directory even where
+  shipables has no record of it. If an install fails, nothing is removed.
+
+- **A global install targets every supported agent**, not just the ones
+  shipables detects. Detection depended on the current directory — Copilot is
+  detected by a `.vscode` folder there — so a global install could silently
+  skip agents. `senso setup` and `senso skills install --global` without
+  `--agent` now name Claude Code, Cursor, Codex, Copilot, Gemini CLI and Cline.
+  A project install still targets only the agents it detects, so it does not
+  create five agents' directories in your repository.
+
+### Fixed
+
+- **`senso uninstall` removes every skill in the `senso-ai` namespace**,
+  including ones recorded as `@senso-ai/…` and ones whose names do not start
+  with `senso-`. Before, it matched only `senso-ai/senso-…`, so a skill
+  installed under the `@` spelling survived the uninstall.
+
+- **`senso skills install @senso-ai/<name>` no longer creates a duplicate
+  record.** shipables records an install under the exact name it was given, so
+  the `@` spelling became a second record for the same directory, and removing
+  either one deleted files the other still claimed. The CLI now always passes
+  the bare `senso-ai/` spelling.
+
+- **`senso skills list` says "No skills installed" when nothing is.** shipables
+  prints `{}` for an empty scope and the check only recognized `[]`.
+
 ## [0.17.5] — 2026-09-23
 
 ### Changed
