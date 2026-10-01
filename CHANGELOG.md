@@ -9,6 +9,8 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
+## [0.18.0] — 2026-10-01
+
 ### Changed
 
 - **The official skill set is now nine skills, and `evaluate-remediate` is
@@ -886,7 +888,8 @@ get` showed the organization's locations and silently dropped its name, slug
 - First published release: authentication, search, content, ingestion,
   organization administration, and self-update.
 
-[Unreleased]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.17.5...HEAD
+[Unreleased]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.17.5...v0.18.0
 [0.17.5]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.17.4...v0.17.5
 [0.17.4]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.17.3...v0.17.4
 [0.17.3]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.17.2...v0.17.3
