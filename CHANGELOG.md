@@ -9,6 +9,8 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
+## [0.18.1] — 2026-10-01
+
 ### Fixed
 
 - **0.18.0 was not published to npm; this release ships it.** The publish job
@@ -896,7 +898,8 @@ get` showed the organization's locations and silently dropped its name, slug
 - First published release: authentication, search, content, ingestion,
   organization administration, and self-update.
 
-[Unreleased]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.18.1...HEAD
+[0.18.1]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.18.0...v0.18.1
 [0.18.0]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.17.5...v0.18.0
 [0.17.5]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.17.4...v0.17.5
 [0.17.4]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.17.3...v0.17.4
