@@ -9,6 +9,14 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
+### Fixed
+
+- **0.18.0 was not published to npm; this release ships it.** The publish job
+  failed its `npm audit` gate on three high-severity advisories in
+  `brace-expansion`, a development-only dependency (via eslint), which is now
+  updated to 5.0.12. The published CLI never depended on it, so nothing changes
+  at runtime — everything listed under 0.18.0 arrives with this version.
+
 ## [0.18.0] — 2026-10-01
 
 ### Changed
