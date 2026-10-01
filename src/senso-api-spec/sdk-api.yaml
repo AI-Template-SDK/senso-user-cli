@@ -5606,7 +5606,9 @@ paths:
       summary: Add a tracked competitor
       description: >-
         Adds a competitor brand to your organization's tracked set. An organization can
-        track at most 50 competitors.
+        track at most 50 competitors; the 51st answers 422. A name whose brand key is
+        already tracked (for example "Acme Inc" when "Acme" is tracked) answers 409.
+        Changing competitors restates analytics history in the background.
       operationId: orgCreateCompetitor
       requestBody:
         required: true
@@ -5632,6 +5634,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
 
   /org/competitors/batch:
     post:
@@ -8183,7 +8187,20 @@ components:
           type: string
           format: uri
           maxLength: 2048
-          description: Competitor website URL.
+          description: >-
+            Competitor website URL. On update, omitting it keeps the current URL and an
+            empty string clears it. Its host is always added to `domains`.
+        domains:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            minLength: 3
+            maxLength: 253
+          description: >-
+            When present, replaces the domains this competitor's citations are attributed
+            to (hosts such as `acme.com`; URLs are reduced to their host). Omit to leave
+            them unchanged.
     CompetitorResponse:
       type: object
       description: A competitor brand your organization tracks.
@@ -8192,6 +8209,7 @@ components:
         - org_id
         - name
         - source
+        - domains
         - created_at
         - updated_at
       additionalProperties: false
@@ -8200,6 +8218,16 @@ components:
           type: string
           format: uuid
           description: Unique identifier of the tracked competitor.
+        brand_key:
+          type: string
+          description: >-
+            The normalized brand key analytics store this competitor under. Two names with
+            the same key (for example "Acme" and "Acme Inc") are the same competitor.
+        domains:
+          type: array
+          items:
+            type: string
+          description: Domains whose citations count as this competitor's.
         org_id:
           type: string
           format: uuid
@@ -11905,16 +11933,16 @@ components:
           type: string
           format: uuid
           nullable: true
-          description: The persona this question was generated from, or null.
+          description: Always null. Legacy personas were removed; the field is kept until the new org persona API ships.
         persona_question_id:
           type: string
           format: uuid
           nullable: true
-          description: The source persona question, or null.
+          description: Always null. Legacy personas were removed; the field is kept until the new org persona API ships.
         persona_name:
           type: string
           nullable: true
-          description: The persona's display name, or null. Populated only in list responses.
+          description: Always null. Legacy personas were removed; the field is kept until the new org persona API ships.
         tags:
           type: array
           items:
@@ -15586,8 +15614,6 @@ components:
         question_type:
           type: string
           description: The prompt's question type (e.g. `awareness`, `consideration`, `evaluation`, `decision`).
-        persona_name:
-          type: string
         owners:
           type: array
           items:
