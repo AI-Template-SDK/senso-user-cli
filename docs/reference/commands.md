@@ -31,6 +31,7 @@ Generated from the command tree of `@senso-ai/cli`. Every command accepts the [g
 - [`senso setup`](#senso-setup) — Install the nine official Senso skills globally, for every supported agent (Claude Code, Cursor, Codex, Copilot, Gemini CLI, Cline), and remove retired ones such as evaluate-remediate.
 - [`senso members`](#senso-members) — View the organization member directory.
 - [`senso credits`](#senso-credits) — View your organization's credit balance.
+- [`senso request-upgrade`](#senso-request-upgrade) — Ask the Senso team to upgrade your organization, or to follow up on something, and notify them.
 - [`senso questions`](#senso-questions) — Manage org-scoped geo questions.
 - [`senso kb`](#senso-kb) — Manage the knowledge base.
 - [`senso permissions`](#senso-permissions) — View available role permissions for the organization.
@@ -1648,6 +1649,20 @@ senso credits history [options]
 | Option | Description | Default |
 |---|---|---|
 | `--days <n>` | Length of the trailing window in days, 1-365 (default 30) |  |
+
+## senso request-upgrade
+
+Ask the Senso team to upgrade your organization, or to follow up on something, and notify them. [request] is one of: plan (Move the workspace to the Optimization tier); fix-answer-gaps (Optimization: fix what AI answers were missing); track-from-drafts (Optimization: track a page from a Senso draft); factual-accuracy (Optimization: see and correct factual errors in AI answers); activate-audience (Ask the Zeta team about reaching an audience through paid channels); recommendation-help (Ask the Zeta team for help with a recommendation). Defaults to plan. One open request per kind: asking again returns the open one and does not notify the team twice.
+
+```
+senso request-upgrade [options] [request]
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--persona <name>` | With activate-audience: the audience or persona to reach |  |
+| `--recommendation <text>` | With recommendation-help: the recommendation you want help with |  |
+| `--note <text>` | Anything the team should know when they follow up |  |
 
 ## senso questions
 

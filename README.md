@@ -135,6 +135,7 @@ argument and flag, generated from the CLI itself.
 | `evals`                                                                  | Judge text and content against your knowledge base and brand kit                |
 | `gaps`                                                                   | What the knowledge base could not answer or back up, and what was done about it |
 | `org` `users` `members` `roles` `permissions` `api-keys` `credits`       | Organization administration                                                     |
+| `request-upgrade`                                                        | Ask the team for an upgrade, or for help                                        |
 | `run-config`                                                             | Which models run, and on which days                                             |
 | `setup` `skills`                                                         | Install the Senso agent skills                                                  |
 | `update`                                                                 | Update this CLI                                                                 |

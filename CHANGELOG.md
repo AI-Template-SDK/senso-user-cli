@@ -9,6 +9,22 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
+### Added
+
+- **`senso request-upgrade` asks the team for an upgrade, or for help.** It
+  sends the same requests the ZMP app does, so the partner's Upgrade Requests
+  page shows them the same way: `plan` (the default — move the workspace to
+  Optimization), `fix-answer-gaps`, `track-from-drafts` and `factual-accuracy`
+  ask for the Optimization tier or one of its features; `activate-audience`
+  (with `--persona`) and `recommendation-help` (with `--recommendation`) ask the
+  Zeta team to follow up. `--note` adds anything else the team should know.
+  Only one request of each kind can be open: asking again exits 0, says when
+  you first asked, and does not notify the team twice — `alreadyRequested` in
+  the JSON payload says which happened. A request made with an API key is
+  recorded as coming from the user who created that key — for a key
+  `senso login` minted, the admin who approved the device — so if someone else
+  should hear back, say so with `--note`.
+
 ## [0.18.1] — 2026-10-01
 
 ### Fixed
