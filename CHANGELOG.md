@@ -9,15 +9,22 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
+### Changed
+
+- **The minimum Node version is now 22.12.** `commander` 15 and `boxen` 9,
+  taken in 0.18.3, require Node 22 and 22.12 respectively, so the CLI no longer
+  runs on Node 20. Node 20 reached end-of-life in April 2026. If you are on Node
+  20, upgrade to 22.12 or later before updating, or stay on 0.18.2.
+
 ## [0.18.3] — 2026-10-14
 
 ### Changed
 
 - **Runtime dependencies updated, including two major versions.** `commander`
   14 → 15 and `boxen` 8 → 9, plus `@clack/prompts` 1.8.1 and `figlet` 1.12.0.
-  Commands, flags, output and exit codes are unchanged, and both majors still
-  run on the Node versions this CLI supports (20.12 and later), so there is
-  nothing to do differently.
+  Commands, flags, output and exit codes are unchanged. Both majors need Node
+  22.12 or later; see the Unreleased entry. This version was tagged but never
+  published to npm.
 
 ## [0.18.2] — 2026-10-14
 

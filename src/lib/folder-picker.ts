@@ -114,7 +114,7 @@ async function promptCreateFolder(
     throw new PickerCanceled();
   }
 
-  return createFolder((name as string).trim(), parentId, opts);
+  return createFolder(name.trim(), parentId, opts);
 }
 
 export async function pickFolder(opts: FolderPickerOptions): Promise<FolderPickerResult> {
@@ -216,7 +216,7 @@ export async function pickFolder(opts: FolderPickerOptions): Promise<FolderPicke
       throw new PickerCanceled();
     }
 
-    const selected = choice as string;
+    const selected = choice;
 
     if (selected === "__BACK__") {
       navigationStack.pop();
