@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@clack/prompts": "1.8.1",
-    "boxen": "8.0.1",
+    "boxen": "9.0.0",
     "commander": "15.0.0",
     "env-paths": "4.0.0",
     "figlet": "1.12.0",
