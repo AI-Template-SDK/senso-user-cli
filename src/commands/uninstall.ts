@@ -223,7 +223,7 @@ export function registerUninstallCommand(program: Command): void {
             message: "Remove the Senso CLI, its skills and the stored API key?",
             initialValue: false,
           });
-          if (p.isCancel(confirmed) || confirmed !== true) {
+          if (p.isCancel(confirmed) || !confirmed) {
             p.cancel("Uninstall canceled. Nothing was removed.");
             return;
           }
