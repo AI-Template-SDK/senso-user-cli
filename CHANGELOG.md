@@ -9,6 +9,8 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
+## [0.18.2] — 2026-10-14
+
 ### Added
 
 - **`senso request-upgrade` asks the team for an upgrade, or for help.** It
@@ -914,7 +916,8 @@ get` showed the organization's locations and silently dropped its name, slug
 - First published release: authentication, search, content, ingestion,
   organization administration, and self-update.
 
-[Unreleased]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.18.1...HEAD
+[Unreleased]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.18.2...HEAD
+[0.18.2]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.18.1...v0.18.2
 [0.18.1]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.18.0...v0.18.1
 [0.18.0]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.17.5...v0.18.0
 [0.17.5]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.17.4...v0.17.5
