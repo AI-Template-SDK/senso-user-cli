@@ -9,6 +9,8 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
+## [0.18.4] — 2026-10-14
+
 ### Changed
 
 - **The minimum Node version is now 22.12.** `commander` 15 and `boxen` 9,
@@ -933,7 +935,8 @@ get` showed the organization's locations and silently dropped its name, slug
 - First published release: authentication, search, content, ingestion,
   organization administration, and self-update.
 
-[Unreleased]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.18.3...HEAD
+[Unreleased]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.18.4...HEAD
+[0.18.4]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.18.3...v0.18.4
 [0.18.3]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.18.2...v0.18.3
 [0.18.2]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.18.1...v0.18.2
 [0.18.1]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.18.0...v0.18.1
