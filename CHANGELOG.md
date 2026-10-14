@@ -9,6 +9,14 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
+### Changed
+
+- **Runtime dependencies updated, including two major versions.** `commander`
+  14 → 15 and `boxen` 8 → 9, plus `@clack/prompts` 1.8.1 and `figlet` 1.12.0.
+  Commands, flags, output and exit codes are unchanged, and both majors still
+  run on the Node versions this CLI supports (20.12 and later), so there is
+  nothing to do differently.
+
 ## [0.18.2] — 2026-10-14
 
 ### Added
