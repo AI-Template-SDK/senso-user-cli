@@ -185,10 +185,19 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      # npm's registry CDN can lag a few seconds behind a publish.
+      # npm's registry CDN can lag behind a publish, sometimes by more than a
+      # minute. Poll until this version resolves rather than guessing a delay.
       - name: Wait for the registry
         shell: bash
-        run: sleep 30
+        run: |
+          VERSION="${{ needs.verify.outputs.version }}"
+          for i in $(seq 1 30); do
+            if npm view "@senso-ai/cli@$VERSION" version >/dev/null 2>&1; then exit 0; fi
+            echo "Waiting for $VERSION on the registry ($i/30)…" >&2
+            sleep 10
+          done
+          echo "::error::@senso-ai/cli@$VERSION never appeared on the registry" >&2
+          exit 1
 
       - name: Install and run the published version
         shell: bash
