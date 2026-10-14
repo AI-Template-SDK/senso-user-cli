@@ -52,6 +52,7 @@
     "/org/content/{}/unpublish",
     "/org/content/{}/versions",
     "/org/credits/balance",
+    "/org/credits/upgrade-request",
     "/org/cta-assets/upload-url",
     "/org/ctas",
     "/org/ctas/default",

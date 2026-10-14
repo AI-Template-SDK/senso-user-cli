@@ -39,6 +39,7 @@ import { registerSkillsCommands } from "./commands/skills.js";
 import { registerSetupCommands } from "./commands/setup.js";
 import { registerMemberCommands } from "./commands/members.js";
 import { registerCreditsCommands } from "./commands/credits.js";
+import { registerRequestUpgradeCommand } from "./commands/request-upgrade.js";
 import { registerQuestionsCommands } from "./commands/questions.js";
 import { registerKBCommands } from "./commands/kb.js";
 import { registerPermissionsCommands } from "./commands/permissions.js";
@@ -182,6 +183,7 @@ export function createProgram(): Command {
   registerSetupCommands(program);
   registerMemberCommands(program);
   registerCreditsCommands(program);
+  registerRequestUpgradeCommand(program);
   registerQuestionsCommands(program);
   registerKBCommands(program);
   registerPermissionsCommands(program);
