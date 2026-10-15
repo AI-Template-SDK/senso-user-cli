@@ -68,6 +68,32 @@ vi.mock("node:os", async (importOriginal) => ({
 }));
 
 /**
+ * The OS opener, recorded instead of run.
+ *
+ * `login` now opens the approval page with or without a terminal, and a real
+ * `open` here would put a browser tab on the developer's screen for every test
+ * that starts a login. Each call records the program and its arguments, so a
+ * test can assert exactly which link would have opened. `execSync` is here
+ * because commands/update.ts imports it at module load.
+ */
+const opener = vi.hoisted(() => ({
+  calls: [] as { command: string; args: string[] }[],
+}));
+vi.mock("node:child_process", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("node:child_process")>()),
+  execFile: vi.fn((command: string, args: string[]) => {
+    opener.calls.push({ command, args });
+    return { unref: () => undefined };
+  }),
+  execSync: vi.fn(),
+}));
+
+/** Every URL the CLI asked the OS to open. */
+function openedUrls(): string[] {
+  return opener.calls.map(({ args }) => args[args.length - 1] ?? "");
+}
+
+/**
  * `process.platform`, pinned.
  *
  * The third input to the device name. Left to the machine, a test that expects
@@ -445,6 +471,118 @@ describe("login --complete, on success", () => {
 
     expect(res.exitCode).toBe(0);
     expect(storedConfig().apiKey).toBe(MINTED_KEY);
+  });
+});
+
+/** The approval page with the code filled in, as `login` prints and opens it. */
+const APPROVAL_URL = `${VERIFY_URL}?user_code=${USER_CODE}`;
+
+describe("login, on the one link it gives the person approving", () => {
+  // The approval page fills the code in from `user_code`, so the whole
+  // instruction is one link. An agent relays this text to a person; a second
+  // step ("now type the code") is the step people get wrong.
+
+  it("prints the pre-filled link without a terminal, worded to be relayed as it is", async () => {
+    withTerminal(false);
+    authorizeOk();
+
+    const res = await runCli(["login", "--no-browser"], { withKey: false });
+
+    expect(res.stdout).toContain(`Open ${APPROVAL_URL} and approve this device.`);
+    expect(res.stdout).toContain("senso login --complete` in the background");
+    expect(res.stdout).toContain("senso whoami");
+    expect(res.stdout).not.toContain("enter the code");
+  });
+
+  it("gives a JSON caller the pre-filled link beside the fields it already had", async () => {
+    withTerminal(false);
+    authorizeOk();
+
+    const res = await runCli(["login", "--output", "json"], { withKey: false });
+
+    expect(res.json()).toMatchObject({
+      verificationUriComplete: APPROVAL_URL,
+      verificationUri: VERIFY_URL,
+      userCode: USER_CODE,
+    });
+  });
+
+  it("prints the pre-filled link in a terminal, with no separate code to type", async () => {
+    withTerminal(true);
+    authorizeOk();
+    tokenAnswers(AUTHORIZED);
+    orgMeOk();
+
+    const res = await runCli(["login", "--no-browser"], { withKey: false });
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stderr).toContain(`Open ${APPROVAL_URL} and approve this device.`);
+    expect(res.stderr).not.toContain("Enter");
+  });
+
+  it("opens the pre-filled link without a terminal, and says so for the agent to relay", async () => {
+    // An agent on the user's machine has a browser beside it: the page should
+    // appear at once, with the agent's message as the fallback.
+    opener.calls = [];
+    withTerminal(false);
+    authorizeOk();
+
+    const res = await runCli(["login"], { withKey: false });
+
+    expect(res.exitCode).toBe(0);
+    expect(openedUrls()).toEqual([APPROVAL_URL]);
+    expect(res.stdout).toContain("Opening the approval page in your browser");
+    // The link is printed whatever the opener did: over SSH or in a container
+    // nothing opens, and the link is all the person has.
+    expect(res.stdout).toContain(`open ${APPROVAL_URL} and approve this device.`);
+  });
+
+  it("reports the attempt under --output json, without claiming a browser appeared", async () => {
+    opener.calls = [];
+    withTerminal(false);
+    authorizeOk();
+
+    const res = await runCli(["login", "--output", "json"], { withKey: false });
+
+    expect(res.json()).toMatchObject({
+      verificationUriComplete: APPROVAL_URL,
+      browserOpenAttempted: true,
+    });
+  });
+
+  it("opens nothing without a terminal when --no-browser is given", async () => {
+    opener.calls = [];
+    withTerminal(false);
+    authorizeOk();
+
+    const res = await runCli(["login", "--no-browser", "--output", "json"], { withKey: false });
+
+    expect(opener.calls).toEqual([]);
+    expect(res.json()).toMatchObject({ browserOpenAttempted: false });
+  });
+
+  it("opens the pre-filled link in a terminal too", async () => {
+    opener.calls = [];
+    withTerminal(true);
+    authorizeOk();
+    tokenAnswers(AUTHORIZED);
+    orgMeOk();
+
+    const res = await runCli(["login"], { withKey: false });
+
+    expect(res.exitCode).toBe(0);
+    expect(openedUrls()).toEqual([APPROVAL_URL]);
+  });
+
+  it("repeats the pre-filled link while --complete waits", async () => {
+    givenPendingLogin({ baseUrl: TEST_BASE_URL });
+    tokenAnswers(AUTHORIZED);
+    orgMeOk();
+
+    const res = await runCli(["login", "--complete"], { withKey: false });
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stderr).toContain(APPROVAL_URL);
   });
 });
 

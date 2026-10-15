@@ -29,6 +29,7 @@ import {
   pollDeviceToken,
   revokeStoredDeviceKey,
   startDeviceAuthorization,
+  verificationUriComplete,
   type DeviceKey,
 } from "../lib/device-auth.js";
 import { CliError, EXIT, toCliError } from "../lib/errors.js";
@@ -611,7 +612,7 @@ async function startDeviceLogin(ctx: Ctx, opts: LoginOptions): Promise<void> {
     : new Date(Date.now() + auth.expiresIn * 1000).toISOString();
 
   if (pending) {
-    log.dim("A login is already waiting for approval. This is the same code.");
+    log.dim("A login is already waiting for approval. This is the same link.");
   } else {
     // The resolved base URL, not the flag: `--complete` is a different process
     // and may not be given the same flag or environment, and a poll sent to a
@@ -626,14 +627,31 @@ async function startDeviceLogin(ctx: Ctx, opts: LoginOptions): Promise<void> {
     });
   }
 
+  // One link, the code already in it: the approval page fills the code in from
+  // `user_code`, so nobody types it.
+  const approvalUrl = verificationUriComplete(auth.verificationUri, auth.userCode);
+  const minutes = String(Math.round(auth.expiresIn / 60));
+
   if (!process.stdin.isTTY) {
-    // Here the code IS the payload — it is the entire result of this
-    // invocation, and the caller is a program that has to read it. The
-    // device_code never appears: it is a bearer secret and belongs only in the
-    // state file.
+    // Opened here too, not only in a terminal. An agent running on the user's
+    // machine has a browser beside it, and the page appearing at once is what
+    // makes the agent's message a fallback rather than the only way in. Over
+    // SSH, in a container or in CI the attempt finds nothing and the link
+    // below is what remains, so it is printed either way.
+    const browserOpenAttempted = opts.browser !== false && openBrowser(approvalUrl);
+
+    // Here the link IS the payload — it is the entire result of this
+    // invocation, and the caller is usually an agent that has to pass it to a
+    // person. The plain text is written to be relayed as it stands: one link,
+    // one thing to do, then what the agent runs next. The device_code never
+    // appears: it is a bearer secret and belongs only in the state file.
     emit(
       ctx,
       {
+        verificationUriComplete: approvalUrl,
+        // An opener was started; whether a browser appeared is unknowable here.
+        browserOpenAttempted,
+        // Kept for callers that already read them; the link above has both.
         verificationUri: auth.verificationUri,
         userCode: auth.userCode,
         expiresIn: auth.expiresIn,
@@ -643,10 +661,16 @@ async function startDeviceLogin(ctx: Ctx, opts: LoginOptions): Promise<void> {
       {
         plain: [
           "",
-          `  Open ${auth.verificationUri} and enter the code ${auth.userCode}`,
-          `  The code expires in ${String(Math.round(auth.expiresIn / 60))} minutes.`,
+          ...(browserOpenAttempted
+            ? [
+                "  Opening the approval page in your browser. If it did not open,",
+                `  open ${approvalUrl} and approve this device.`,
+              ]
+            : [`  Open ${approvalUrl} and approve this device.`]),
+          `  The link expires in ${minutes} minutes.`,
           "",
-          `  Then run: senso login --complete`,
+          "  Next: run `senso login --complete` in the background. It waits for the",
+          "  approval and stores the key. Run `senso whoami` once it finishes.",
           "",
         ],
       },
@@ -654,8 +678,8 @@ async function startDeviceLogin(ctx: Ctx, opts: LoginOptions): Promise<void> {
     return;
   }
 
-  announceCode(auth.verificationUri, auth.userCode, auth.expiresIn);
-  if (opts.browser !== false) openBrowser(auth.verificationUri);
+  announceApproval(approvalUrl, minutes);
+  if (opts.browser !== false) openBrowser(approvalUrl);
 
   const key = await pollUntilResolved({
     deviceCode: auth.deviceCode,
@@ -701,13 +725,14 @@ async function completeDeviceLogin(ctx: Ctx): Promise<void> {
   }
 
   // Two logins race on one state file and the last write wins, which orphans
-  // the first. Printing the code being waited on is what makes that visible
-  // rather than mystifying: it will not match the one on screen.
-  if (state.userCode) {
-    log.info(`Waiting for approval of code ${pc.bold(state.userCode)}`);
-  }
+  // the first. Printing the link being waited on is what makes that visible
+  // rather than mystifying: its code will not match the link the user opened.
+  log.info("Waiting for approval...");
   if (state.verificationUri) {
-    log.dim(`Approve it at ${state.verificationUri}`);
+    const approvalUrl = state.userCode
+      ? verificationUriComplete(state.verificationUri, state.userCode)
+      : state.verificationUri;
+    log.dim(`If you have not yet, open ${approvalUrl} and approve this device.`);
   }
 
   const baseUrl = ctx.baseUrl ?? state.baseUrl;
@@ -724,15 +749,12 @@ async function completeDeviceLogin(ctx: Ctx): Promise<void> {
   });
 }
 
-/** The code and the URL, on stderr, where a human can act on them. */
-function announceCode(verificationUri: string, userCode: string, expiresIn: number): void {
+/** The link, on stderr, where a human can act on it. */
+function announceApproval(approvalUrl: string, minutes: string): void {
   log.raw("");
-  log.raw(`  ${pc.bold("Approve this device to finish signing in.")}`);
+  log.raw(`  Open ${pc.cyan(approvalUrl)} and approve this device.`);
   log.raw("");
-  log.raw(`    1. Open   ${pc.cyan(verificationUri)}`);
-  log.raw(`    2. Enter  ${pc.bold(userCode)}`);
-  log.raw("");
-  log.dim(`The code expires in ${String(Math.round(expiresIn / 60))} minutes. Waiting...`);
+  log.dim(`The link expires in ${minutes} minutes. Waiting...`);
 }
 
 export function registerAuthCommands(program: Command): void {

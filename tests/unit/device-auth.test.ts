@@ -24,6 +24,7 @@ import {
   openBrowser,
   pollDeviceToken,
   startDeviceAuthorization,
+  verificationUriComplete,
 } from "../../src/lib/device-auth.js";
 import { CliError, EXIT } from "../../src/lib/errors.js";
 
@@ -306,5 +307,40 @@ describe("opening the verification page", () => {
     expect(() => {
       openBrowser("https://app.senso.ai/cli/verify");
     }).not.toThrow();
+  });
+});
+
+describe("the pre-filled approval link", () => {
+  // The approval page reads `user_code`, so this one link is everything the
+  // person approving needs. A malformed link sends them to a page with no code.
+
+  it("adds user_code to the bare page", () => {
+    expect(verificationUriComplete("https://docs.senso.ai/device", "ABCD-EFGH")).toBe(
+      "https://docs.senso.ai/device?user_code=ABCD-EFGH",
+    );
+  });
+
+  it("keeps a query string the page already has, adding exactly one user_code", () => {
+    expect(verificationUriComplete("https://docs.senso.ai/device?ref=cli", "ABCD-EFGH")).toBe(
+      "https://docs.senso.ai/device?ref=cli&user_code=ABCD-EFGH",
+    );
+  });
+
+  it("replaces a user_code the page URL already carries rather than adding a second", () => {
+    expect(verificationUriComplete("https://docs.senso.ai/device?user_code=OLD", "ABCD-EFGH")).toBe(
+      "https://docs.senso.ai/device?user_code=ABCD-EFGH",
+    );
+  });
+
+  it("leaves a trailing slash where it is", () => {
+    expect(verificationUriComplete("https://docs.senso.ai/device/", "ABCD-EFGH")).toBe(
+      "https://docs.senso.ai/device/?user_code=ABCD-EFGH",
+    );
+  });
+
+  it("still carries the code when the page URL will not parse", () => {
+    expect(verificationUriComplete("docs.senso.ai/device", "AB CD")).toBe(
+      "docs.senso.ai/device?user_code=AB%20CD",
+    );
   });
 });
