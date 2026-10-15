@@ -191,18 +191,20 @@ the key that approval mints. It works with or without a terminal — the only
 difference is the shape:
 
 ```bash
-senso login              # in a terminal: prints a code, then waits
+senso login              # in a terminal: prints the link, then waits
 ```
 
 ```bash
-senso login              # without one: prints the code and exits 0
+senso login              # without one: prints the link and exits 0
 senso login --complete   # waits for the approval and stores the key
 ```
 
 The split exists because an agent's shell usually shows a command's output only
-after it exits, so one blocking process would hide the code until it expired.
-Approval happens on the page the first command prints: sign in, type the code,
-confirm. The code lasts five minutes and the key it mints lasts seven days.
+after it exits, so one blocking process would hide the link until it expired.
+Approval happens on the link the first command prints, which has the code
+already filled in: sign in, pick the organization, authorize. `login` opens it
+in your default browser for you, with or without a terminal; `--no-browser`
+stops that. The link lasts five minutes and the key it mints lasts seven days.
 
 **`senso login` is safe to run twice.** If the key you already have still works,
 it says so and stops — no second code, no second key. That makes it harmless for

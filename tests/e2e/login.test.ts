@@ -96,10 +96,19 @@ describe("`senso login` without a terminal, which is the agent's path", () => {
     // surfaced until it exits — which is exactly how an agent host behaves —
     // so a single blocking process would hide the code for the whole five
     // minutes it was good for.
+    //
+    // --no-browser because this is the real binary: without it, `login` opens
+    // the approval page with the OS opener and puts a tab on the developer's
+    // screen. Opening is covered, with the opener recorded, in
+    // tests/commands/auth-device.test.ts.
     apiOpensAFlow();
     const configDir = freshConfigDir();
 
-    const res = await runSenso(["login"], { baseUrl: api.url, configDir, timeoutMs: 10_000 });
+    const res = await runSenso(["login", "--no-browser"], {
+      baseUrl: api.url,
+      configDir,
+      timeoutMs: 10_000,
+    });
 
     expect(res.code).toBe(0);
     expect(res.stdout).toContain(USER_CODE);
@@ -131,7 +140,11 @@ describe("`senso login` without a terminal, which is the agent's path", () => {
     api.respondWith("/org/me", { body: ORG });
     const configDir = freshConfigDir();
 
-    const started = await runSenso(["login"], { baseUrl: api.url, configDir, timeoutMs: 10_000 });
+    const started = await runSenso(["login", "--no-browser"], {
+      baseUrl: api.url,
+      configDir,
+      timeoutMs: 10_000,
+    });
     expect(started.code).toBe(0);
     expect(existsSync(join(configDir, "device-auth.json"))).toBe(true);
 

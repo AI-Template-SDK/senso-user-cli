@@ -9,6 +9,24 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
+### Changed
+
+- **`senso login` gives one link with the code already in it.** It prints and
+  opens `…/device?user_code=ABCD-EFGH` instead of the bare page plus a code to
+  type, because the approval page now fills the code in itself. Without a
+  terminal, the output is worded for an agent to pass on as it is — open the
+  link and approve the device, then run `senso login --complete` in the
+  background and `senso whoami` once it finishes — and `--output json` gains
+  `verificationUriComplete`. `verificationUri` and `userCode` are still there.
+
+- **`senso login` opens the approval page without a terminal, too.** Before, it
+  opened your browser only when run in a terminal; run by an agent, it printed
+  the link and nothing more. Now it opens the page either way, so it appears as
+  soon as an agent starts the login, and says so — the link is still printed,
+  for when nothing can open (SSH, containers, CI). `--output json` gains
+  `browserOpenAttempted`, which means an opener was started, not that a browser
+  appeared. `--no-browser` turns it off.
+
 ## [0.18.4] — 2026-10-14
 
 ### Changed

@@ -206,6 +206,31 @@ export async function startDeviceAuthorization(opts: {
   };
 }
 
+/**
+ * The approval page with the code already filled in: `<verification_uri>?user_code=ABCD-EFGH`.
+ *
+ * The page reads `user_code`, keeps only characters from the code alphabet
+ * (hyphen and case do not matter), and drops it from the address bar, so the
+ * person approving opens one link and never types the code. This is RFC 8628's
+ * `verification_uri_complete`, built here because the API returns only the bare
+ * `verification_uri`.
+ *
+ * Built with `URL`, so a page that already carries a query string or ends in a
+ * slash still gets exactly one well-formed parameter. A URI `URL` will not
+ * parse gets the parameter appended as text, so the code is never lost from
+ * the one line the user is shown.
+ */
+export function verificationUriComplete(verificationUri: string, userCode: string): string {
+  try {
+    const url = new URL(verificationUri);
+    url.searchParams.set("user_code", userCode);
+    return url.toString();
+  } catch {
+    const separator = verificationUri.includes("?") ? "&" : "?";
+    return `${verificationUri}${separator}user_code=${encodeURIComponent(userCode)}`;
+  }
+}
+
 export function clampInterval(seconds: number): number {
   return Math.min(Math.max(seconds, MIN_INTERVAL_SECONDS), MAX_INTERVAL_SECONDS);
 }
@@ -297,7 +322,11 @@ export async function pollDeviceToken(opts: {
 }
 
 /**
- * Opens the verification page, best-effort.
+ * Opens the verification page, best-effort, and says whether it tried.
+ *
+ * `true` means an opener was started, not that a browser appeared: the opener
+ * exits on its own and nothing waits for it, so a headless machine whose
+ * `xdg-open` finds no browser still reports `true`. Callers word it as "tried".
  *
  * Never awaited, never fatal, and never the only way to reach the page: the URL
  * and the code are on screen whatever happens here. Headless machines, an agent
@@ -308,11 +337,11 @@ export async function pollDeviceToken(opts: {
  * something a shell re-parses. On Windows that rules out `cmd /c start`, whose
  * argument handling is exactly the problem — `rundll32` takes the URL whole.
  */
-export function openBrowser(url: string): void {
+export function openBrowser(url: string): boolean {
   // Only ever a web page. This URL comes from the server's configuration, and
   // handing an arbitrary scheme to the OS opener is how "open the page" becomes
   // "run the thing".
-  if (!/^https?:\/\//i.test(url)) return;
+  if (!/^https?:\/\//i.test(url)) return false;
 
   const [command, args] =
     process.platform === "darwin"
@@ -328,8 +357,10 @@ export function openBrowser(url: string): void {
     const child = execFile(command, args, () => undefined);
     // Do not hold the event loop open waiting for a browser to exit.
     child.unref();
+    return true;
   } catch {
     // Spawning failed outright. The URL is already on screen.
+    return false;
   }
 }
 
