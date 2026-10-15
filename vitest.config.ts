@@ -31,6 +31,10 @@ export default defineConfig({
           environment: "node",
           globals: true,
           setupFiles: ["./tests/setup.ts"],
+          // Set before any module loads. picocolors decides whether to color
+          // when it is imported, and under CI=true it says yes — setting
+          // NO_COLOR in a beforeEach is too late to change its mind.
+          env: { NO_COLOR: "1" },
           include: [
             "tests/unit/**/*.test.ts",
             "tests/commands/**/*.test.ts",

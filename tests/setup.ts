@@ -74,7 +74,8 @@ beforeEach(() => {
   process.env.SENSO_NO_UPDATE_CHECK = "1";
 
   // Color codes would otherwise be interleaved through every assertion about
-  // what a command printed.
+  // what a command printed. vitest.config.ts sets this before anything loads,
+  // which is what picocolors sees; this restores it for any test that unset it.
   process.env.NO_COLOR = "1";
 
   // runAction sets process.exitCode rather than exiting, so it persists across
