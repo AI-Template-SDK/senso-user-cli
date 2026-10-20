@@ -9,6 +9,8 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
+## [0.18.6] — 2026-10-20
+
 ### Changed
 
 - **With no key, the hint asks whether the person has a Senso account before
@@ -966,7 +968,8 @@ get` showed the organization's locations and silently dropped its name, slug
 - First published release: authentication, search, content, ingestion,
   organization administration, and self-update.
 
-[Unreleased]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.18.5...HEAD
+[Unreleased]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.18.6...HEAD
+[0.18.6]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.18.5...v0.18.6
 [0.18.5]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.18.4...v0.18.5
 [0.18.4]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.18.3...v0.18.4
 [0.18.3]: https://github.com/AI-Template-SDK/senso-user-cli/compare/v0.18.2...v0.18.3
