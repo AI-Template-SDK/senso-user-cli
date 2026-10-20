@@ -327,6 +327,8 @@ describe("whoami, when the API answers", () => {
     expect(res.stdout).toBe("");
     expect(res.stderr).toContain("no API key found");
     expect(res.stderr).toContain("senso login");
+    // The command agents check sign-in with gives the hint every other command does.
+    expect(res.stderr).toContain("already have a Senso account");
   });
 
   it("reports the organization the key belongs to", async () => {

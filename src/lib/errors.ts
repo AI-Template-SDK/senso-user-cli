@@ -128,11 +128,21 @@ export class ExitSignal extends Error {
   }
 }
 
-/** The error every command hits first: no credential anywhere. */
+/**
+ * The error every command hits first: no credential anywhere.
+ *
+ * The hint is read by an agent at the moment it decides what to run next, and in full: it is
+ * command output, not a page it fetched and summarized. It used to offer only ways to sign in,
+ * and an agent setting Senso up for someone with no account read it and ran `senso login`,
+ * which hands that person a five-minute link to a sign-in page they cannot get past. No key on
+ * this machine says nothing about whether the person has an account, so the hint asks the
+ * agent to find out first, and names the steps at docs.senso.ai/llms.txt that do it. The
+ * three ways to authenticate stay, for scripts and CI that already have a key.
+ */
 export function missingApiKeyError(): CliError {
   return new CliError("Not authenticated: no API key found.", EXIT.AUTH, {
     code: "unauthorized",
-    hint: "Run `senso login`, set SENSO_API_KEY, or pass --api-key.",
+    hint: "This machine is not signed in. If you are setting Senso up, ask your user whether they already have a Senso account before running `senso login`: someone new signs up first, at https://docs.senso.ai/sign-up. The full setup steps for agents are at https://docs.senso.ai/llms.txt. Otherwise run `senso login`, set SENSO_API_KEY, or pass --api-key.",
   });
 }
 

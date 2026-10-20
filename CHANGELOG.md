@@ -9,6 +9,17 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
+### Changed
+
+- **With no key, the hint asks whether the person has a Senso account before
+  `senso login`.** "Not authenticated" means this machine has no key, not that
+  the person has no account, but the hint offered only ways to sign in, and an
+  agent setting Senso up for someone new ran `senso login` for a person with no
+  account to approve it with. The hint now tells an agent to ask first, links
+  sign-up and the setup steps at https://docs.senso.ai/llms.txt, and still lists
+  `senso login`, `SENSO_API_KEY` and `--api-key`. `senso whoami` gives the same
+  hint as every other command. `error.code` is unchanged.
+
 ## [0.18.5] — 2026-10-15
 
 ### Changed
