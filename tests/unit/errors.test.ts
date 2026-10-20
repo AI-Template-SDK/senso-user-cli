@@ -76,6 +76,17 @@ describe("the errors every command can raise", () => {
     expect(err.hint).toContain("--api-key");
   });
 
+  it("asks an agent to check for an account before `senso login`, and says where to sign up", () => {
+    // No key on this machine says nothing about whether the person has an account. An agent
+    // that read only "Run `senso login`" ran it for someone who had none.
+    const hint = missingApiKeyError().hint ?? "";
+
+    expect(hint.indexOf("Senso account")).toBeGreaterThan(-1);
+    expect(hint.indexOf("Senso account")).toBeLessThan(hint.indexOf("Otherwise run `senso login`"));
+    expect(hint).toContain("https://docs.senso.ai/sign-up");
+    expect(hint).toContain("https://docs.senso.ai/llms.txt");
+  });
+
   it("treats malformed --data as a usage error and shows the quoting", () => {
     const err = invalidJsonError("--data");
 

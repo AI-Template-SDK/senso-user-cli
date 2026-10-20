@@ -32,7 +32,7 @@ import {
   verificationUriComplete,
   type DeviceKey,
 } from "../lib/device-auth.js";
-import { CliError, EXIT, toCliError } from "../lib/errors.js";
+import { CliError, EXIT, missingApiKeyError, toCliError } from "../lib/errors.js";
 import { emit, emitConfirmation } from "../lib/output.js";
 import { runAction, type Ctx } from "../lib/run-action.js";
 import { banner } from "../utils/branding.js";
@@ -832,12 +832,9 @@ export function registerAuthCommands(program: Command): void {
         // this command actually used, not a second guess at the same chain.
         const { key: apiKey, source, shadowed } = resolveApiKey({ apiKey: ctx.apiKey });
 
-        if (!apiKey) {
-          throw new CliError("Not authenticated: no API key found.", EXIT.AUTH, {
-            code: "unauthorized",
-            hint: "Run `senso login`, set SENSO_API_KEY, or pass --api-key.",
-          });
-        }
+        // The same error as every other command, so whoami, the command agents check
+        // sign-in with, gives the same hint.
+        if (!apiKey) throw missingApiKeyError();
 
         const config = readConfig();
 
