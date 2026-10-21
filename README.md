@@ -110,7 +110,7 @@ command, globally, so every agent on the machine can use them:
 senso setup
 ```
 
-It installs the nine official skills for every supported agent, installs only
+It installs the ten official skills for every supported agent, `senso-onboarding` among them,, installs only
 what is missing or out of date (on a current machine it says "up to date" and
 changes nothing), and removes the retired `evaluate-remediate`. Pass `--local`
 to scope it to the current project, or `--agent <name>` to target one agent.

@@ -53,15 +53,18 @@ export interface OfficialSkill {
   kind: "flow" | "module";
 }
 
-// Mirrors the skills published from the senso-skills repository. This list
-// drifted once already — senso-onboarding shipped from senso-contextos and was
-// never added here — so tests/policy/repo-rules.test.ts compares it against a
-// fixture.
+// Mirrors the skills published from the senso-skills repository, so
+// tests/policy/repo-rules.test.ts compares it against a fixture: it drifted
+// once already. senso-onboarding is the exception that proves it — its 1.x was
+// a hackathon skill shipped from senso-contextos and never listed here; 2.0.0
+// is the first run, published from senso-skills with the rest, and
+// docs.senso.ai tells an agent to run `senso setup` and use it.
 //
-// ONE SET, NOT A MENU. The nine cross-reference each other by heading, so a
+// ONE SET, NOT A MENU. The ten cross-reference each other by heading, so a
 // partial install is broken by construction; `--all` and `setup` always mean
-// all nine. Ordered as a first run uses them, flows before modules.
+// all ten. Ordered as a first run uses them, flows before modules.
 export const OFFICIAL_SKILLS: readonly OfficialSkill[] = [
+  { package: "senso-ai/senso-onboarding", kind: "flow" },
   { package: "senso-ai/senso-quickstart", kind: "flow" },
   { package: "senso-ai/senso-verification-loop-setup", kind: "flow" },
   { package: "senso-ai/senso-verification-loop", kind: "flow" },
@@ -300,7 +303,7 @@ export async function listInstalled(global: boolean): Promise<Record<string, Ins
  * one registry call.
  *
  * One `search` rather than an `info` per skill: the registry rate-limits, and
- * nine lookups on top of nine installs is what an agent re-running `setup`
+ * ten lookups on top of ten installs is what an agent re-running `setup`
  * would trip it with. `shipables update` is no help — 0.1.2 reports every
  * skill as up to date with its latest version "unknown".
  */
@@ -363,7 +366,7 @@ export function registerSkillsCommands(program: Command): void {
   skills
     .command("install [names...]")
     .description(
-      `Install Senso agent skills. With no names, or --all, installs the nine official skills as one set: ${OFFICIAL_SKILLS.map((s) => shortName(s.package)).join(", ")}. They reference each other, so install them together; a single name still works and warns. \`senso setup\` installs the set globally in one step.`,
+      `Install Senso agent skills. With no names, or --all, installs the ten official skills as one set: ${OFFICIAL_SKILLS.map((s) => shortName(s.package)).join(", ")}. They reference each other, so install them together; a single name still works and warns. \`senso setup\` installs the set globally in one step.`,
     )
     .option("--all", "Install every official Senso skill")
     .option(

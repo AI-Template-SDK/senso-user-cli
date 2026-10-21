@@ -5,9 +5,9 @@
  * A named shortcut for what a first run always wants, and what every later run
  * should converge on:
  *
- *   1. Work out which of the nine are missing or behind the registry, from
+ *   1. Work out which of the ten are missing or behind the registry, from
  *      shipables' own record and one registry search. A machine that already
- *      has all nine at their latest versions installs nothing and says "up to
+ *      has all ten at their latest versions installs nothing and says "up to
  *      date" — an agent can run this at the start of every session.
  *   2. Install those, and only those. The install loop is the one
  *      `skills install` uses, so the two cannot come to mean different things.
@@ -131,7 +131,7 @@ export function registerSetupCommands(program: Command): void {
   program
     .command("setup")
     .description(
-      "Install the nine official Senso skills globally, for every supported agent (Claude Code, Cursor, Codex, Copilot, Gemini CLI, Cline), and remove retired ones such as evaluate-remediate. Installs only what is missing or out of date; on a machine that is current it changes nothing and says so. Use --local to scope it to the current project instead.",
+      "Install the ten official Senso skills globally, for every supported agent (Claude Code, Cursor, Codex, Copilot, Gemini CLI, Cline), and remove retired ones such as evaluate-remediate. Installs only what is missing or out of date; on a machine that is current it changes nothing and says so. Use --local to scope it to the current project instead.",
     )
     .option(
       "--agent <name>",

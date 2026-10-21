@@ -8,7 +8,7 @@
  *   - `--global` is present unless someone asked for `--local`, and a global
  *     install names every supported agent rather than shipables' `--all`, which
  *     means only the agents it happens to detect from the current directory;
- *   - a machine with all nine at their latest versions installs nothing and
+ *   - a machine with all ten at their latest versions installs nothing and
  *     says "up to date", so an agent can run it every session;
  *   - a retired skill is removed only after every install succeeded, and is
  *     removed from disk even when shipables has no record of it — `shipables
@@ -237,7 +237,7 @@ describe("setup, when it cannot tell what is installed", () => {
 });
 
 describe("setup, on the argv it hands to shipables", () => {
-  it("installs all nine, globally, naming every supported agent", async () => {
+  it("installs all ten, globally, naming every supported agent", async () => {
     const res = await runCli(["setup"]);
 
     expect(res.exitCode).toBe(0);
@@ -247,7 +247,7 @@ describe("setup, on the argv it hands to shipables", () => {
     // --yes is what stops the child prompting where nobody can answer.
     expect(calls("install")[0]?.args).toEqual([
       "install",
-      "senso-ai/senso-quickstart",
+      "senso-ai/senso-onboarding",
       ...ALL_AGENT_FLAGS,
       "--global",
       "--env",
@@ -315,7 +315,7 @@ describe("setup, on the argv it hands to shipables", () => {
 });
 
 describe("setup, on a machine that already has the skills", () => {
-  it("installs nothing and says up to date when all nine are current", async () => {
+  it("installs nothing and says up to date when all ten are current", async () => {
     everythingCurrent();
 
     const res = await runCli(["setup"]);
@@ -459,6 +459,7 @@ describe("setup, on what it reports", () => {
 
     expect(res.json()).toEqual({
       installed: [
+        "onboarding",
         "quickstart",
         "verification-loop-setup",
         "verification-loop",
