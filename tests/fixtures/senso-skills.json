@@ -1,8 +1,9 @@
 {
-  "_comment": "The official Senso agent skills, as published to the Shipables registry from the senso-skills repository. src/commands/skills.ts must list exactly these. Maintained by hand: a mismatch means either the registry moved or the CLI's list did. These nine superseded the five workflow skills; senso-evaluate-remediate is retired (a tombstone in the registry) and `senso setup` removes it.",
+  "_comment": "The official Senso agent skills, as published to the Shipables registry from the senso-skills repository. src/commands/skills.ts must list exactly these. Maintained by hand: a mismatch means either the registry moved or the CLI's list did. These superseded the five workflow skills; senso-evaluate-remediate is retired (a tombstone in the registry) and `senso setup` removes it. senso-onboarding joined at 2.0.0, the first run before any key exists.",
   "_source": "https://github.com/tenzin-senso/senso-skills",
-  "_captured": "2026-09-29",
+  "_captured": "2026-10-21",
   "skills": [
+    "senso-ai/senso-onboarding",
     "senso-ai/senso-quickstart",
     "senso-ai/senso-verification-loop-setup",
     "senso-ai/senso-verification-loop",

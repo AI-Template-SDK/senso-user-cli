@@ -9,6 +9,17 @@ mattered, and what you need to do differently.
 
 ## [Unreleased]
 
+### Added
+
+- **`senso setup` installs `senso-onboarding`**, the first run before any key
+  exists: it asks whether the person has a Senso account (or was invited)
+  before anything is signed in, then runs the browser approval and hands over
+  to Shared Context or the Verification Loop. docs.senso.ai now tells an agent
+  to install the CLI, run `senso setup` and use this skill, in place of the
+  steps it used to serve. The official set is ten. Publish
+  `@senso-ai/senso-onboarding` 2.0.0 before releasing this, or `senso setup`
+  has a skill it cannot find.
+
 ## [0.18.6] — 2026-10-20
 
 ### Changed

@@ -28,7 +28,7 @@ Generated from the command tree of `@senso-ai/cli`. Every command accepts the [g
 - [`senso prompts`](#senso-prompts) — Manage prompts (GEO questions).
 - [`senso run-config`](#senso-run-config) — Configure which AI models are used for question runs and on which days they run.
 - [`senso skills`](#senso-skills) — Install and manage Senso agent skills.
-- [`senso setup`](#senso-setup) — Install the nine official Senso skills globally, for every supported agent (Claude Code, Cursor, Codex, Copilot, Gemini CLI, Cline), and remove retired ones such as evaluate-remediate.
+- [`senso setup`](#senso-setup) — Install the ten official Senso skills globally, for every supported agent (Claude Code, Cursor, Codex, Copilot, Gemini CLI, Cline), and remove retired ones such as evaluate-remediate.
 - [`senso members`](#senso-members) — View the organization member directory.
 - [`senso credits`](#senso-credits) — View your organization's credit balance.
 - [`senso request-upgrade`](#senso-request-upgrade) — Ask the Senso team to upgrade your organization, or to follow up on something, and notify them.
@@ -1541,7 +1541,7 @@ senso skills [options] [command]
 
 ### senso skills install
 
-Install Senso agent skills. With no names, or --all, installs the nine official skills as one set: quickstart, verification-loop-setup, verification-loop, shared-context-setup, shared-context, context-layer, gap-report, generate-verify, publish. They reference each other, so install them together; a single name still works and warns. `senso setup` installs the set globally in one step.
+Install Senso agent skills. With no names, or --all, installs the ten official skills as one set: onboarding, quickstart, verification-loop-setup, verification-loop, shared-context-setup, shared-context, context-layer, gap-report, generate-verify, publish. They reference each other, so install them together; a single name still works and warns. `senso setup` installs the set globally in one step.
 
 ```
 senso skills install [options] [names...]
@@ -1587,7 +1587,7 @@ senso skills remove [options] <name>
 
 ## senso setup
 
-Install the nine official Senso skills globally, for every supported agent (Claude Code, Cursor, Codex, Copilot, Gemini CLI, Cline), and remove retired ones such as evaluate-remediate. Installs only what is missing or out of date; on a machine that is current it changes nothing and says so. Use --local to scope it to the current project instead.
+Install the ten official Senso skills globally, for every supported agent (Claude Code, Cursor, Codex, Copilot, Gemini CLI, Cline), and remove retired ones such as evaluate-remediate. Installs only what is missing or out of date; on a machine that is current it changes nothing and says so. Use --local to scope it to the current project instead.
 
 ```
 senso setup [options]

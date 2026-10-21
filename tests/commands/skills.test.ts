@@ -104,7 +104,7 @@ function argv(n = 0): string[] {
   return invocations()[n]?.args ?? [];
 }
 
-const SKILL_COUNT = 9;
+const SKILL_COUNT = 10;
 
 beforeEach(() => {
   child.state.calls = [];
